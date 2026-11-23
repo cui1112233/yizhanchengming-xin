@@ -241,6 +241,19 @@ function textReceiptForBook(record, book) {
   return record && (!record.kind || record.kind === 'text') && (!record.bookId || record.bookId === book?.id);
 }
 
+export function textPublishStatus(record) {
+  if (!record) return '';
+  if (['published', 'failed', 'upload_incomplete'].includes(record.status)) return record.status;
+  return record.phase === 'uploading' ? 'uploading' : record.status || '';
+}
+
+export function textPublishImageProgress(record) {
+  if (textPublishStatus(record) !== 'uploading') return '';
+  const ids = Array.isArray(record.imageIds) ? record.imageIds : [];
+  const total = Number(record.pageCount) || ids.length;
+  return total ? `已上传图片 ${ids.filter(id => Number(id) > 0).length} / ${total}` : '';
+}
+
 function confirmedTextReceipt(record, book) {
   return Boolean(textReceiptForBook(record, book) && record.status === 'published' && Number(record.carouselId) > 0
     && Array.isArray(record.imageIds) && record.imageIds.length && record.imageIds.every(id => Number(id) > 0)
@@ -252,6 +265,7 @@ function textBookTimeline(book, summary) {
   const matchesBook = textReceiptForBook(record, book);
   const confirmed = confirmedTextReceipt(record, book);
   const published = confirmed || confirmedTextReceipt(summary?.textLastPublishedRecord, book);
+  const publishStatus = textPublishStatus(record);
   const awaitingReceipt = matchesBook && ['pending', 'accepted', 'submitted', 'upload_pending_confirm'].includes(record.status);
   return Object.entries(textStageCopy).map(([key, copy]) => {
     const manualUpload = key === 'text_publish' && matchesBook && summary.textPublishSource === 'manual';
@@ -260,9 +274,10 @@ function textBookTimeline(book, summary) {
     let receiptMessage = '';
     if (key === 'text_publish') {
       const current = matchesBook && textReceiptMatchesRun(record, run, summary.runs);
-      if (current) receiptMessage = record.message || record.errorMessage || '';
+      if (current) receiptMessage = [record.message || record.errorMessage, textPublishImageProgress(record)].filter(Boolean).join(' · ');
       if (current && confirmed) status = 'completed';
-      else if (current && ['failed','upload_incomplete'].includes(record.status)) status = 'failed';
+      else if (current && ['failed','upload_incomplete'].includes(publishStatus)) status = 'failed';
+      else if (current && publishStatus === 'uploading') status = 'running';
       else if (status === 'completed' || (status === 'pending' && current && awaitingReceipt)) status = 'running';
     }
     const label = copy[status] || stageLabel('runtime', key);
@@ -278,7 +293,9 @@ function textBookState(book, summary, runMode, textAutoUpload, automationBook, m
   if (upload.status === 'completed') {
     return { ...base, ...upload, tone: 'green', published: true, terminal: true };
   }
-  if (summary?.textPublishSource === 'manual' && upload.status === 'running') return { ...base, ...upload, tone:'blue' };
+  if (upload.status === 'running' && (summary?.textPublishSource === 'manual' || automationBook?.stage === 'text_publish')) {
+    return { ...base, ...upload, tone:'blue' };
+  }
   const failed = summary?.textPublishSource === 'manual' && upload.status === 'failed' ? upload : timeline.find(step => step.status === 'failed');
   if (failed) return { ...base, ...failed, tone: 'red', failedStep: failed };
   if (taskState(automationBook) === 'failed' && !automationBook.stale) {

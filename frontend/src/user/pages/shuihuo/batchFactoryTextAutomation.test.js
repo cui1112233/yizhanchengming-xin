@@ -85,8 +85,10 @@ test('批量重试先确认和选合集，再一次提交所有同意的自动�
   const firstWrite=events.findIndex(Array.isArray);
   assert.ok(events.slice(0,firstWrite).includes('select:b2'));
   assert.ok(events.slice(0,firstWrite).includes('confirm:cancel'));
+  const requestKey=events.find(Array.isArray)[3].b.requestKey;
+  assert.ok(requestKey);
   assert.deepEqual(events.filter(Array.isArray),[
-    ['retry','batch',['b','b2'],{b:{collectionId:'c-b',force:true},b2:{collectionId:'chosen-b2',force:false}}],
+    ['retry','batch',['b','b2'],{b:{collectionId:'c-b',force:true,requestKey},b2:{collectionId:'chosen-b2',force:false}}],
     ['manual','batch','manual','manual-current',{force:true}]
   ]);
 });
@@ -102,7 +104,45 @@ test('失败的自动重传仍带有旧成功回执时，取消保留旧回执�
   assert.equal((await retry(false)).submitted,0);
   assert.equal(calls.length,0);
   assert.equal((await retry(true)).submitted,1);
-  assert.deepEqual(calls,[['batch',['book'],{book:{collectionId:'c',force:true}}]]);
+  const requestKey=calls[0][2].book.requestKey;
+  assert.ok(requestKey);
+  assert.deepEqual(calls,[['batch',['book'],{book:{collectionId:'c',force:true,requestKey}}]]);
+});
+
+test('中断上传携带原请求编号继续已收图片，历史回执不触发强制重传',async()=>{
+  const record={status:'uploading',phase:'uploading',requestKey:'keep-me',imageIds:[2,0,3],pageCount:3};
+  const status={published:false,publish:record,lastPublished:{status:'published'}};
+  for(const rec of [record,{...record,status:'pending'}]){
+    assert.deepEqual(helpers.textUploadControl({id:'c'},{...status,publish:rec}),{
+      label:'继续上传',disabled:false,force:false,requestKey:'keep-me'
+    });
+  }
+  const calls=[];
+  const api={getTextPublishStatus:async()=>status,publishTextCollection:async(...args)=>calls.push(args)};
+  const item={book:{id:'b'},stage:'text_publish',summary:{textPublishSource:'manual',textPublishRecord:{...record,collectionId:'c'}}};
+  const result=await helpers.retryTextBooks(api,'batch',[item],{confirmRepublish:()=>{throw Error('不应要求强制重传')}});
+  assert.deepEqual(result.errors,[]);
+  assert.deepEqual(calls,[['batch','b','c',{force:false,requestKey:'keep-me'}]]);
+  api.retryBatchAutomation=async(...args)=>calls.push(args);
+  await helpers.retryTextBooks(api,'batch',[{...item,automatic:true,summary:{runs:[{id:'r',stage:'text_publish',collectionId:'c'}]}}],{});
+  assert.deepEqual(calls[1],['batch',['b'],{b:{collectionId:'c',force:false,requestKey:'keep-me'}}]);
+});
+
+test('同次确认丢响应后重放原批量请求，下次确认才换上传编号',async()=>{
+  const calls=[];
+  let prompts=0;
+  const api={getTextPublishStatus:async()=>({publish:{status:'failed'},lastPublished:{status:'published'}}),
+    retryBatchAutomation:async(...args)=>{calls.push(args);if(calls.length===1)throw Error('连接中断')}};
+  const item={book:{id:'b'},stage:'text_publish',automatic:true,summary:{runs:[{id:'r',stage:'text_publish',collectionId:'replay-c'}]}};
+  const retry=()=>helpers.retryTextBooks(api,'replay-batch',[item],{confirmRepublish:()=>{prompts++;return true}});
+  assert.equal((await retry()).submitted,0);
+  assert.equal((await retry()).submitted,1);
+  assert.equal(prompts,1);
+  assert.ok(calls[0][2].b.requestKey);
+  assert.deepEqual(calls[0],calls[1]);
+  assert.equal((await retry()).submitted,1);
+  assert.equal(prompts,2);
+  assert.notEqual(calls[2][2].b.requestKey,calls[1][2].b.requestKey);
 });
 
 test('已选文本进入自动生产接口，日志收录手动上传回执',()=>{
@@ -132,7 +172,7 @@ test('混选漫画与文本会在提交前提示分开选择', () => {
 
 const browser = [process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(path => path && existsSync(path));
-async function runChrome(contents) {
+async function runChrome(contents, budget = 16000) {
   const dir = mkdtempSync(join(tmpdir(),'text-publish-'));
   try {
     const result = await build({stdin:{resolveDir:here,loader:'jsx',contents},jsx:'automatic',bundle:true,write:false,format:'iife',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"production"'},minify:true});
@@ -140,7 +180,7 @@ async function runChrome(contents) {
     const html=join(dir,'index.html');
     writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="app.js"></script>');
     const dom=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking',
-      '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget=16000',
+      '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget='+budget,
       '--dump-dom',pathToFileURL(html).href],{timeout:45000,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']});
     assert.ok(dom.includes('data-result="passed"'),dom.match(/data-error="([^"]*)"/)?.[1] || '浏览器未完成验证');
   } finally { rmSync(dir,{recursive:true,force:true,maxRetries:4,retryDelay:150}); }
@@ -192,6 +232,84 @@ test('Chrome 点击上传、取消和确认再次上传，等待回读期间不�
       }
       run().catch(e=>document.body.dataset.error=e.message);
     `);
+});
+
+test('Chrome 重开媒体库后沿用原上传记录，轮询图片数量、回执和最终失败提示', {skip:!browser},async()=>{
+  await runChrome(`
+    import React from 'react';
+    import {createRoot} from 'react-dom/client';
+    import TextMediaPanel from './TextMediaPanel.jsx';
+    const root=createRoot(document.querySelector('#root'));
+    const sleep=n=>new Promise(resolve=>setTimeout(resolve,n));
+    async function until(check){for(let i=0;i<600;i++){if(check())return;await sleep(20)}throw Error(document.body.innerText)}
+    const button=s=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()===s);
+    const history={status:'published',carouselId:9,imageIds:[2,3,4]};
+    const posts=[];
+    let publish,reads=0,failOnce=false;
+    window.confirm=()=>{throw Error('继续上传不应触发强制重传确认')};
+    window.fetch=async(url,options={})=>{
+      const path=String(url).split('?')[0];
+      let data={};
+      if(path.endsWith('/text-pages'))data={pages:[],artifacts:[]};
+      else if(path.endsWith('/text-collections'))data={items:[{id:'c',status:'ready'}]};
+      else if(path.endsWith('/text-collections/c'))data={id:'c',status:'ready'};
+      else if(path.endsWith('/text-collections/c/publish')){
+        if(options.method==='POST'){
+          posts.push(JSON.parse(options.body));
+          publish={...publish,status:'pending',phase:'create_unknown',message:'正在核对平台回执'};
+        }else{
+          reads++;if(failOnce){failOnce=false;return new Response('{"error":"服务暂不可用"}',{status:503})}
+        }
+        data={published:publish.status==='published',publish,lastPublished:history};
+      }
+      return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}})
+    };
+    async function run(){
+      for(const [index,end] of ['published','failed'].entries()){
+        publish={status:index?'pending':'uploading',phase:'uploading',requestKey:'original-'+index,
+          intentId:'same-intent-'+index,imageIds:[71,0,0],pageCount:3,message:'正在补传剩余图片'};
+        root.render(<TextMediaPanel key={index} batchId="batch" book={{id:'book',title:'测试'}} initialTab="collections"/>);
+        await until(()=>button('继续上传')&&!button('继续上传').disabled&&document.body.innerText.includes('1 / 3'));
+        if(!document.body.innerText.includes('正在补传剩余图片'))throw Error('未显示后端消息');
+        if(index===0){
+          failOnce=true;publish={...publish,imageIds:[71,72,0]};
+          await until(()=>button('继续上传')&&!button('继续上传').disabled&&document.body.innerText.includes('2 / 3'));
+        }
+        button('继续上传').click();await until(()=>button('等待上传确认'));
+        if(posts.length!==index+1||posts[index].force!==false||posts[index].requestKey!=='original-'+index)throw Error('继续上传未沿用请求编号');
+        publish={...publish,status:end,phase:end==='published'?'confirmed':'failed',message:'',errorMessage:end==='failed'?'图片审核失败':''};
+        await until(()=>end==='failed'?document.body.innerText.includes('图片审核失败'):document.body.innerText.includes('已上传')&&button('再次上传'));
+      }
+      const before=reads;await sleep(3400);if(reads!==before)throw Error('失败后仍在轮询');
+      document.body.dataset.result='passed';root.unmount();
+    }run().catch(e=>document.body.dataset.error=e.message);
+  `,24000);
+});
+
+test('Chrome 页面重载后只重放同一次确认，成功后新确认使用新的编号', {skip:!browser},async()=>{
+  await runChrome(`
+    import {retryTextBooks} from './batchFactoryNovelListHelpers.js';
+    async function run(){
+      const step=Number(sessionStorage.getItem('reloadStep')||0);
+      const prior=sessionStorage.getItem('beforeReload');
+      const book={id:'book'};
+      const item={book,automatic:true,stage:'text_publish',summary:{runs:[{id:'r',stage:'text_publish',collectionId:'c'}]}};
+      let prompts=0,key='';
+      const api={getTextPublishStatus:async()=>({publish:{status:'failed'},lastPublished:{status:'published'}}),
+        retryBatchAutomation:async(batch,ids,overrides)=>{key=overrides.book.requestKey;if(!step)throw Error('回复丢失')}};
+      const retry=()=>retryTextBooks(api,'batch',[item],{confirmRepublish:()=>{prompts++;return true}});
+      await retry();
+      if(!key)throw Error('缺少上传编号');
+      if(!step){
+        if(prompts!==1)throw Error('未确认');
+        sessionStorage.setItem('beforeReload',key);sessionStorage.setItem('reloadStep','1');location.reload();return;
+      }
+      if(prompts||key!==prior)throw Error('刷新后重复确认或更换了上传编号');
+      await retry();
+      if(prompts!==1||key===prior)throw Error('新确认须使用新编号');
+      document.body.dataset.result='passed';
+    }run().catch(e=>document.body.dataset.error=e.message)
+  `);
 });
 
 test('Chrome 在生产表重试手动上传、打开日志并立即执行所选文本书', {skip:!browser}, async () => {
@@ -270,7 +388,7 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
       const requests=posts.filter(x=>x.path.endsWith('automation/retry'));
       const sent=requests[0].payload, forced=sent.textPublishOverrides?.b, normal=sent.textPublishOverrides?.b2;
       if(requests.length!==1||sent.bookIds.join(',')!=='b,b2'||forced?.collectionId!=='c'||forced.force!==true||
-        normal?.collectionId!=='choose-b2'||normal.force!==false)throw Error('两本书未按各自选集和确认状态一起提交');
+        !forced.requestKey||normal?.collectionId!=='choose-b2'||normal.force!==false)throw Error('两本书未按各自选集和确认状态一起提交');
       document.body.dataset.result='passed';root.unmount();
     }
     run().catch(e=>document.body.dataset.error=e.message);

@@ -82,7 +82,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         root.render(<TextMediaDialog batchId="a" book={{id:'b',title:'测试书',revision:7}} onUpload={()=>{publishes++;collection.status='uploaded'}} onClose={()=>root.unmount()} />);
         await until(()=>document.body.innerText.includes('只有一句。'));
         if(!button('在完整句子后拆页').disabled)throw Error('单句页仍能拆分');
-        button('更新文字页').click();await until(()=>reads>=2&&!button('更新文字页').disabled);
+        button('更新文字页').click();await until(()=>reads>=2&&button('更新文字页')?.disabled===false);
         if(!button('在完整句子后拆页').disabled)throw Error('空句末列表仍可拆分');
         single=false;button('更新文字页').click();
         await until(()=>document.body.innerText.includes('第一段完整。'));
@@ -135,11 +135,11 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         button('恢复系统生成').click();await sleep(80);if(restores!==0)throw Error('取消后仍然恢复');
         confirmRestore=true;button('恢复系统生成').click();await until(()=>!button('恢复系统生成')&&restores===1);
         if(!mutations.some(([url,body])=>url.endsWith('/p2/render')&&JSON.parse(body).expectedRevision===5))throw Error('未用解锁后的页版本重新出图');
-        button('上一页').click();await until(()=>button('在完整句子后拆页')&&!button('在完整句子后拆页').disabled);
+        button('上一页').click();await until(()=>button('在完整句子后拆页')?.disabled===false);
         button('在完整句子后拆页').click();await until(()=>mutations.some(([url,b])=>url.endsWith('/p1/split')&&JSON.parse(b).offset===6&&JSON.parse(b).expectedRevision===4));
-        await until(()=>!button('与下一页合并').disabled);button('与下一页合并').click();
+        await until(()=>button('与下一页合并')?.disabled===false);button('与下一页合并').click();
         await until(()=>mutations.some(([url,b])=>url.endsWith('/p1/merge')&&JSON.parse(b).expectedRevision===4));
-        await until(()=>!button('封面').disabled);
+        await until(()=>button('封面')?.disabled===false);
         button('封面').click();await until(()=>document.body.innerText.includes('测试书')&&!document.body.innerText.includes('第二段完整。'));
         upload('上传成品封面');await until(()=>button('恢复系统生成'));
         confirmRestore=false;button('恢复系统生成').click();await sleep(80);if(restores!==1)throw Error('取消恢复封面未生效');
@@ -147,12 +147,12 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         if(!mutations.some(([url,b])=>url.endsWith('text-cover/render')&&JSON.parse(b).expectedRevision===5))throw Error('未重新生成封面');
         button('文本合集').click();await until(()=>document.body.innerText.includes('暂无文本合集'));
         ready=true;button('文字页').click();await until(()=>button('更新文字页'));
-        button('更新文字页').click();await until(()=>!button('合成当前书').disabled);
-        button('合成当前书').click();await until(()=>button('重新合成')&&!button('上传网络').disabled);
+        button('更新文字页').click();await until(()=>button('合成当前书')?.disabled===false);
+        button('合成当前书').click();await until(()=>button('重新合成')&&button('上传网络')?.disabled===false);
         button('上传网络').click();await until(()=>button('再次上传'));
         confirmRestore=false;button('再次上传').click();await sleep(50);if(publishes!==1)throw Error('取消后重复上传');
-        confirmRestore=true;await until(()=>!button('再次上传').disabled);button('再次上传').click();await sleep(100);
-        await until(()=>publishes===2&&!button('关闭文本媒体库').disabled);
+        confirmRestore=true;await until(()=>button('再次上传')?.disabled===false);button('再次上传').click();await sleep(100);
+        await until(()=>publishes===2&&button('关闭文本媒体库')?.disabled===false);
         esc();await until(()=>!document.querySelector('.text-media-panel'));
         if(requests.some(([url,m])=>m!=='PUT'&&!url.includes('/text-')&&!url.includes('/client-errors')))throw Error('文本库请求了其他模式接口');
         document.body.dataset.result='passed'

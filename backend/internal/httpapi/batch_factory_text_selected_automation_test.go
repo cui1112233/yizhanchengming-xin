@@ -137,7 +137,7 @@ func TestSignedTextRetryTwoBooksCreatesOnlyConfirmedRepublish(t *testing.T) {
 		t.Fatal(err)
 	}
 	ids := []string{}
-	overrides := map[string]any{}
+	overrides := map[string]map[string]any{}
 	for i, book := range batch.Books {
 		ids = append(ids, book.ID)
 		scope := txt.Scope{Owner: "alice", BatchID: batch.ID, BookID: book.ID}
@@ -150,6 +150,9 @@ func TestSignedTextRetryTwoBooksCreatesOnlyConfirmedRepublish(t *testing.T) {
 		}
 		entries[book.ID] = map[string]any{"bookId": book.ID, "stage": "text_publish", "status": "failed", "error": "上传失败", "frozenTextSettings": string(frozen)}
 		overrides[book.ID] = map[string]any{"collectionId": id, "force": i == 0}
+		if i == 0 {
+			overrides[book.ID]["requestKey"] = "confirmed-once"
+		}
 	}
 
 	job := map[string]any{"id": "original", "owner": "alice", "batchId": batch.ID, "state": "failed", "runMode": "full_submit", "concurrency": 1, "books": entries}
@@ -157,11 +160,15 @@ func TestSignedTextRetryTwoBooksCreatesOnlyConfirmedRepublish(t *testing.T) {
 		t.Fatal(err)
 	}
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: now, Slice: 2, Store: store, AutomationCoordinator: coord, TextRepository: repo, LocalArtifacts: files, N8ComicPublisher: publisher})
-	resp := signedJSONRequest(t, api, now(), "alice", http.MethodPost, "/api/batch-factory/v12/batches/"+batch.ID+"/automation/retry", map[string]any{"bookIds": ids, "textPublishOverrides": overrides})
-	if resp.Code != http.StatusOK {
-		t.Fatalf("retry %d %s", resp.Code, resp.Body.String())
+	retry := func() map[string]any {
+		t.Helper()
+		resp := signedJSONRequest(t, api, now(), "alice", http.MethodPost, "/api/batch-factory/v12/batches/"+batch.ID+"/automation/retry", map[string]any{"bookIds": ids, "textPublishOverrides": overrides})
+		if resp.Code != http.StatusOK {
+			t.Fatalf("retry %d %s", resp.Code, resp.Body.String())
+		}
+		return waitForTerminalAutomationJob(t, coord, "alice", batch.ID)
 	}
-	job = waitForTerminalAutomationJob(t, coord, "alice", batch.ID)
+	job = retry()
 	for i, id := range ids {
 		scope := txt.Scope{Owner: "alice", BatchID: batch.ID, BookID: id}
 		collection := repo.collections[scope]
@@ -180,5 +187,16 @@ func TestSignedTextRetryTwoBooksCreatesOnlyConfirmedRepublish(t *testing.T) {
 	}
 	if client.calls != 1 {
 		t.Fatalf("two retries issued %d external requests; want one confirmed republish", client.calls)
+	}
+	retry()
+	runs, err := store.ListBookStageRuns(ctx, "alice", batch.ID, ids[0])
+	if err != nil || len(runs) != 1 || runs[0].RequestID != "confirmed-once" || client.calls != 1 {
+		t.Fatalf("replay runs=%+v external calls=%d err=%v", runs, client.calls, err)
+	}
+	overrides[ids[0]]["requestKey"] = "confirmed-again"
+	retry()
+	runs, err = store.ListBookStageRuns(ctx, "alice", batch.ID, ids[0])
+	if err != nil || len(runs) != 2 || client.calls != 2 {
+		t.Fatalf("new confirmation runs=%+v external calls=%d err=%v", runs, client.calls, err)
 	}
 }

@@ -6,6 +6,7 @@ import AuthenticatedTextPageImage from './AuthenticatedTextPageImage.jsx';
 import { canCreateTextCollection, textBookCompletion, textPagePresentation, textPageDirtyImpact } from './textMediaState.js';
 import { initialPageDraft,pageChanges,splitChoices,uploadLabel } from './textMediaActions.js';
 import { TextPageEditor,useDraftPreview } from './TextPageEditor.jsx';
+import { textPublishImageProgress, textPublishStatus } from './batchFactoryBookState.js';
 import { textUploadControl } from './batchFactoryNovelListHelpers.js';
 import { updateTextProductionSettings } from './textProductionConfig.js';
 import './text-media-panel.css';
@@ -101,6 +102,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
       .catch(e => { if (!controller.signal.aborted) setActionError(e.message); });
     return () => controller.abort();
   }, [tab, collection?.id, batchId, book.id, refresh]);
+  const publishing = busy === 'publish';
   useEffect(() => {
     if (!collection?.id || onUpload) return;
     const controller = new AbortController();
@@ -112,25 +114,30 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
         });
         if (controller.signal.aborted) return;
         setReceipt({id:collection.id, status});
-        if (status?.publish?.status === 'pending') timer = setTimeout(read, 3000);
+        const state = textPublishStatus(status?.publish);
+        if (['uploading','pending'].includes(state) || (publishing && !state)) timer = setTimeout(read, 3000);
       } catch (e) {
         if (!controller.signal.aborted) {
-          setReceipt({id:collection.id, error:e.message || '上传状态读取失败'});
+          setReceipt(previous => ({id:collection.id, status:previous?.id === collection.id ? previous.status : null, error:e.message || '上传状态读取失败'}));
+          timer = setTimeout(read, 3000);
         }
       }
     }
     void read();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [batchId, book.id, collection?.id, refresh, onUpload]);
+  }, [batchId, book.id, collection?.id, refresh, onUpload, publishing]);
   const selectedReceipt = receipt?.id === collection?.id ? receipt : null;
-  const upload = onUpload
+  const publishRecord = selectedReceipt?.status?.publish;
+  const publishState = textPublishStatus(publishRecord);
+  const upload = onUpload && textPublishStatus(collection) !== 'uploading'
     ? {label:uploadLabel(collection), force:uploadLabel(collection) === '再次上传', disabled:!collection}
-    : textUploadControl(collection, selectedReceipt?.status);
+    : textUploadControl(collection, onUpload ? {publish:collection} : selectedReceipt?.status);
   function publish() {
     if (upload.disabled || (upload.force && !window.confirm('这个文本合集已上传，确认再次上传？'))) return;
     void run('publish', async () => {
-      if (onUpload) return onUpload(collection, {force:upload.force});
-      const status = await publishTextCollection(batchId, book.id, collection.id, {force:upload.force});
+      const payload = {force:upload.force, ...(upload.requestKey && {requestKey:upload.requestKey})};
+      if (onUpload) return onUpload(collection, payload);
+      const status = await publishTextCollection(batchId, book.id, collection.id, payload);
       setReceipt({id:collection.id, status});
     });
   }
@@ -285,9 +292,10 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
       <div className="text-media-scroll" role="tabpanel">
         {(error || actionError) && <div role="alert">{error || actionError} <button type="button" onClick={() => {setActionError('');reload();}}>刷新</button></div>}
         {selectedReceipt?.error && <div role="alert">{selectedReceipt.error} <button type="button" onClick={reload}>刷新上传状态</button></div>}
-        {selectedReceipt?.status?.publish && <div role="status">{selectedReceipt.status.published ? '已上传' : ({
-          pending:selectedReceipt.status.publish.message || '已提交，等待上传确认', failed:'上传失败', upload_incomplete:'图片上传未完成'
-        })[selectedReceipt.status.publish.status]} {selectedReceipt.status.publish.errorMessage || selectedReceipt.status.publish.error}</div>}
+        {publishRecord && <div role="status">{selectedReceipt.status.published ? '已上传' : ({
+          uploading:publishRecord.message || '正在上传合集图片', pending:publishRecord.message || '已提交，等待上传确认',
+          failed:'上传失败', upload_incomplete:'图片上传未完成'
+        })[publishState]} {textPublishImageProgress(publishRecord)} {publishRecord.errorMessage || publishRecord.error}</div>}
         {tab === 'collections' ? <>
           <CollectionChoices collections={collections} current={collection} choose={id=>{chooseCollection(id);setCollectionImage('');}} />
           {collection && <section><h4>合集内容</h4><div className="text-media-page-choices"><button type="button" onClick={()=>setCollectionImage('')}>封面</button>
@@ -326,7 +334,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
       </div>}<div className="text-media-actions">
         <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded ? '收起' : '展开'}</button>
         <button type="button" disabled={!!busy || !!session || !canCompose} onClick={()=>run('compose',compose)}>{collections.length ? '重新合成' : '合成当前书'}</button>
-        <button type="button" disabled={upload.disabled || !!busy || !!session} onClick={publish}>{upload.label}</button>
+        <button type="button" disabled={upload.disabled || !!selectedReceipt?.error || !!busy || !!session} onClick={publish}>{upload.label}</button>
       </div></footer>
     </aside>
   </div>;

@@ -148,6 +148,24 @@ test('previous confirmed upload stays available for republish while current rece
   assert.equal(batchFactoryBookState({id:'b'},runtime).published,false);
 });
 
+test('uploading status or phase restores partial manual and automatic progress', () => {
+  for (const partial of [{status:'uploading'},{phase:'uploading'},{status:'pending',phase:'uploading'}]) {
+    for (const automatic of [false,true]) {
+      const run={id:'run',attempt:2,stage:'text_publish',status:'failed'};
+      const record={kind:'text',bookId:'b',...partial,imageIds:[84,0,97],pageCount:3,message:'继续上传剩余图片'};
+      if (automatic) Object.assign(record,{runId:'run',attempt:2});
+      const runtime={productionMode:'text', automationBook:automatic?{stage:'text_publish',status:'failed'}:null,
+        stageSummary:{runs:automatic?[run]:[],textPublishRecord:record}};
+      const state=batchFactoryBookState({id:'b'},runtime);
+      assert.equal(state.label,'正在上传');
+      assert.match(state.detail,/继续上传剩余图片.*2 \/ 3/);
+      assert.equal(state.terminal,false);
+      assert.equal(batchFactoryBookTimeline({id:'b'},runtime).at(-1).status,'running');
+      assert.equal(batchFactoryBatchProgress([{id:'b'}],runtime).running,1);
+    }
+  }
+});
+
 test('pending publisher record after restart is still awaiting readback', () => {
   const stageSummary = {textPublishRecord:{kind:'text',bookId:'b',status:'pending'}};
   assert.equal(batchFactoryBookState({id:'b'},{productionMode:'text',stageSummary}).label,'正在上传');

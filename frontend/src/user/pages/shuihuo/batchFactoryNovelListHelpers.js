@@ -2,7 +2,7 @@ import { getBookAssetImageBlob, getBookAssetImageGenerationTask, getBatch, listB
 import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
 import { audioPlanningRequired, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
-import { textReceiptMatchesRun } from './batchFactoryBookState.js';
+import { textPublishStatus, textReceiptMatchesRun } from './batchFactoryBookState.js';
 import { BOOK_CONFIG_REGIONS, normalizeSensitiveMode } from './batchFactoryBookConfigRegions';
 import { buildBatchFactoryH3Constraints } from './batchFactoryH3Constraints';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, batchFactorySourceText, comicAnalysisCharactersForBook } from './batchFactoryContentRange';
@@ -523,11 +523,28 @@ export function collectionUploadKind(kinds) {
 
 export function textUploadControl(collection, status) {
   const force = Boolean(status?.published || status?.lastPublished);
-  const pending = status?.publish?.status === 'pending';
+  const publishStatus = textPublishStatus(status?.publish);
+  if (publishStatus === 'uploading') {
+    return {label:'继续上传', disabled:!collection?.id, force:false, ...(status.publish.requestKey && {requestKey:status.publish.requestKey})};
+  }
+  const pending = publishStatus === 'pending';
   return {
     label: pending ? '等待上传确认' : force ? '再次上传' : '上传网络',
     disabled: !collection?.id || !status || pending,
     force
+  };
+}
+
+// 浏览器刷新后仍需重用已确认、但尚未收到调度器答复的请求编号。
+const transientTextRetryKeys = Object.create(null);
+function textRetryConfirmation(batchId, bookId, collectionId) {
+  const storage = typeof window === 'undefined' ? transientTextRetryKeys : window.sessionStorage;
+  const owner = typeof window === 'undefined' ? '' : window.localStorage.getItem('auth_username') || '';
+  const slot = 'text-republish:' + JSON.stringify([owner, batchId, bookId, collectionId]);
+  return {
+    read:() => storage[slot],
+    save:key => { storage[slot] = key; },
+    finish:key => { if (storage[slot] === key) delete storage[slot]; }
   };
 }
 
@@ -542,10 +559,23 @@ async function planTextUpload(api, batchId, item, chooseCollection, confirmRepub
   if (!collectionId) return {skip:'已取消'};
   const status = await api.getTextPublishStatus(batchId, book.id, collectionId);
   if (!status) throw Error('无法读取合集上传状态');
+  const confirmation = manual ? null : textRetryConfirmation(batchId, book.id, collectionId);
+  if (status.publish?.requestKey) confirmation?.finish(status.publish.requestKey);
   const current = manual || (status.publish && run && textReceiptMatchesRun(status.publish, run, summary.runs));
   if (status.published && current) return {skip:'已上传'};
-  if (status.publish?.status === 'pending') return {skip:'等待上传确认'};
+  const upload = textUploadControl({id:collectionId}, status);
+  if (textPublishStatus(status.publish) === 'uploading') return {manual, collectionId, force:false, requestKey:upload.requestKey};
+  if (upload.disabled) return {skip:'等待上传确认'};
   const force = Boolean(status.published || status.lastPublished || summary?.textLastPublishedRecord?.collectionId === collectionId);
+  if (force && !manual) {
+    let requestKey = confirmation.read();
+    if (!requestKey) {
+      if (!await confirmRepublish(book, collectionId)) return {skip:'已取消'};
+      requestKey = globalThis.crypto?.randomUUID?.() || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      confirmation.save(requestKey);
+    }
+    return {manual, collectionId, force, requestKey, acknowledged:() => confirmation.finish(requestKey)};
+  }
   if (force && !await confirmRepublish(book, collectionId)) return {skip:'已取消'};
   return {manual, collectionId, force};
 }
@@ -554,6 +584,7 @@ export async function retryTextBooks(api, batchId, items, {chooseCollection, con
   const automaticIds = [];
   const overrides = {};
   const manual = [];
+  const confirmations = [];
   const skipped = [];
   const errors = [];
   for (const item of items) {
@@ -563,10 +594,12 @@ export async function retryTextBooks(api, batchId, items, {chooseCollection, con
         const plan = await planTextUpload(api, batchId, item, chooseCollection, confirmRepublish);
         if (plan.skip) { skipped.push(plan.skip); continue; }
         if (plan.manual) {
-          manual.push({book, run:() => api.publishTextCollection(batchId, book.id, plan.collectionId, {force:plan.force})});
+          const payload = {force:plan.force, ...(plan.requestKey && {requestKey:plan.requestKey})};
+          manual.push({book, run:() => api.publishTextCollection(batchId, book.id, plan.collectionId, payload)});
           continue;
         }
-        overrides[book.id] = {collectionId:plan.collectionId, force:plan.force};
+        overrides[book.id] = {collectionId:plan.collectionId, force:plan.force, ...(plan.requestKey && {requestKey:plan.requestKey})};
+        if (plan.acknowledged) confirmations.push(plan.acknowledged);
       } else if (!item.automatic && ['text_collection','text_render'].includes(stage)) {
         manual.push({book, run:() => retryTextStage(api, batchId, book.id, {...item.failed, stage})});
         continue;
@@ -577,7 +610,10 @@ export async function retryTextBooks(api, batchId, items, {chooseCollection, con
   // 全部确认完成后才提交。调度器按照一个 bookIds 列表重开原任务。
   const operations = [];
   if (automaticIds.length) operations.push({
-    label:'自动生产', count:automaticIds.length, run:() => api.retryBatchAutomation(batchId, automaticIds, overrides)
+    label:'自动生产', count:automaticIds.length, run:async () => {
+      await api.retryBatchAutomation(batchId, automaticIds, overrides);
+      confirmations.forEach(acknowledge => acknowledge());
+    }
   });
   for (const action of manual) operations.push({label:action.book.title || action.book.id, count:1, run:action.run});
   let submitted = 0;
