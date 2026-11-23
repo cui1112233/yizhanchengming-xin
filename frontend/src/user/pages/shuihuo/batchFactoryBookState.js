@@ -207,21 +207,26 @@ const textStageCopy = {
   text_publish: { pending: '等待上传', failed: '上传失败', completed: '已上传' }
 };
 
-function compareTextPublishIdentifiers(record, run) {
-  return [
-    [run.requestKey || run.requestId, record.requestKey || record.requestId],
-    [run.id, record.runId],
-    [run.attempt, record.attempt]
-  ].filter(([left, right]) => left && right).map(([left, right]) => String(left) === String(right));
+function textAttemptRequestKey(run) {
+  const key = run.publishRequestKey || run.requestKey || run.requestId;
+  return key && key !== run.collectionId ? key : '';
 }
 
-function textReceiptMatchesRun(record, run, runs) {
+function textReceiptMatchesRun(record, run, runs = []) {
   if (!run) return true;
+  if (record.collectionId && run.collectionId && record.collectionId !== run.collectionId) return false;
+  if (record.runId) return record.runId === run.id;
   const previous = runs.filter(other => other !== run && other.stage === 'text_publish');
-  if (previous.some(other => compareTextPublishIdentifiers(record, other).includes(true))) return false;
-  const identities = compareTextPublishIdentifiers(record, run);
-  if (identities.length) return identities.every(Boolean);
-  if (previous.length || run.requestKey || run.requestId || run.id || run.attempt) return false;
+  // 旧版把合集编号也写入 requestId；同一合集可上传多次，只有唯一的请求或尝试编号能确认本轮。
+  const identities = [
+    [record.attempt, run.attempt, other => other.attempt],
+    [record.requestKey || record.requestId, textAttemptRequestKey(run), textAttemptRequestKey]
+  ].filter(([recordValue, runValue]) => recordValue && runValue);
+  if (identities.length) {
+    return identities.every(([recordValue, runValue]) => String(recordValue) === String(runValue))
+      && identities.some(([recordValue, , getValue]) => !previous.some(other => String(getValue(other)) === String(recordValue)));
+  }
+  if (previous.length || textAttemptRequestKey(run) || run.id || run.attempt) return false;
   // 只有唯一一条无编号的旧上传记录可以按回执时间判断。
   const started = Date.parse(run.createdAt || run.startedAt || run.updatedAt);
   const received = Date.parse(record.publishedAt || record.createdAt);
@@ -229,19 +234,29 @@ function textReceiptMatchesRun(record, run, runs) {
   return taskState(run) === 'succeeded' && !Number.isFinite(started);
 }
 
+function textReceiptForBook(record, book) {
+  return record && (!record.kind || record.kind === 'text') && (!record.bookId || record.bookId === book?.id);
+}
+
+function confirmedTextReceipt(record, book) {
+  return Boolean(textReceiptForBook(record, book) && record.status === 'published' && Number(record.carouselId) > 0
+    && Array.isArray(record.imageIds) && record.imageIds.length && record.imageIds.every(id => Number(id) > 0)
+    && (!record.pageCount || record.imageIds.length === Number(record.pageCount)));
+}
+
 function textBookTimeline(book, summary) {
   const record = summary?.textPublishRecord;
-  const matchesBook = record && (!record.kind || record.kind === 'text') && (!record.bookId || record.bookId === book?.id);
-  // 与发布服务的成功记录一致：远端合集和图片都已落地。
-  const published = Boolean(matchesBook && record.status === 'published' && Number(record.carouselId) > 0
-    && Array.isArray(record.imageIds) && record.imageIds.length > 0);
-  const awaitingReceipt = matchesBook && ['accepted', 'submitted', 'upload_pending_confirm'].includes(record.status);
+  const matchesBook = textReceiptForBook(record, book);
+  const confirmed = confirmedTextReceipt(record, book);
+  const published = confirmed || confirmedTextReceipt(summary?.textLastPublishedRecord, book);
+  const awaitingReceipt = matchesBook && ['pending', 'accepted', 'submitted', 'upload_pending_confirm'].includes(record.status);
   return Object.entries(textStageCopy).map(([key, copy]) => {
     const run = latestStageRun(summary, key);
     let status = statusFromRun(run);
     if (key === 'text_publish') {
       const current = matchesBook && textReceiptMatchesRun(record, run, summary.runs);
-      if (current && published) status = 'completed';
+      if (current && confirmed) status = 'completed';
+      else if (current && ['failed','upload_incomplete'].includes(record.status)) status = 'failed';
       else if (status === 'completed' || (status === 'pending' && current && awaitingReceipt)) status = 'running';
     }
     const label = copy[status] || stageLabel('runtime', key);

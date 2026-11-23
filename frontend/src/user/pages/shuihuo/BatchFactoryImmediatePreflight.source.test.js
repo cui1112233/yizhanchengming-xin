@@ -15,9 +15,12 @@ test('每个立即执行入口都先拉一次只读预检，再带 skipPreflight
   assert.match(source, /await preflightBatchAutomation\(batch\.id, \{/);
   assert.match(source, /runMode: automationRunMode/);
   assert.match(source, /skipPreflight: true/);
-  // 预检只在这一处发起，没有定时器或轮询包装。
+  // 自动生产窗口与“立即执行已选”各自先发起一次只读预检。
   const calls = source.match(/await preflightBatchAutomation\(/g) || [];
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
+  const selected = source.slice(source.indexOf('async function runSelectedProduction()'), source.indexOf('const effectiveExecutionConfig', source.indexOf('async function runSelectedProduction()')));
+  assert.ok(selected.includes('await preflightBatchAutomation(batch.id'));
+  assert.ok(selected.includes('book?.passed === true'));
   assert.doesNotMatch(source, /setInterval\([\s\S]{0,200}preflightBatchAutomation/);
 });
 
@@ -35,6 +38,11 @@ test('质检面板的修复入口分别指向统一配置、单书设置和模�
   assert.match(adminApp, /pathname === '\/admin\/shuihuo-models'/);
   assert.match(source, /window\.location\.assign\('\/admin\/shuihuo-models'\)/);
   assert.match(source, /void openAutomationStart\(\)/);
+});
+
+test('文本批次预检使用文本规则，立即执行不受视频执行器开关阻止', () => {
+  assert.ok(source.includes("if (productionMode === 'text') return textModelPreflightReasons(settings)"));
+  assert.ok(source.includes("batchProductionMode === 'video' && automationRunMode !== 'storyboard_only'"));
 });
 
 test('定时执行的本地快检按漫画配置键判断发布绑定，不再误伤漫画批次', () => {

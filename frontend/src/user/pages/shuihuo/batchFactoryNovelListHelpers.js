@@ -2,7 +2,7 @@ import { getBookAssetImageBlob, getBookAssetImageGenerationTask, getBatch, listB
 import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
 import { audioPlanningRequired, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
-import { BOOK_CONFIG_REGIONS } from './batchFactoryBookConfigRegions';
+import { BOOK_CONFIG_REGIONS, normalizeSensitiveMode } from './batchFactoryBookConfigRegions';
 import { buildBatchFactoryH3Constraints } from './batchFactoryH3Constraints';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, batchFactorySourceText, comicAnalysisCharactersForBook } from './batchFactoryContentRange';
 import { readStoryboardPromptEditableText } from './storyboardPromptEditor';
@@ -504,6 +504,63 @@ export function effectiveBookSettings(batch, book) {
   if (['comic', 'video', 'text'].includes(batchPatch.productionMode)) effective.productionMode = batchPatch.productionMode;
   else if (!['comic', 'video', 'text'].includes(effective.productionMode) && comic.enabled === true && String(comic.body || '').trim()) effective.productionMode = 'comic';
   return normalizeAudioSourceSettings(effective);
+}
+
+export function textModelPreflightReasons(settings) {
+  const missing = settings.some(value => normalizeSensitiveMode(value) === 'ai'
+    && !String(value.textModelId || '').trim()
+    && !String(value.sensitiveAIModels || '').split(',').some(id => id.trim()));
+  return missing ? ['AI 优化需要选择文本模型'] : [];
+}
+
+export function collectionUploadKind(kinds) {
+  const selected = new Set(kinds);
+  if (selected.has('comic') && selected.has('text')) throw Error('漫画与文本不能一起上传，请分开选择。');
+  if (selected.size > 1) throw Error('请选择同一种生产模式的作品上传。');
+  return kinds[0];
+}
+
+export function textUploadControl(collection, status) {
+  const force = Boolean(status?.published || status?.lastPublished);
+  const pending = status?.publish?.status === 'pending';
+  return {
+    label: pending ? '等待上传确认' : force ? '再次上传' : '上传网络',
+    disabled: !collection?.id || !status || pending,
+    force
+  };
+}
+
+// 只使用失败任务指出的合集。列表中新建的合集可能属于另一次手动编辑。
+export async function retryTextStage(api, batchId, bookId, failed) {
+  if (failed.stage === 'text_publish') {
+    if (!failed.collectionId) throw Error('这条失败记录缺少合集编号，请在文本媒体库选择要上传的合集。');
+    return api.publishTextCollection(batchId, bookId, failed.collectionId, {force:false});
+  }
+  if (!['text_render','text_collection'].includes(failed.stage)) return;
+  const {document, pages = []} = await api.listTextPages(batchId, bookId);
+  if (!document) throw Error('当前书还没有文字页，请先准备文字页。');
+  if (failed.stage === 'text_collection') {
+    return api.createTextCollection(batchId, bookId, {
+      expectedRevision:document.revision, versionId:document.activeVersionId,
+      paginationVersion:document.paginationVersion, pageIds:pages.map(page => page.id)
+    });
+  }
+  const failedOrdinals = new Set(Array.from(String(failed.errorMessage || '').matchAll(/第\s*(\d+)\s*页/g), match => Number(match[1])));
+  const targets = pages.filter(page => !page.locked && !page.activeArtifactId && page.status !== 'ready'
+    && (failed.pageId ? page.id === failed.pageId : page.status === 'failed' || failedOrdinals.has(page.ordinal)));
+  if (failed.pageId && !targets.length) throw Error('这张文字页已锁定、已完成或不在当前版本中。');
+  const errors = [];
+  for (const page of targets) {
+    try { await api.renderTextPage(batchId, bookId, page.id, {expectedRevision:page.revision}); }
+    catch (error) { errors.push(`第 ${page.ordinal} 页：${error.message}`); }
+  }
+  if (!failed.pageId && !document.coverLocked && !document.coverArtifactId && /封面[：:]/.test(failed.errorMessage || '')) {
+    try {
+      const latest = targets.length ? (await api.listTextPages(batchId, bookId)).document : document;
+      if (!latest.coverLocked && !latest.coverArtifactId) await api.renderTextCover(batchId, bookId, {expectedRevision:latest.revision});
+    } catch (error) { errors.push(`封面：${error.message}`); }
+  }
+  if (errors.length) throw Error(errors.join('；'));
 }
 
 export function baseSetupEnabled(settings = {}) {

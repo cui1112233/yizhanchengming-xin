@@ -90,6 +90,45 @@ test('a previous text receipt preserves republish eligibility while the new atte
   assert.equal(progress().completionPercent, 100);
 });
 
+test('same collection republish uses run identity before reused request and collection keys', () => {
+  const first = {stage:'text_publish',id:'first',collectionId:'c',requestId:'c',attempt:1,status:'succeeded'};
+  const second = {...first,id:'second',attempt:2,status:'running'};
+  const stageSummary = {runs:[first,second]};
+  const state = () => batchFactoryBookState({id:'b'},{productionMode:'text',stageSummary});
+  for (const [identity,expected] of [
+    [{runId:'first',attempt:1},false], [{runId:'first',attempt:2},false],
+    [{runId:'second'},true], [{attempt:1},false], [{attempt:2},true], [{},false]
+  ]) {
+    stageSummary.textPublishRecord = {...verifiedTextPublish, collectionId:'c',requestKey:'c',...identity};
+    assert.equal(state().terminal,expected);
+  }
+  stageSummary.textPublishRecord = {...verifiedTextPublish,collectionId:'other',runId:'second'};
+  assert.equal(state().terminal,false);
+});
+
+test('previous confirmed upload stays available for republish while current receipt is pending or failed', () => {
+  const summary={runs:[],textLastPublishedRecord:{...verifiedTextPublish,bookId:'b',kind:'text'}};
+  for (const [status,label] of [['pending','正在上传'],['failed','上传失败'],['upload_incomplete','上传失败']]) {
+    summary.textPublishRecord={kind:'text',bookId:'b',status};
+    const state=batchFactoryBookState({id:'b'},{productionMode:'text',stageSummary:summary});
+    assert.equal(state.label,label);
+    assert.equal(state.published,true);
+    assert.equal(state.terminal,false);
+  }
+  const runtime={productionMode:'text',stageSummary:{textPublishRecord:{...verifiedTextPublish,pageCount:4}}};
+  assert.equal(batchFactoryBookState({id:'b'},runtime).published,false);
+});
+
+test('pending publisher record after restart is still awaiting readback', () => {
+  const stageSummary = {textPublishRecord:{kind:'text',bookId:'b',status:'pending'}};
+  assert.equal(batchFactoryBookState({id:'b'},{productionMode:'text',stageSummary}).label,'正在上传');
+  stageSummary.textPublishRecord={...verifiedTextPublish,collectionId:'manual-collection',bookId:'b',kind:'text'};
+  const state=batchFactoryBookState({id:'b'},{productionMode:'text',stageSummary});
+  assert.equal(state.label,'已上传');
+  assert.equal(state.terminal,true);
+  assert.equal(state.published,true);
+});
+
 test('an identified text upload attempt requires a matching receipt identity', () => {
   const run = { stage: 'text_publish', status: 'running', attempt: 2, createdAt: '2026-11-24T11:00:00Z' };
   const stageSummary = { runs: [run] };

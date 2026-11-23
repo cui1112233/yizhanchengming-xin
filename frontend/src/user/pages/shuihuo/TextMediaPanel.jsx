@@ -1,11 +1,12 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createTextCollection, getTextCollection, listTextCollections, listTextPages, prepareTextBook } from '../../../shared/api/batchFactoryText.js';
 import * as api from '../../../shared/api/batchFactoryText.js';
-import { getBatch, saveBookOverride } from '../../../shared/api/batchFactoryV12.js';
+import { getBatch, saveBookOverride, publishTextCollection, getTextPublishStatus } from '../../../shared/api/batchFactoryV12.js';
 import AuthenticatedTextPageImage from './AuthenticatedTextPageImage.jsx';
 import { canCreateTextCollection, textBookCompletion, textPagePresentation, textPageDirtyImpact } from './textMediaState.js';
 import { initialPageDraft,pageChanges,splitChoices,uploadLabel } from './textMediaActions.js';
 import { TextPageEditor,useDraftPreview } from './TextPageEditor.jsx';
+import { textUploadControl } from './batchFactoryNovelListHelpers.js';
 import { updateTextProductionSettings } from './textProductionConfig.js';
 import './text-media-panel.css';
 
@@ -62,13 +63,14 @@ function CandidateList({ items, selectedId, activeId, onSelect }) {
     </button>)}</div> : <p>暂无成品图</p>}</section>;
 }
 
-function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved, onClose, onUpload, closeGuard }) {
+function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialTab = 'pages', onSaved, onClose, onUpload, closeGuard }) {
   const [refresh, setRefresh] = useState(0);
-  const [tab, setTab] = useState('pages');
+  const [tab, setTab] = useState(initialTab);
   const [pageId, setPageId] = useState(initialPageId);
   const [selectedCandidate, selectCandidate] = useState('');
   const [chosenCollection, chooseCollection] = useState('');
   const [collectionDetail, setCollectionDetail] = useState(null);
+  const [receipt, setReceipt] = useState(null);
   const [collectionImage, setCollectionImage] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState('');
@@ -99,6 +101,39 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved,
       .catch(e => { if (!controller.signal.aborted) setActionError(e.message); });
     return () => controller.abort();
   }, [tab, collection?.id, batchId, book.id, refresh]);
+  useEffect(() => {
+    if (!collection?.id || onUpload) return;
+    const controller = new AbortController();
+    let timer;
+    async function read() {
+      try {
+        const status = await getTextPublishStatus(batchId, book.id, collection.id, {
+          signal:controller.signal, suppressGlobalError:true
+        });
+        if (controller.signal.aborted) return;
+        setReceipt({id:collection.id, status});
+        if (status?.publish?.status === 'pending') timer = setTimeout(read, 3000);
+      } catch (e) {
+        if (!controller.signal.aborted) {
+          setReceipt({id:collection.id, error:e.message || '上传状态读取失败'});
+        }
+      }
+    }
+    void read();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [batchId, book.id, collection?.id, refresh, onUpload]);
+  const selectedReceipt = receipt?.id === collection?.id ? receipt : null;
+  const upload = onUpload
+    ? {label:uploadLabel(collection), force:uploadLabel(collection) === '再次上传', disabled:!collection}
+    : textUploadControl(collection, selectedReceipt?.status);
+  function publish() {
+    if (upload.disabled || (upload.force && !window.confirm('这个文本合集已上传，确认再次上传？'))) return;
+    void run('publish', async () => {
+      if (onUpload) return onUpload(collection, {force:upload.force});
+      const status = await publishTextCollection(batchId, book.id, collection.id, {force:upload.force});
+      setReceipt({id:collection.id, status});
+    });
+  }
   const currentCollection = collectionDetail?.id === collection?.id ? collectionDetail : collection;
   const collectionItems = currentCollection?.items || [];
   const candidates = artifacts.filter(a => tab === 'cover' ? a.kind === 'cover' : a.kind === 'page' && a.pageId === page?.id);
@@ -249,6 +284,10 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved,
           {label}{key === 'pages' ? ' '+pages.length : key === 'collections' ? ' '+collections.length : ''}</button>)}</nav>
       <div className="text-media-scroll" role="tabpanel">
         {(error || actionError) && <div role="alert">{error || actionError} <button type="button" onClick={() => {setActionError('');reload();}}>刷新</button></div>}
+        {selectedReceipt?.error && <div role="alert">{selectedReceipt.error} <button type="button" onClick={reload}>刷新上传状态</button></div>}
+        {selectedReceipt?.status?.publish && <div role="status">{selectedReceipt.status.published ? '已上传' : ({
+          pending:'已提交，等待上传确认', failed:'上传失败', upload_incomplete:'图片上传未完成'
+        })[selectedReceipt.status.publish.status]} {selectedReceipt.status.publish.errorMessage || selectedReceipt.status.publish.error}</div>}
         {tab === 'collections' ? <>
           <CollectionChoices collections={collections} current={collection} choose={id=>{chooseCollection(id);setCollectionImage('');}} />
           {collection && <section><h4>合集内容</h4><div className="text-media-page-choices"><button type="button" onClick={()=>setCollectionImage('')}>封面</button>
@@ -287,7 +326,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved,
       </div>}<div className="text-media-actions">
         <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded ? '收起' : '展开'}</button>
         <button type="button" disabled={!!busy || !!session || !canCompose} onClick={()=>run('compose',compose)}>{collections.length ? '重新合成' : '合成当前书'}</button>
-        <button type="button" disabled={!onUpload || !collection || !!busy || !!session} onClick={()=>{if(uploadLabel(collection)==='再次上传' && !window.confirm('这个文本合集已上传，确认再次上传？'))return;void run('publish',()=>onUpload(collection));}}>{uploadLabel(collection)}</button>
+        <button type="button" disabled={upload.disabled || !!busy || !!session} onClick={publish}>{upload.label}</button>
       </div></footer>
     </aside>
   </div>;
