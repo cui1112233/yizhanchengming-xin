@@ -175,7 +175,7 @@ func TestComicPageGenerateChatChannelRetryWritesSinglePageAndImage(t *testing.T)
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
 		Title: "漫画批次",
-		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一页"}}}},
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: "本页原稿", TxtText: "本页原稿", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一页"}}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -208,6 +208,7 @@ func TestComicPageGenerateChatChannelRetryWritesSinglePageAndImage(t *testing.T)
 	}}); err != nil {
 		t.Fatal(err)
 	}
+	prepareComicPageSourceForGeneration(t, store, catalog, batch.ID, book.ID, video.ID)
 	api := NewRouter(RouterOptions{
 		BridgeSecret:    "secret",
 		Now:             func() time.Time { return now },

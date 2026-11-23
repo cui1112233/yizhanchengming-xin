@@ -276,6 +276,9 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	} else if !errors.Is(err, batchfactoryv11.ErrNotFound) {
 		return nil, err
 	}
+	if strings.TrimSpace(workingFrontContent) != "" {
+		workingFrontContent = batchfactoryv11.EffectiveWorkingSource(book, workingFrontContent)
+	}
 	content := publish121Content(book, workingFrontContent)
 	if len(content) == 0 {
 		return nil, fmt.Errorf("当前小说没有可上传的正文")

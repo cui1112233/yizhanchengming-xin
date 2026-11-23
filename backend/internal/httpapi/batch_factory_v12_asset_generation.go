@@ -213,7 +213,7 @@ func assetImageGenerationContext(parent context.Context) (context.Context, conte
 // store/provider boundary as the Shuihuo project page. The old Node handler
 // used to receive this one action even when every other batch operation was on
 // Go, which made the asset step the last hidden runtime split.
-func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, resolveModelOwner func(string) string, rewrite comicPromptRewriter) {
+func registerV12AssetGenerationRoute(mux *http.ServeMux, production *BatchAutomationCoordinator, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, resolveModelOwner func(string) string, rewrite comicPromptRewriter) {
 	if mux == nil || store == nil || files == nil {
 		return
 	}
@@ -262,6 +262,10 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.S
 			UseThreeView *bool    `json:"useThreeView"`
 		}
 		if !decodeJSON(w, r, &input) {
+			return
+		}
+		if _, err := production.batchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), false, true); err != nil {
+			writeStoreError(w, err)
 			return
 		}
 		selectedBatch := batch

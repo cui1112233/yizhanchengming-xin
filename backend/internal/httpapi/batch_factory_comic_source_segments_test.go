@@ -30,7 +30,7 @@ func TestComicSourceSegmentRoutesCreateListAndSplit(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
 	source := strings.Repeat("这是一句完整剧情，人物行动并推动冲突。", 16)
-	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "漫画", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: source}}})
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "漫画", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", TxtText: source, SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: source}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestComicSourceSegmentRouteUsesAISafeBoundarySelection(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
 	source := strings.Repeat("第一段剧情完整结束。", 6) + strings.Repeat("第二段剧情完整结束。", 6) + strings.Repeat("第三段剧情完整结束。", 6) + strings.Repeat("第四段剧情完整结束。", 6)
-	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "漫画", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: source}}})
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "漫画", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", TxtText: source, SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: source}}})
 	if err != nil {
 		t.Fatal(err)
 	}

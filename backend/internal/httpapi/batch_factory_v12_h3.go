@@ -8,7 +8,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 )
 
-func registerV12H3Routes(mux *http.ServeMux, service *batchfactoryv11.H3KernelService, director *batchfactoryv11.DirectorService) {
+func registerV12H3Routes(mux *http.ServeMux, production *BatchAutomationCoordinator, service *batchfactoryv11.H3KernelService, director *batchfactoryv11.DirectorService) {
 	mux.HandleFunc("POST /api/batch-factory/v12/batches/{batchId}/books/{bookId}/h3/director", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -29,6 +29,11 @@ func registerV12H3Routes(mux *http.ServeMux, service *batchfactoryv11.H3KernelSe
 		}
 		if runner == nil {
 			writeStoreError(w, batchfactoryv11.ErrUnavailable)
+			return
+		}
+		_, err = production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true)
+		if err != nil {
+			writeStoreError(w, err)
 			return
 		}
 		revision, err := runner.RunH3Director(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.H3DirectorRunRequest)

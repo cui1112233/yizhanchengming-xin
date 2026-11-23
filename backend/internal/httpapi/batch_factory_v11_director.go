@@ -63,6 +63,26 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			writeStoreError(w, err)
 			return
 		}
+		batch, err := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		old, found := findBatchBookByID(batch, r.PathValue("bookId"))
+		if !found {
+			writeStoreError(w, batchfactoryv11.ErrNotFound)
+			return
+		}
+		if old.Revision != input.ExpectedRevision {
+			writeStoreError(w, batchfactoryv11.ErrConflict)
+			return
+		}
+		prepared, err := stages.PrepareProductionText(r.Context(), owner, batch.ID, old.ID)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		input.ExpectedRevision = prepared.Revision
 		candidate, err := runner.CreateDirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.ExpectedRevision)
 		if err != nil {
 			writeStoreError(w, err)
@@ -81,6 +101,21 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			ExpectedRevision int64  `json:"expectedRevision"`
 		}
 		if !decodeJSON(w, r, &input) {
+			return
+		}
+		prepared, err := stages.PrepareProductionText(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		candidate, err := service.DirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		stage := mapOrEmpty(prepared.SourceMetadata["batchSensitiveStage"])
+		if candidate.ProductionVersion == "" || candidate.ProductionVersion != stage["key"] {
+			writeStoreError(w, batchfactoryv11.NewConfigRequiredError("正文版本已变化，请重新生成候选提示词"))
 			return
 		}
 		video, err := service.AcceptDirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"), input.CandidateID, input.ExpectedRevision)
@@ -151,6 +186,10 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			writeStoreError(w, err)
 			return
 		}
+		if _, err := stages.PrepareProductionText(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId")); err != nil {
+			writeStoreError(w, err)
+			return
+		}
 		value, err := runner.RunHook(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
 		if err != nil {
 			writeStoreError(w, err)
@@ -173,6 +212,10 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 		}
 		runner, err := directorForRequest(service, input.TextProvider)
 		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		if _, err := stages.PrepareProductionText(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId")); err != nil {
 			writeStoreError(w, err)
 			return
 		}

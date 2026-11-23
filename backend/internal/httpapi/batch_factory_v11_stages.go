@@ -81,7 +81,11 @@ func registerBookStageRoutes(mux *http.ServeMux, service *batchfactoryv11.BookSt
 			// 页级重试，避免用户点“重试失败步骤”只能看到 409。
 			if errors.Is(err, batchfactoryv11.ErrConflict) && retryComicPages != nil {
 				retried, retryErr := retryComicPages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
-				if retryErr == nil && retried > 0 {
+				if retryErr != nil {
+					writeStoreError(w, retryErr)
+					return
+				}
+				if retried > 0 {
 					fallback, summaryErr := service.Summary(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
 					if summaryErr != nil {
 						writeStoreError(w, summaryErr)

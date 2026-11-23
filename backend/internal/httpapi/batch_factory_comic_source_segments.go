@@ -13,7 +13,7 @@ func comicSourceDigest(value string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func registerComicSourceSegmentRoutes(mux *http.ServeMux, store batchfactoryv11.Store, director *batchfactoryv11.DirectorService) {
+func registerComicSourceSegmentRoutes(mux *http.ServeMux, production *BatchAutomationCoordinator, store batchfactoryv11.Store, director *batchfactoryv11.DirectorService) {
 	segmentStore, ok := store.(batchfactoryv11.ComicSourceSegmentStore)
 	if mux == nil || !ok {
 		return
@@ -36,6 +36,10 @@ func registerComicSourceSegmentRoutes(mux *http.ServeMux, store batchfactoryv11.
 		owner, ok := bridgeOwner(r)
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if _, err := production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true); err != nil {
+			writeStoreError(w, err)
 			return
 		}
 		batch, err := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
@@ -65,7 +69,7 @@ func registerComicSourceSegmentRoutes(mux *http.ServeMux, store batchfactoryv11.
 		}
 		source := book.SourceText
 		if book.WorkingFrontContent != "" {
-			source = book.WorkingFrontContent
+			source = batchfactoryv11.EffectiveWorkingSource(*book, book.WorkingFrontContent)
 		}
 		boundaries := batchfactoryv11.EnumerateComicSourceBoundaries(source)
 		drafts, err := batchfactoryv11.FallbackComicSourceSegments(source, boundaries)

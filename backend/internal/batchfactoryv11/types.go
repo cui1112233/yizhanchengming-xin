@@ -559,6 +559,7 @@ type DirectorRunInput struct {
 // Its prompts are keyed by the already-persisted VIDEO IDs so accepting one
 // candidate never changes the formal director revision or VIDEO inventory.
 type DirectorPromptCandidate struct {
+	ProductionVersion  string            `json:"productionVersion,omitempty"`
 	ID                 string            `json:"id"`
 	SourceBookRevision int64             `json:"sourceBookRevision"`
 	CreatedAt          time.Time         `json:"createdAt"`

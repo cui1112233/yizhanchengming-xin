@@ -115,9 +115,10 @@ func TestReadbackMySQLStoreHydratesComicSourceSegments(t *testing.T) {
 			AddRow("video-old", 0, "orphaned", "task-old", "https://cdn.example/video-old.mp4", "doubao", "succeeded", now))
 
 	digest := sourceDigest("第一段。")
-	mock.ExpectQuery("SELECT COALESCE\\(NULLIF\\(d.content,''\\),r.source_text,''\\)").
+	metadata := []byte(`{"batchSensitiveStage":{"status":"done","authoredBase":"` + WorkingDraftVersion("编辑稿。") + `","output":"` + digest + `"}}`)
+	mock.ExpectQuery("SELECT COALESCE.*r.source_metadata_json,COALESCE").
 		WithArgs("book-1", "batch-1", "alice").
-		WillReturnRows(sqlmock.NewRows([]string{"source"}).AddRow("第一段。"))
+		WillReturnRows(sqlmock.NewRows([]string{"source", "metadata", "draft"}).AddRow("第一段。", metadata, "编辑稿。"))
 	mock.ExpectQuery("SELECT s.video_id,v.ordinal,s.start_offset").
 		WithArgs("alice", "batch-1", "book-1").
 		WillReturnRows(sqlmock.NewRows([]string{"video_id", "ordinal", "start_offset", "end_offset", "source_text", "character_count", "boundary_type", "reason", "source_digest", "segmentation_version", "prompt_stale", "media_stale", "revision"}).

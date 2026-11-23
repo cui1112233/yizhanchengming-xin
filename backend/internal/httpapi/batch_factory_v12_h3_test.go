@@ -40,7 +40,7 @@ func TestV12H3DirectorRouteWritesValidatedCompleteDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := batchfactoryv11.NewMemoryStore()
-	batch, _ := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "raw novel"}}})
+	batch, _ := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", TxtText: "\n五岁的我刚被认回豪门，爸妈就甩下一百万生活费。\n\n把我和陆晚晚扔在别墅里大眼瞪小眼。\n三个月后，爸妈提前回国，想给我们一个惊喜。\n", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "\n五岁的我刚被认回豪门，爸妈就甩下一百万生活费。\n\n把我和陆晚晚扔在别墅里大眼瞪小眼。\n三个月后，爸妈提前回国，想给我们一个惊喜。\n"}}})
 	seedHTTPH3Assets(t, store, batch, raw)
 	director := &batchfactoryv11.DirectorService{Store: store, Provider: &directorHTTPProvider{output: string(raw)}}
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 3, Store: store, Director: director})

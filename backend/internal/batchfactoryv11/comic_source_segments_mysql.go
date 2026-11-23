@@ -14,10 +14,8 @@ func (s *MySQLStore) ReplaceComicSourceSegments(ctx context.Context, owner, batc
 		return ComicSourceSegmentation{}, err
 	}
 	defer tx.Rollback()
-	var source string
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(NULLIF(d.content,''),r.source_text,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=b.batch_id WHERE b.id=? AND b.batch_id=? AND b.owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&source); errors.Is(err, sql.ErrNoRows) {
-		return ComicSourceSegmentation{}, ErrNotFound
-	} else if err != nil {
+	source, err := loadComicProductionSource(ctx, tx, owner, batchID, bookID, true)
+	if err != nil {
 		return ComicSourceSegmentation{}, err
 	}
 	if digest != sourceDigest(source) {
@@ -67,10 +65,8 @@ func (s *MySQLStore) BindComicSourceSegments(ctx context.Context, owner, batchID
 		return ComicSourceSegmentation{}, err
 	}
 	defer tx.Rollback()
-	var source string
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(NULLIF(d.content,''),r.source_text,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=b.batch_id WHERE b.id=? AND b.batch_id=? AND b.owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&source); errors.Is(err, sql.ErrNoRows) {
-		return ComicSourceSegmentation{}, ErrNotFound
-	} else if err != nil {
+	source, err := loadComicProductionSource(ctx, tx, owner, batchID, bookID, true)
+	if err != nil {
 		return ComicSourceSegmentation{}, err
 	}
 	if digest != sourceDigest(source) {
@@ -123,10 +119,8 @@ func (s *MySQLStore) BindComicSourceSegments(ctx context.Context, owner, batchID
 }
 
 func (s *MySQLStore) GetComicSourceSegmentation(ctx context.Context, owner, batchID, bookID string) (ComicSourceSegmentation, error) {
-	var source string
-	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(NULLIF(d.content,''),r.source_text,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=b.batch_id WHERE b.id=? AND b.batch_id=? AND b.owner_username=?`, bookID, batchID, owner).Scan(&source); errors.Is(err, sql.ErrNoRows) {
-		return ComicSourceSegmentation{}, ErrNotFound
-	} else if err != nil {
+	source, err := loadComicProductionSource(ctx, s.db, owner, batchID, bookID, false)
+	if err != nil {
 		return ComicSourceSegmentation{}, err
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT s.video_id,v.ordinal,s.start_offset,s.end_offset,s.source_text,s.character_count,s.boundary_type,s.reason,s.source_digest,s.segmentation_version,s.prompt_stale,s.media_stale,s.revision FROM batch_factory_v12_comic_source_segments s JOIN batch_factory_v12_videos v ON v.id=s.video_id WHERE s.owner_username=? AND s.batch_id=? AND s.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`, owner, batchID, bookID)
@@ -167,10 +161,8 @@ func (s *MySQLStore) SplitComicSourceSegment(ctx context.Context, owner, batchID
 		return ComicSourceSegmentation{}, err
 	}
 	defer tx.Rollback()
-	var source string
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(NULLIF(d.content,''),r.source_text,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=b.batch_id WHERE b.id=? AND b.batch_id=? AND b.owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&source); errors.Is(err, sql.ErrNoRows) {
-		return ComicSourceSegmentation{}, ErrNotFound
-	} else if err != nil {
+	source, err := loadComicProductionSource(ctx, tx, owner, batchID, bookID, true)
+	if err != nil {
 		return ComicSourceSegmentation{}, err
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT s.video_id,v.ordinal,s.start_offset,s.end_offset,s.source_text,s.character_count,s.boundary_type,s.reason,s.source_digest,s.segmentation_version,s.prompt_stale,s.media_stale,s.revision FROM batch_factory_v12_comic_source_segments s JOIN batch_factory_v12_videos v ON v.id=s.video_id WHERE s.owner_username=? AND s.batch_id=? AND s.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id FOR UPDATE`, owner, batchID, bookID)
@@ -284,3 +276,22 @@ func (s *MySQLStore) SplitComicSourceSegment(ctx context.Context, owner, batchID
 }
 
 var _ ComicSourceSegmentStore = (*MySQLStore)(nil)
+
+func loadComicProductionSource(ctx context.Context, q interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, owner, batchID, bookID string, lock bool) (string, error) {
+	query := `SELECT COALESCE(r.source_text,''),r.source_metadata_json,COALESCE(d.content,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=b.batch_id WHERE b.id=? AND b.batch_id=? AND b.owner_username=?`
+	if lock {
+		query += " FOR UPDATE"
+	}
+	var source, draft string
+	var metadata []byte
+	err := q.QueryRowContext(ctx, query, bookID, batchID, owner).Scan(&source, &metadata, &draft)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return EffectiveWorkingSource(Book{SourceText: source, SourceMetadata: decodeSourceMetadata(metadata)}, draft), nil
+}

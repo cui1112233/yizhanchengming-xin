@@ -37,6 +37,7 @@ import (
 )
 
 type comicPageGenerator struct {
+	production     *BatchAutomationCoordinator
 	store          batchfactoryv11.Store
 	files          *localartifact.Store
 	localExecutors *localexecutor.Service
@@ -983,6 +984,16 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if selectedPageIndex >= comicPageGenerationLimit {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: 漫画生图最多执行前 %d 页", batchfactoryv11.ErrConflict, comicPageGenerationLimit)
 	}
+	if g.production != nil {
+		prepared, err := g.production.batchSensitiveStage(ctx, owner, batchID, bookID, false, true)
+		if err != nil {
+			return page, image, err
+		}
+		seg := selectedPage.ComicSourceSegment
+		if seg == nil || seg.SourceDigest != comicSourceDigest(prepared.SourceText) || seg.PromptStale {
+			return page, image, batchfactoryv11.NewConfigRequiredError("该页提示词对应旧版正文，请先重新生成提示词")
+		}
+	}
 	effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, selectedBook.SettingsState.Patch)
 	effective, err = resolvePublishedComicStyleReference(effective, g.presetCatalog)
 	if err != nil {
@@ -1845,8 +1856,8 @@ func comicPromptTextIsJSON(text string) bool {
 	return trimmed[0] == '{' || trimmed[0] == '['
 }
 
-func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, presetCatalog *prompt.Catalog, accounts auth.Store, profiles *MemberProfileStore, director *batchfactoryv11.DirectorService, generationGate *comicPageGenerationGate, imageCache imagegenerationcache.Repository) {
-	registerComicSourceSegmentRoutes(mux, store, director)
+func registerComicPageRoutes(mux *http.ServeMux, production *BatchAutomationCoordinator, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, presetCatalog *prompt.Catalog, accounts auth.Store, profiles *MemberProfileStore, director *batchfactoryv11.DirectorService, generationGate *comicPageGenerationGate, imageCache imagegenerationcache.Repository) {
+	registerComicSourceSegmentRoutes(mux, production, store, director)
 	comicStore, ok := store.(batchfactoryv11.ComicPageStore)
 	if mux == nil || !ok {
 		return
@@ -1863,7 +1874,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	const image = images + "/{imageId}"
 	const collections = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-collections"
 	const collectionDownload = collections + "/{collectionId}/download"
-	generator := comicPageGenerator{store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, userConfig: userConfig, presetCatalog: presetCatalog, generationGate: generationGate, imageCache: imageCache, resolveModelOwner: func(owner string) string {
+	generator := comicPageGenerator{production: production, store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, userConfig: userConfig, presetCatalog: presetCatalog, generationGate: generationGate, imageCache: imageCache, resolveModelOwner: func(owner string) string {
 		return effectiveModelCatalogOwner(BridgeIdentity{Username: owner}, profiles, accounts)
 	}}
 
@@ -2198,6 +2209,10 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		}
 		if director == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "漫画提示词服务未配置"})
+			return
+		}
+		if _, err := production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true); err != nil {
+			writeStoreError(w, err)
 			return
 		}
 		pagesList, err := comicStore.ListComicPages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))

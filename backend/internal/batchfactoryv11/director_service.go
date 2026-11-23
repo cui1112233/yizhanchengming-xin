@@ -277,6 +277,23 @@ func (s *DirectorService) hydrateVideoPromptPreset(snapshot DirectorSnapshot) (D
 	return snapshot, nil
 }
 
+// WorkingDraftVersion identifies an authored working draft without changing its content.
+func WorkingDraftVersion(draft string) string { return "working:" + sourceDigest(draft) }
+
+// EffectiveWorkingSource returns the persisted production text when it was prepared
+// for this draft. Editors continue to read the original draft, and TxtText remains the
+// captured original. A later draft edit invalidates this version automatically.
+func EffectiveWorkingSource(book Book, draft string) string {
+	if strings.TrimSpace(draft) == "" {
+		return book.SourceText
+	}
+	state, _ := book.SourceMetadata["batchSensitiveStage"].(map[string]any)
+	if state["status"] == "done" && state["authoredBase"] == WorkingDraftVersion(draft) && state["output"] == sourceDigest(book.SourceText) {
+		return book.SourceText
+	}
+	return draft
+}
+
 // productionBook returns a copy that keeps sourceText immutable while allowing
 // a user-approved per-book working front to drive Hook and Director generation.
 // The draft is deliberately separate from captured source text: publishing can
@@ -350,7 +367,7 @@ func comicSourceTextForBook(book Book) string {
 func (s *DirectorService) productionBookWithSourceMode(ctx context.Context, owner, batchID string, book Book, completeSource bool) (Book, error) {
 	draft, err := s.Store.GetDraft(ctx, owner, "working-front:"+book.ID, "working-front-content", batchID)
 	if err == nil && strings.TrimSpace(draft.Content) != "" {
-		book.SourceText = strings.TrimSpace(draft.Content)
+		book.SourceText = strings.TrimSpace(EffectiveWorkingSource(book, draft.Content))
 		return book, nil
 	}
 	if err != nil && !errors.Is(err, ErrNotFound) {
@@ -637,6 +654,9 @@ func (s *DirectorService) CreateDirectorPromptCandidate(ctx context.Context, own
 		SourceBookRevision: latestBook.Revision,
 		CreatedAt:          now,
 		VideoPrompts:       make(map[string]string, len(latestBook.Videos)),
+	}
+	if stage, _ := latestBook.SourceMetadata["batchSensitiveStage"].(map[string]any); stage["status"] == "done" {
+		candidate.ProductionVersion, _ = stage["key"].(string)
 	}
 	for index, video := range latestBook.Videos {
 		candidate.VideoPrompts[video.ID] = storyboardVideoPrompt(result.Storyboard[index])

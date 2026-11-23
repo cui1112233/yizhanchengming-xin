@@ -11,8 +11,8 @@ import (
 // registerV12SmartUnifiedRefresh keeps the optional visual-baseline refresh
 // on Go. It uses the same text provider as the Go director and persists the
 // normalized style on the book, so a later director/H3 run can reuse it.
-func registerV12SmartUnifiedRefresh(mux *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, provider batchfactoryv11.DirectorProvider) {
-	if mux == nil || store == nil {
+func registerV12SmartUnifiedRefresh(mux *http.ServeMux, auth BridgeAuth, production *BatchAutomationCoordinator, provider batchfactoryv11.DirectorProvider) {
+	if mux == nil || production.store == nil {
 		return
 	}
 	mux.Handle("POST /api/batch-factory/v12/batches/{batchId}/books/{bookId}/smart-unified/refresh", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -25,27 +25,13 @@ func registerV12SmartUnifiedRefresh(mux *http.ServeMux, auth BridgeAuth, store b
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"smartUnified": map[string]any{"available": false, "skipped": true, "reason": "文本模型服务未配置"}})
 			return
 		}
-		batch, err := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
+		batchID := r.PathValue("batchId")
+		book, err := production.runBatchSensitiveStage(r.Context(), owner, batchID, r.PathValue("bookId"), true)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		var book batchfactoryv11.Book
-		found := false
-		for _, candidate := range batch.Books {
-			if candidate.ID == r.PathValue("bookId") {
-				book, found = candidate, true
-				break
-			}
-		}
-		if !found {
-			writeStoreError(w, batchfactoryv11.ErrNotFound)
-			return
-		}
 		source := strings.TrimSpace(book.SourceText)
-		if source == "" {
-			source = strings.TrimSpace(book.WorkingFrontContent)
-		}
 		if source == "" {
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"smartUnified": map[string]any{"available": false, "skipped": true, "reason": "当前书没有可分析的原文"}})
 			return
@@ -66,7 +52,7 @@ func registerV12SmartUnifiedRefresh(mux *http.ServeMux, auth BridgeAuth, store b
 			return
 		}
 		encoded, _ := json.Marshal(style)
-		latest, err := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
+		latest, err := production.store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -75,7 +61,7 @@ func registerV12SmartUnifiedRefresh(mux *http.ServeMux, auth BridgeAuth, store b
 			if candidate.ID != r.PathValue("bookId") {
 				continue
 			}
-			_, err = store.SaveSettings(r.Context(), owner, batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: r.PathValue("batchId"), BookID: r.PathValue("bookId")}, batchfactoryv11.SettingsUpdate{
+			_, err = production.store.SaveSettings(r.Context(), owner, batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: r.PathValue("batchId"), BookID: r.PathValue("bookId")}, batchfactoryv11.SettingsUpdate{
 				Patch: batchfactoryv11.SettingsPatch{"h3StyleAnalysis": mustJSONRaw(string(encoded))}, ExpectedRevision: candidate.Revision,
 			})
 			break

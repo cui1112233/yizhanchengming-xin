@@ -45,7 +45,7 @@ func (s *MemoryStore) ReplaceComicSourceSegments(_ context.Context, owner, batch
 	book := &owned.Value.Books[bookIndex]
 	source := book.SourceText
 	if draft, exists := s.drafts[draftKey(owner, "working-front:"+book.ID, "working-front-content", batchID)]; exists && draft.Content != "" {
-		source = draft.Content
+		source = EffectiveWorkingSource(*book, draft.Content)
 	}
 	if digest != sourceDigest(source) {
 		return ComicSourceSegmentation{}, fmt.Errorf("%w: 漫画正文已变化", ErrConflict)
@@ -98,7 +98,7 @@ func (s *MemoryStore) BindComicSourceSegments(_ context.Context, owner, batchID,
 	book := &owned.Value.Books[bookIndex]
 	source := book.SourceText
 	if draft, exists := s.drafts[draftKey(owner, "working-front:"+book.ID, "working-front-content", batchID)]; exists && draft.Content != "" {
-		source = draft.Content
+		source = EffectiveWorkingSource(*book, draft.Content)
 	}
 	if digest != sourceDigest(source) {
 		return ComicSourceSegmentation{}, fmt.Errorf("%w: 漫画正文已变化", ErrConflict)
@@ -156,7 +156,7 @@ func (s *MemoryStore) getComicSourceSegmentationLocked(owner, batchID, bookID st
 	}
 	source := book.SourceText
 	if draft, exists := s.drafts[draftKey(owner, "working-front:"+book.ID, "working-front-content", batchID)]; exists && draft.Content != "" {
-		source = draft.Content
+		source = EffectiveWorkingSource(book, draft.Content)
 	}
 	result := ComicSourceSegmentation{BatchID: batchID, BookID: bookID, CurrentDigest: sourceDigest(source)}
 	for ordinal, video := range book.Videos {
@@ -203,7 +203,7 @@ func (s *MemoryStore) SplitComicSourceSegment(_ context.Context, owner, batchID,
 	book := &owned.Value.Books[bookIndex]
 	source := book.SourceText
 	if draft, exists := s.drafts[draftKey(owner, "working-front:"+book.ID, "working-front-content", batchID)]; exists && draft.Content != "" {
-		source = draft.Content
+		source = EffectiveWorkingSource(*book, draft.Content)
 	}
 	videoIndex := -1
 	for index := range book.Videos {

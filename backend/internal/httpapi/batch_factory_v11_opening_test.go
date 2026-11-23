@@ -14,7 +14,7 @@ import (
 func TestOpeningVariantsRouteReturnsGeneratedVariants(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
-	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "她被当众羞辱后沉默离开。"}}})
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", TxtText: "她被当众羞辱后沉默离开。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "她被当众羞辱后沉默离开。"}}})
 	if err != nil {
 		t.Fatal(err)
 	}

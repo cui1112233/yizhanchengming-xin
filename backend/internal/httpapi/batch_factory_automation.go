@@ -649,7 +649,7 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 				scoped.Books = append(scoped.Books, book)
 			}
 		}
-		if validationErr := c.validateAutomationGlobalPreflight(ctx, item.owner, batch, automationStringValue(item.job["runMode"], "full_submit")); validationErr != nil {
+		if validationErr := c.validateResumedAutomation(ctx, item.owner, batch, item.job); validationErr != nil {
 			c.blockAutomationBooksForJob(item.job, validationErr.Error(), c.now())
 			item.job["state"], item.job["lastError"], item.job["updatedAt"] = "failed", validationErr.Error(), c.now()
 			_ = c.setJob(item.owner, item.batchID, item.jobID, item.job)
@@ -1645,7 +1645,11 @@ func (c *BatchAutomationCoordinator) applyResumePreflight(ctx context.Context, o
 			failed++
 			continue
 		}
-		if reason := c.automationBookPreflightReason(ctx, owner, batch, book, runMode); reason != "" {
+		reason := ""
+		if !frozenComicUpload(runMode, entry) {
+			reason = c.automationBookPreflightReason(ctx, owner, batch, book, runMode)
+		}
+		if reason != "" {
 			// 预检失败只改终态和原因，stage 保持原值，避免把已完成阶段清掉。
 			entry["status"], entry["error"], entry["message"], entry["updatedAt"] = "blocked", "", reason, now
 			entry["retryRequested"] = false
@@ -1769,7 +1773,7 @@ func (c *BatchAutomationCoordinator) ResumeInterruptedJobs(ctx context.Context) 
 		}
 		// 自动恢复与正常派发共用同一套全局预检，避免重启后在没有执行器的
 		// 情况下把整批书重新置为 running。
-		if validationErr := c.validateAutomationGlobalPreflight(ctx, item.owner, batch, automationStringValue(item.job["runMode"], "full_submit")); validationErr != nil {
+		if validationErr := c.validateResumedAutomation(ctx, item.owner, batch, item.job); validationErr != nil {
 			c.blockAutomationBooksForJob(item.job, validationErr.Error(), c.now())
 			item.job["state"], item.job["lastError"], item.job["updatedAt"] = "failed", validationErr.Error(), c.now()
 			_ = c.setJob(item.owner, item.batchID, item.jobID, item.job)
@@ -2487,6 +2491,43 @@ func (c *BatchAutomationCoordinator) automationSubmitDeferred(job map[string]any
 		strings.TrimSpace(automationStringValue(job["scheduledAt"], "")) != "" && !automationJobDue(job, c.now())
 }
 
+func (c *BatchAutomationCoordinator) validateResumedAutomation(ctx context.Context, owner string, batch batchfactoryv11.Batch, job map[string]any) error {
+	runMode := automationStringValue(job["runMode"], "full_submit")
+	entries, _ := job["books"].(map[string]any)
+	onlyPublish := false
+	for _, item := range entries {
+		entry, _ := item.(map[string]any)
+		if entry["status"] == "completed" {
+			continue
+		}
+		if !frozenComicUpload(runMode, entry) {
+			return c.validateAutomationGlobalPreflight(ctx, owner, batch, runMode)
+		}
+		onlyPublish = true
+	}
+	if onlyPublish {
+		if c.comicPublish == nil {
+			return fmt.Errorf("N8 漫画发布服务未配置")
+		}
+		return nil
+	}
+	return c.validateAutomationGlobalPreflight(ctx, owner, batch, runMode)
+}
+
+func frozenComicUpload(runMode string, entry map[string]any) bool {
+	stage := automationStringValue(entry["stage"], "")
+	return runMode == "full_submit" && (stage == "comic_publish" || stage == "waiting_submit") && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != ""
+}
+
+// New collections freeze the selected publish profile. Legacy jobs have only the
+// collection ID and continue using the book's previously configured profile.
+func frozenComicSettings(entry map[string]any, current batchfactoryv11.SettingsPatch) batchfactoryv11.SettingsPatch {
+	if raw, ok := entry["frozenComicPublishSettings"].(string); ok {
+		return batchfactoryv11.SettingsPatch{"comicPublishSettings": json.RawMessage(raw)}
+	}
+	return current
+}
+
 func (c *BatchAutomationCoordinator) latestComicCollection(ctx context.Context, owner, batchID, bookID, collectionID string) (batchfactoryv11.ComicCollection, error) {
 	comicStore, ok := c.store.(batchfactoryv11.ComicPageStore)
 	if !ok {
@@ -2501,8 +2542,8 @@ func (c *BatchAutomationCoordinator) latestComicCollection(ctx context.Context, 
 			return collection, nil
 		}
 	}
-	if len(collections) == 0 {
-		return batchfactoryv11.ComicCollection{}, fmt.Errorf("漫画合集不存在")
+	if strings.TrimSpace(collectionID) != "" || len(collections) == 0 {
+		return batchfactoryv11.ComicCollection{}, fmt.Errorf("指定的漫画合集不存在")
 	}
 	return collections[len(collections)-1], nil
 }
@@ -3585,7 +3626,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 		}
 		// 并发槽位还没拿到时如实写 queued，前端才会显示“排队中”。
 		// 回补书保留原 stage/retryAt/batchRetryCount，拿到槽位后仍能续跑。
-		if markAutomationBookQueued(entry, c.now()) {
+		if !frozenComicUpload(jobRunMode, entry) && markAutomationBookQueued(entry, c.now()) {
 			persist()
 		}
 		workers.Add(1)
@@ -3629,7 +3670,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 			}
 		}
 		jobMu.Unlock()
-		if markAutomationBookStarted(entry, c.now()) {
+		if !frozenComicUpload(jobRunMode, entry) && markAutomationBookStarted(entry, c.now()) {
 			persist()
 		}
 		go func(book batchfactoryv11.Book) {
@@ -3855,7 +3896,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 				}
 				// 幂等：已经发布成功的书，在重新执行/误点执行时直接跳过，
 				// 避免在 N8 重复创建合集。强制重生成时才允许重新发布。
-				if !jobForceRegenerate &&
+				if !jobForceRegenerate && !frozenComicUpload(jobRunMode, entry) &&
 					jobRunMode == "full_submit" &&
 					batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "comic" {
 					if record, collectionID, published := c.publishedComicRecord(ctx, owner, batchID, book.ID); published {
@@ -3867,7 +3908,11 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						continue
 					}
 				}
-				if entryStatus == "scheduled" && automationStringValue(entry["stage"], "") == "waiting_submit" {
+				frozenUpload := frozenComicUpload(jobRunMode, entry)
+				if frozenUpload && entry["stage"] == "waiting_submit" && c.automationSubmitDeferred(job) {
+					continue
+				}
+				if !frozenUpload && entryStatus == "scheduled" && entry["stage"] == "waiting_submit" {
 					if c.automationSubmitDeferred(job) {
 						continue
 					}
@@ -3889,7 +3934,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						} else if c.comicPublish == nil {
 							submitErr = fmt.Errorf("N8 漫画发布服务未配置")
 						} else {
-							_, submitErr = c.comicPublish(publishCtx, owner, batchID, book.ID, collection, submitSettings)
+							_, submitErr = c.comicPublish(publishCtx, owner, batchID, book.ID, collection, frozenComicSettings(entry, submitSettings))
 						}
 					} else {
 						submitErr = c.publishVideo(publishCtx, owner, batchID, book.ID)
@@ -3907,6 +3952,47 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						continue
 					}
 					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "已按定时提交时间完成上传", c.now()
+					persist()
+					continue
+				}
+				if frozenUpload {
+					entry["stage"] = "comic_publish"
+					entry["message"], entry["updatedAt"] = "正在继续发布已生成漫画合集", c.now()
+					persist()
+					publishCtx, cancel := context.WithTimeout(ctx, comicPublishStageTimeout)
+					collection, collectionErr := c.latestComicCollection(publishCtx, owner, batchID, book.ID, automationStringValue(entry["comicCollectionId"], ""))
+					var publishErr error
+					var record N8ComicPublishRecord
+					if collectionErr == nil && c.comicPublishRecord != nil {
+						record, _ = c.comicPublishRecord(publishCtx, owner, batchID, collection.ID)
+					}
+					if collectionErr != nil {
+						publishErr = collectionErr
+					} else if record.Status != "published" && c.comicPublish == nil {
+						publishErr = fmt.Errorf("N8 漫画发布服务未配置")
+					} else if record.Status != "published" {
+						record, publishErr = c.comicPublish(publishCtx, owner, batchID, book.ID, collection, frozenComicSettings(entry, batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)))
+					}
+					cancel()
+					if publishErr != nil || record.Status != "published" {
+						// 只复用已上传 imageIDs、继续建合集；不能当成发布完成。
+						if publishErr == nil {
+							publishErr = errN8ComicCarouselIncomplete
+						}
+						entry["publishState"] = "upload_incomplete"
+						if len(record.ImageIDs) > 0 {
+							entry["comicImageIDs"] = record.ImageIDs
+						}
+						fail("comic_publish", publishErr, "漫画图片已上传，正在继续创建合集")
+						continue
+					}
+					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "漫画合集已发布", c.now()
+					delete(entry, "retryRequested")
+					delete(entry, "retryAt")
+					delete(entry, "retryReason")
+					delete(entry, "publishState")
+					entry["comicCarouselId"], entry["comicPublishName"] = record.CarouselID, record.Name
+					entry["comicImageIDs"] = record.ImageIDs
 					persist()
 					continue
 				}
@@ -3956,43 +4042,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					continue
 				}
 				if batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "comic" {
-					if jobRunMode == "full_submit" && automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
-						entry["message"], entry["updatedAt"] = "正在继续发布已生成漫画合集", c.now()
-						persist()
-						publishCtx, cancel := context.WithTimeout(ctx, comicPublishStageTimeout)
-						collection, collectionErr := c.latestComicCollection(publishCtx, owner, batchID, book.ID, automationStringValue(entry["comicCollectionId"], ""))
-						var publishErr error
-						var record N8ComicPublishRecord
-						if collectionErr != nil {
-							publishErr = collectionErr
-						} else if c.comicPublish == nil {
-							publishErr = fmt.Errorf("N8 漫画发布服务未配置")
-						} else {
-							record, publishErr = c.comicPublish(publishCtx, owner, batchID, book.ID, collection, effective)
-						}
-						cancel()
-						if publishErr != nil || record.Status != "published" {
-							// 只复用已上传 imageIDs、继续建合集；不能当成发布完成。
-							if publishErr == nil {
-								publishErr = errN8ComicCarouselIncomplete
-							}
-							entry["publishState"] = "upload_incomplete"
-							if len(record.ImageIDs) > 0 {
-								entry["comicImageIDs"] = record.ImageIDs
-							}
-							fail("comic_publish", publishErr, "漫画图片已上传，正在继续创建合集")
-							continue
-						}
-						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "漫画合集已发布", c.now()
-						delete(entry, "retryRequested")
-						delete(entry, "retryAt")
-						delete(entry, "retryReason")
-						delete(entry, "publishState")
-						entry["comicCarouselId"], entry["comicPublishName"] = record.CarouselID, record.Name
-						entry["comicImageIDs"] = record.ImageIDs
-						persist()
-						continue
-					}
 					acknowledgeComicRetry(entry)
 					// 本轮补齐提示词后仍缺失的页数；storyboard_only 收尾必须保留它，
 					// 不能把「部分页缺提示词」写成「每页提示词已完成」。
@@ -4334,6 +4383,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					collection = confirmedCollection
 					clearAutomationFailure(entry)
 					entry["comicCollectionId"], entry["comicPageCount"] = collection.ID, len(collection.Items)
+					if raw, ok := effective["comicPublishSettings"]; ok {
+						entry["frozenComicPublishSettings"] = string(raw)
+					}
 					// 资产参考图缺失不阻断整本：页图已全部完成，先安排回补轮
 					// 把缺失的参考图补回来；回补预算用完就带着已有资产继续发布。
 					shortfallCount := automationNumberValue(entry["assetShortfallCount"], 0)
@@ -4363,7 +4415,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_publish", "正在发布漫画合集", c.now()
 						persist()
 						publishCtx, cancel := context.WithTimeout(ctx, comicPublishStageTimeout)
-						record, publishErr := c.comicPublish(publishCtx, owner, batchID, book.ID, collection, batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch))
+						record, publishErr := c.comicPublish(publishCtx, owner, batchID, book.ID, collection, frozenComicSettings(entry, effective))
 						cancel()
 						if publishErr != nil {
 							if n8ImagesAlreadyUploadedError(publishErr.Error()) {

@@ -19,7 +19,7 @@ func TestDirectorPromptCandidateRoutesPreserveUntilSelectedVideoAccepts(t *testi
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
 		Title: "b",
 		Books: []batchfactoryv11.CreateBookInput{{
-			Title: "k", SourceText: "林晚进入客厅。",
+			Title: "k", TxtText: "林晚进入客厅。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚进入客厅。",
 			Videos: []batchfactoryv11.CreateVideoInput{
 				{Label: "VIDEO 01", VideoPrompt: "保留第一条"},
 				{Label: "VIDEO 02", VideoPrompt: "保留第二条"},
@@ -53,7 +53,7 @@ func TestDirectorPromptCandidateRoutesPreserveUntilSelectedVideoAccepts(t *testi
 	if err := json.Unmarshal(created.Body.Bytes(), &createdBody); err != nil {
 		t.Fatal(err)
 	}
-	if createdBody.Candidate.SourceBookRevision != book.Revision || createdBody.Candidate.ID == "" {
+	if createdBody.Candidate.SourceBookRevision <= book.Revision || createdBody.Candidate.ID == "" {
 		t.Fatalf("candidate=%+v", createdBody.Candidate)
 	}
 	if !strings.Contains(createdBody.Candidate.VideoPrompts[firstVideo.ID], "第一候选镜头") || !strings.Contains(createdBody.Candidate.VideoPrompts[secondVideo.ID], "第二候选镜头") {

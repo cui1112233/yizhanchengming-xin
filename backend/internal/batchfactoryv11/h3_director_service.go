@@ -46,6 +46,9 @@ func (s *DirectorService) RunH3Director(ctx context.Context, owner, batchID, boo
 	if err != nil {
 		return DirectorRevision{}, err
 	}
+	if stage, _ := book.SourceMetadata["batchSensitiveStage"].(map[string]any); stage["status"] == "done" && !strings.Contains(strings.Join(h3NonEmptyVideoSourceLines(book.SourceText), "\n"), source.Text) {
+		return DirectorRevision{}, NewConfigRequiredError("导演输入与当前生产文本不一致，请重新选择正文")
+	}
 	if strings.TrimSpace(request.Preset.Key) == "" || request.Preset.Revision <= 0 {
 		return DirectorRevision{}, fmt.Errorf("%w: H3 director preset key and revision are required", ErrInvalid)
 	}

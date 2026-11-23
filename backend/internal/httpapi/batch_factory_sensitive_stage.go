@@ -122,14 +122,21 @@ func batchSensitiveModels(settings batchfactoryv11.SettingsPatch) []string {
 	return nil
 }
 
-func sensitiveBaseText(ctx context.Context, s batchfactoryv11.Store, owner string, book batchfactoryv11.Book, state map[string]any, limit int) (string, string, error) {
+func sensitiveBaseText(ctx context.Context, s batchfactoryv11.Store, owner, batchID string, book batchfactoryv11.Book, state map[string]any, limit int) (string, string, error) {
+	draft, err := s.GetDraft(ctx, owner, "working-front:"+book.ID, "working-front-content", batchID)
+	if err != nil && !errors.Is(err, batchfactoryv11.ErrNotFound) {
+		return "", "", err
+	}
+	if strings.TrimSpace(draft.Content) != "" {
+		return draft.Content, batchfactoryv11.WorkingDraftVersion(draft.Content), nil
+	}
 	digest := sensitiveDigest(book.SourceText)
 	kind := firstMetadataString(book.SourceMetadata, "sourceContentVersion")
 	edited := book.SourceMetadata["productionTextEdited"] == true
 	// Selected rewrites and explicit edits are authored inputs. Freeze that version
 	// once so changing the policy later can start from the same wording.
 	baseKey := firstMetadataString(state, "authoredBase")
-	if baseKey != "" && state["raw"] == sensitiveDigest(book.TxtText) && (digest == state["output"] || digest == state["previous"]) {
+	if baseKey != "" && !strings.HasPrefix(baseKey, "working:") && state["raw"] == sensitiveDigest(book.TxtText) && (digest == state["output"] || digest == state["previous"]) {
 		d, err := s.GetDraft(ctx, owner, baseKey, "sensitive_source", book.ID)
 		if err != nil {
 			return "", "", err
@@ -152,6 +159,10 @@ func sensitiveBaseText(ctx context.Context, s batchfactoryv11.Store, owner strin
 }
 
 func (c *BatchAutomationCoordinator) runBatchSensitiveStage(ctx context.Context, owner, batchID, bookID string, manualRetry bool) (batchfactoryv11.Book, error) {
+	return c.batchSensitiveStage(ctx, owner, batchID, bookID, manualRetry, false)
+}
+
+func (c *BatchAutomationCoordinator) batchSensitiveStage(ctx context.Context, owner, batchID, bookID string, manualRetry, verifyOnly bool) (batchfactoryv11.Book, error) {
 	batch, err := c.store.GetBatch(ctx, owner, batchID)
 	if err != nil {
 		return batchfactoryv11.Book{}, err
@@ -175,7 +186,7 @@ func (c *BatchAutomationCoordinator) runBatchSensitiveStage(ctx context.Context,
 		limit = capture
 	}
 	state := mapOrEmpty(book.SourceMetadata["batchSensitiveStage"])
-	input, baseKey, err := sensitiveBaseText(ctx, c.store, owner, book, state, limit)
+	input, baseKey, err := sensitiveBaseText(ctx, c.store, owner, batchID, book, state, limit)
 	if err != nil {
 		return book, err
 	}
@@ -187,6 +198,9 @@ func (c *BatchAutomationCoordinator) runBatchSensitiveStage(ctx context.Context,
 			adapters.settings, err = c.ttsStore.GetConfig(ctx, owner)
 			if err != nil {
 				cause := fmt.Errorf("读取本地敏感规则失败：%w", err)
+				if verifyOnly {
+					return book, cause
+				}
 				state = map[string]any{"status": "failed", "mode": string(mode), "version": version, "input": sensitiveDigest(input), "raw": sensitiveDigest(book.TxtText), "previous": sensitiveDigest(book.SourceText), "authoredBase": baseKey, "error": cause.Error()}
 				updated, saveErr := writer.SaveBookProductionText(ctx, owner, batchID, bookID, batchfactoryv11.SaveBookProductionTextInput{Stage: state, KeepProductionText: true, ExpectedRevision: book.Revision})
 				if saveErr != nil {
@@ -201,7 +215,17 @@ func (c *BatchAutomationCoordinator) runBatchSensitiveStage(ctx context.Context,
 		version += "/" + sensitiveDigest(prompt.BatchFactorySensitiveEditsPrompt()) + "/" + strings.Join(adapters.models, ",")
 	}
 	rawDigest := sensitiveDigest(book.TxtText)
-	key := sensitiveDigest(strings.Join([]string{rawDigest, sensitiveDigest(input), string(mode), version}, "\x00"))
+	signature := []string{rawDigest, sensitiveDigest(input), string(mode), version}
+	if strings.HasPrefix(baseKey, "working:") {
+		signature = append(signature, baseKey)
+	}
+	key := sensitiveDigest(strings.Join(signature, "\x00"))
+	if verifyOnly {
+		if state["key"] != key || state["status"] != "done" || state["output"] != sensitiveDigest(book.SourceText) {
+			return book, batchfactoryv11.NewConfigRequiredError("当前素材与生产文本版本尚未核对，请先重新生成分镜或提示词")
+		}
+		return book, nil
+	}
 	if state["key"] == key {
 		switch state["status"] {
 		case "done":
@@ -244,6 +268,17 @@ func (c *BatchAutomationCoordinator) runBatchSensitiveStage(ctx context.Context,
 		model = adapters.models[0]
 	}
 	result, processErr := processor.Process(ctx, batchfactorysensitive.Input{Mode: mode, Text: input, TextModelID: model, Owner: owner, BookID: bookID})
+	if processErr == nil {
+		current, err := c.store.GetDraft(ctx, owner, "working-front:"+bookID, "working-front-content", batchID)
+		if err != nil && !errors.Is(err, batchfactoryv11.ErrNotFound) {
+			processErr = err
+		} else if strings.TrimSpace(current.Content) != "" && baseKey != batchfactoryv11.WorkingDraftVersion(current.Content) || strings.TrimSpace(current.Content) == "" && strings.HasPrefix(baseKey, "working:") {
+			processErr = batchfactoryv11.NewConfigRequiredError("执行期间编辑稿已变化，请用最新稿重试")
+		}
+	}
+	if processErr == nil && strings.TrimSpace(result.ProductionText) == "" {
+		processErr = errors.New("敏感处理后的生产文本为空，请调整规则或模型后重试")
+	}
 	final := copyAnyMap(state)
 	final["finished"] = time.Now().UTC().Format(time.RFC3339Nano)
 	save := batchfactoryv11.SaveBookProductionTextInput{Stage: final, ExpectedRevision: claimed.Revision}

@@ -244,7 +244,7 @@ func TestComicPageGenerationRejectsARecentDurableGenerationTask(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
 		Title: "漫画批次",
-		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一页"}}}},
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: "本页原稿", TxtText: "本页原稿", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一页"}}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -257,13 +257,15 @@ func TestComicPageGenerationRejectsARecentDurableGenerationTask(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	catalog := novelfetchworkshop.NewMemoryStore()
+	prepareComicPageSourceForGeneration(t, store, catalog, batch.ID, book.ID, video.ID)
 	api := NewRouter(RouterOptions{
 		BridgeSecret:    "secret",
 		Now:             func() time.Time { return now },
 		Slice:           1,
 		Store:           store,
 		LocalArtifacts:  localartifact.NewStore(t.TempDir(), 1024),
-		NovelFetchStore: novelfetchworkshop.NewMemoryStore(),
+		NovelFetchStore: catalog,
 	})
 	path := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + book.ID + "/comic-pages/" + video.ID + "/generate"
 	response := signedJSONRequest(t, api, now, "alice", http.MethodPost, path, map[string]any{
@@ -578,7 +580,7 @@ func TestComicPageGenerateUsesPagePromptAndStoresCandidateOutsideAssets(t *testi
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
 		Title: "漫画批次",
-		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一页"}}}},
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: "本页原稿", TxtText: "本页原稿", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一页"}}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -605,6 +607,7 @@ func TestComicPageGenerateUsesPagePromptAndStoresCandidateOutsideAssets(t *testi
 	}}); err != nil {
 		t.Fatal(err)
 	}
+	prepareComicPageSourceForGeneration(t, store, catalog, batch.ID, book.ID, video.ID)
 	api := NewRouter(RouterOptions{
 		BridgeSecret:    "secret",
 		Now:             func() time.Time { return now },
@@ -1289,7 +1292,7 @@ func TestComicPageManualPromptEditInvalidatesRepairedPromptAndGenerationUsesNewP
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
 		Title: "漫画批次",
-		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "第九页"}}}},
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: "本页原稿", TxtText: "本页原稿", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, Videos: []batchfactoryv11.CreateVideoInput{{Label: "第九页"}}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1319,6 +1322,7 @@ func TestComicPageManualPromptEditInvalidatesRepairedPromptAndGenerationUsesNewP
 	}); err != nil {
 		t.Fatal(err)
 	}
+	prepareComicPageSourceForGeneration(t, store, catalog, batch.ID, book.ID, video.ID)
 	api := NewRouter(RouterOptions{
 		BridgeSecret:    "secret",
 		Now:             func() time.Time { return now },
