@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,10 +24,8 @@ func TestShuihuoProjectsListIncludesOnlyMarkedBatches(t *testing.T) {
 		t.Fatal(err)
 	}
 	shuihuo, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
-		Title: "创作漫剧项目",
-		InitialBatchSettings: batchfactoryv11.SettingsPatch{
-			"shuihuoProject": []byte("true"),
-		},
+		Title:          "创作漫剧项目",
+		ShuihuoProject: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -40,6 +39,85 @@ func TestShuihuoProjectsListIncludesOnlyMarkedBatches(t *testing.T) {
 	projects := body["projects"]
 	if len(projects) != 1 || projects[0]["id"] != shuihuo.ID {
 		t.Fatalf("projects=%v, want only marked project %q and no unmarked batch %q", projects, shuihuo.ID, ordinary.ID)
+	}
+}
+
+func TestProjectOwnershipSurvivesOnlyThroughServerCreation(t *testing.T) {
+	ctx := context.Background()
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	presets, err := NewFileAutomationPresetStore(filepath.Join(t.TempDir(), "presets.json"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 4, Store: store, AutomationPresetStore: presets})
+	regular := signedJSONRequest(t, api, now, "alice", "POST", "/api/batch-factory/v11/batches", map[string]any{"title": "regular", "ShuihuoProject": true, "projectKind": "shuihuo", "initialBatchSettings": map[string]any{"shuihuoProject": true, "projectKind": "shuihuo", "patch": map[string]any{"patch": map[string]any{"SHUIHUOPROJECT": true, "shuihuoProject": true}}, "aspectRatio": "3:4"}})
+	if regular.Code != 201 {
+		t.Fatal(regular.Body.String())
+	}
+	ordinary := decodeBody[map[string]batchfactoryv11.Batch](t, regular)["batch"]
+	if isShuihuoProjectBatch(ordinary) || ordinary.SettingsState.Patch["projectKind"] != nil || string(ordinary.SettingsState.Patch["aspectRatio"]) != `"3:4"` {
+		t.Fatalf("ordinary initial settings = %s", mustJSON(ordinary.SettingsState.Patch))
+	}
+	created := signedJSONRequest(t, api, now, "alice", "POST", "/api/shuihuo-production/projects", map[string]any{"name": "project"})
+	if created.Code != 201 {
+		t.Fatal(created.Body.String())
+	}
+	projectID := decodeBody[map[string]any](t, created)["id"].(string)
+	preset, err := presets.Create("alice", "preset", map[string]any{"shuihuoProject": true, "projectKind": "shuihuo", "textModelId": "text"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preset.Config["shuihuoProject"] != nil || preset.Config["projectKind"] != nil || preset.Config["textModelId"] != "text" {
+		t.Fatalf("stored preset = %v", preset.Config)
+	}
+	version, err := store.CreateConfigVersion(ctx, "alice", batchfactoryv11.ConfigVersion{Name: "regular", Config: mustJSON(map[string]any{"shuihuoProject": true, "patch": map[string]any{"shuihuoProject": false, "aspectRatio": "3:4"}})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var versionConfig map[string]any
+	if err := json.Unmarshal(version.Config, &versionConfig); err != nil {
+		t.Fatal(err)
+	}
+	nested := versionConfig["patch"].(map[string]any)
+	if versionConfig["shuihuoProject"] != nil || nested["shuihuoProject"] != nil || nested["aspectRatio"] != "3:4" {
+		t.Fatalf("saved config version = %s", version.Config)
+	}
+	// A historical preset can still contain ownership in its saved JSON.
+	coordinator := &BatchAutomationCoordinator{store: store}
+	for _, tc := range []struct {
+		id      string
+		project bool
+	}{{ordinary.ID, false}, {projectID, true}} {
+		current, err := store.GetBatch(ctx, "alice", tc.id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if isShuihuoProjectBatch(current) != tc.project {
+			t.Fatal("incorrect initial project ownership")
+		}
+		for _, patch := range []map[string]any{{"restoreKeys": []string{"shuihuoProject"}}, {"patch": map[string]any{"shuihuoProject": !tc.project, "projectKind": "shuihuo"}}, {"patch": map[string]any{"patch": map[string]any{"shuihuoProject": !tc.project, "projectKind": "shuihuo"}}}} {
+			patch["expectedRevision"] = current.Revision
+			res := signedJSONRequest(t, api, now, "alice", "PUT", "/api/batch-factory/v11/batches/"+tc.id+"/settings", patch)
+			if res.Code != 200 {
+				t.Fatal(res.Body.String())
+			}
+			current, err = store.GetBatch(ctx, "alice", tc.id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if isShuihuoProjectBatch(current) != tc.project || current.SettingsState.Patch["projectKind"] != nil {
+				t.Fatalf("settings changed ownership on %s: %s", tc.id, mustJSON(current.SettingsState.Patch))
+			}
+		}
+		legacy := AutomationPreset{Config: map[string]any{"shuihuoProject": !tc.project, "projectKind": "shuihuo", "textModelId": "text"}}
+		current, err = coordinator.applyPreset(ctx, "alice", current, &legacy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if isShuihuoProjectBatch(current) != tc.project || current.SettingsState.Patch["projectKind"] != nil {
+			t.Fatalf("preset changed ownership on %s: %s", tc.id, mustJSON(current.SettingsState.Patch))
+		}
 	}
 }
 

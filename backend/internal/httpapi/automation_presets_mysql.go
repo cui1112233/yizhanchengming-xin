@@ -58,6 +58,7 @@ func (s *MySQLAutomationPresetStore) importLegacyJSON(path string) error {
 			continue
 		}
 		for _, item := range items {
+			item.Config = automationPresetUserSettings(item.Config)
 			if strings.TrimSpace(item.ID) == "" || len(item.Config) == 0 {
 				continue
 			}
@@ -146,7 +147,7 @@ func scanAutomationPreset(row automationPresetScanner) (AutomationPreset, error)
 	if err := json.Unmarshal([]byte(config), &parsed); err != nil {
 		return AutomationPreset{}, fmt.Errorf("decode automation preset %s config: %w", item.ID, err)
 	}
-	item.Config = parsed
+	item.Config = automationPresetUserSettings(parsed)
 	item.CreatedAt = createdAt.UTC().Format(time.RFC3339Nano)
 	item.UpdatedAt = updatedAt.UTC().Format(time.RFC3339Nano)
 	return item, nil
@@ -203,6 +204,7 @@ func (s *MySQLAutomationPresetStore) History(owner, id string) ([]AutomationPres
 
 func (s *MySQLAutomationPresetStore) Create(owner, name string, config map[string]any) (AutomationPreset, error) {
 	owner, name = strings.TrimSpace(owner), strings.TrimSpace(name)
+	config = automationPresetUserSettings(config)
 	if owner == "" || name == "" || len(config) == 0 {
 		return AutomationPreset{}, ErrAutomationPresetInvalid
 	}
@@ -264,6 +266,7 @@ func (s *MySQLAutomationPresetStore) Update(owner, id string, expectedVersion in
 		}
 	}
 	name = strings.TrimSpace(name)
+	config = automationPresetUserSettings(config)
 	if name == "" || len(config) == 0 {
 		return AutomationPreset{}, ErrAutomationPresetInvalid
 	}

@@ -21,7 +21,7 @@ func TestRouterKeepsShuihuoVideoSubmissionsIndependent(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			ctx := context.Background()
 			store := batchfactoryv11.NewMemoryStore()
-			batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "Project", InitialBatchSettings: batchfactoryv11.SettingsPatch{"shuihuoProject": mustJSON(true)}, Books: []batchfactoryv11.CreateBookInput{{Title: "book", SourceText: "源稿。"}}})
+			batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "Project", ShuihuoProject: true, Books: []batchfactoryv11.CreateBookInput{{Title: "book", SourceText: "源稿。"}}})
 			if err != nil {
 				t.Fatal(err)
 			}

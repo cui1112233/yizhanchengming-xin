@@ -3,6 +3,7 @@ package batchfactoryv11
 import (
 	"encoding/json"
 	"sort"
+	"strings"
 )
 
 func clonePatch(input SettingsPatch) SettingsPatch {
@@ -31,6 +32,12 @@ func normalizeLegacyNestedPatch(input SettingsPatch) SettingsPatch {
 		return out
 	}
 	delete(out, "patch")
+	// Only the canonical top-level marker was written by the project creator.
+	for key := range nested {
+		if IsProjectOwnershipKey(key) {
+			delete(nested, key)
+		}
+	}
 	// The nested patch is the older full configuration; outer keys are later
 	// sparse updates and therefore win when both provide the same setting.
 	for key, value := range out {
@@ -39,12 +46,71 @@ func normalizeLegacyNestedPatch(input SettingsPatch) SettingsPatch {
 	return normalizeLegacyNestedPatch(nested)
 }
 
+const shuihuoProjectKey = "shuihuoProject"
+
+// Project ownership is set once by the creating module and is never a user setting.
+func IsProjectOwnershipKey(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "shuihuoproject", "projectkind", "project-kind", "project_kind":
+		return true
+	}
+	return false
+}
+
+// Strip ownership from a saved config or legacy patch envelope while
+// preserving every unrelated value, including non-object configs.
+func userConfigJSON(raw json.RawMessage) (json.RawMessage, bool) {
+	var object SettingsPatch
+	if json.Unmarshal(raw, &object) != nil || object == nil {
+		return raw, false
+	}
+	changed := false
+	for key := range object {
+		if IsProjectOwnershipKey(key) {
+			delete(object, key)
+			changed = true
+		}
+	}
+	if nested, ok := object["patch"]; ok {
+		if clean, modified := userConfigJSON(nested); modified {
+			object["patch"] = clean
+			changed = true
+		}
+	}
+	if !changed {
+		return raw, false
+	}
+	cleaned, _ := json.Marshal(object)
+	return cleaned, true
+}
+
+func (p SettingsPatch) IsShuihuoProject() bool {
+	return strings.TrimSpace(string(p[shuihuoProjectKey])) == "true"
+}
+
+func (input CreateBatchInput) initialSettings() SettingsPatch {
+	patch := ApplySparseUpdate(nil, SettingsUpdate{Patch: input.InitialBatchSettings})
+	if input.ShuihuoProject {
+		patch[shuihuoProjectKey] = json.RawMessage("true")
+	}
+	return patch
+}
+
 func ApplySparseUpdate(current SettingsPatch, update SettingsUpdate) SettingsPatch {
 	out := clonePatch(current)
 	for _, key := range update.RestoreKeys {
+		if IsProjectOwnershipKey(key) {
+			continue
+		}
 		delete(out, key)
 	}
 	for key, value := range update.Patch {
+		if IsProjectOwnershipKey(key) {
+			continue
+		}
+		if key == "patch" {
+			value, _ = userConfigJSON(value)
+		}
 		out[key] = append([]byte(nil), value...)
 	}
 	return out

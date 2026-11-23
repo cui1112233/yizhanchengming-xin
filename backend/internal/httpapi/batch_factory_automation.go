@@ -2257,10 +2257,7 @@ func hasAutomationPublishProfile(publish map[string]any) bool {
 // ResolveSettings(batch, book) 再叠加一次，最终优先级为
 // 单书显式值 > 批次统一配置 > 预设默认。
 func mergeAutomationPresetConfig(current, config map[string]any) map[string]any {
-	merged := map[string]any{}
-	for key, value := range config {
-		merged[key] = value
-	}
+	merged := automationPresetUserSettings(config)
 	for key, value := range current {
 		merged[key] = value
 	}

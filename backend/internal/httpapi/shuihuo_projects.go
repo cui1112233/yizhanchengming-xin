@@ -1274,7 +1274,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "仅支持 TXT、SRT、VTT 或 DOCX 文件"})
 			return
 		}
-		batch, err := store.CreateBatch(r.Context(), owner, batchfactoryv11.CreateBatchInput{Title: name, InitialBatchSettings: batchfactoryv11.SettingsPatch{"shuihuoProject": json.RawMessage("true")}, Books: []batchfactoryv11.CreateBookInput{{Title: name}}})
+		batch, err := store.CreateBatch(r.Context(), owner, batchfactoryv11.CreateBatchInput{Title: name, ShuihuoProject: true, Books: []batchfactoryv11.CreateBookInput{{Title: name}}})
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -1335,10 +1335,8 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				return
 			}
 			batch, err := store.CreateBatch(r.Context(), owner, batchfactoryv11.CreateBatchInput{
-				Title: name,
-				InitialBatchSettings: batchfactoryv11.SettingsPatch{
-					"shuihuoProject": json.RawMessage("true"),
-				},
+				Title:          name,
+				ShuihuoProject: true,
 				// Keep one editable source book so the legacy source PUT can update
 				// a newly-created project before any segmentation work starts.
 				Books: []batchfactoryv11.CreateBookInput{{Title: name}},
@@ -2723,8 +2721,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 }
 
 func isShuihuoProjectBatch(batch batchfactoryv11.Batch) bool {
-	value, ok := batch.SettingsState.Patch["shuihuoProject"]
-	return ok && strings.TrimSpace(string(value)) == "true"
+	return batch.SettingsState.Patch.IsShuihuoProject()
 }
 
 func shuihuoDefaultConfig() map[string]any {

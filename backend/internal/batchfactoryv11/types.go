@@ -179,8 +179,10 @@ type CreateBookInput struct {
 	Videos         []CreateVideoInput `json:"videos,omitempty"`
 }
 type CreateBatchInput struct {
-	Title string            `json:"title"`
-	Books []CreateBookInput `json:"books,omitempty"`
+	// Set only by the Shuihuo project's create and import handlers.
+	ShuihuoProject bool              `json:"-"`
+	Title          string            `json:"title"`
+	Books          []CreateBookInput `json:"books,omitempty"`
 	// InitialBatchSettings is written as the batch-level patch during creation.
 	// It exists so a batch cannot be consumed from an intake before its selected
 	// automation preset has been frozen into the batch itself.

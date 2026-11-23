@@ -101,6 +101,7 @@ func (s *FileAutomationPresetStore) Create(owner, name string, config map[string
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	owner, name = strings.TrimSpace(owner), strings.TrimSpace(name)
+	config = automationPresetUserSettings(config)
 	if owner == "" || name == "" || len(config) == 0 {
 		return AutomationPreset{}, ErrAutomationPresetInvalid
 	}
@@ -131,6 +132,7 @@ func (s *FileAutomationPresetStore) Update(owner, id string, expectedVersion int
 		if len(config) == 0 {
 			config = items[index].Config
 		}
+		config = automationPresetUserSettings(config)
 		if strings.TrimSpace(name) == "" || len(config) == 0 {
 			return AutomationPreset{}, ErrAutomationPresetInvalid
 		}
@@ -189,8 +191,24 @@ func newAutomationPresetID() string {
 	return "auto-preset-" + hex.EncodeToString(buf)
 }
 
+func automationPresetUserSettings(config map[string]any) map[string]any {
+	result := make(map[string]any, len(config))
+	for key, value := range config {
+		if batchfactoryv11.IsProjectOwnershipKey(key) {
+			continue
+		}
+		if key == "patch" {
+			if nested, ok := value.(map[string]any); ok {
+				value = automationPresetUserSettings(nested)
+			}
+		}
+		result[key] = value
+	}
+	return result
+}
+
 func cloneAutomationPreset(item AutomationPreset) AutomationPreset {
-	item.Config = cloneAutomationMap(item.Config)
+	item.Config = cloneAutomationMap(automationPresetUserSettings(item.Config))
 	return item
 }
 

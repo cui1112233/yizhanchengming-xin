@@ -134,7 +134,7 @@ func TestCreateBatchTxBindsGiantMetadataAndSettingsAsText(t *testing.T) {
 		WithArgs(int64(2), sqlmock.AnyArg(), sqlmock.AnyArg(), "alice").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO batch_factory_v12_settings_patches").
-		WithArgs(string(ScopeBatch), sqlmock.AnyArg(), "alice", sqlmock.AnyArg(), nil, nil, jsonTextArg{}, int64(2), sqlmock.AnyArg()).
+		WithArgs(string(ScopeBatch), sqlmock.AnyArg(), "alice", sqlmock.AnyArg(), nil, nil, `{"automationMode":"full_auto"}`, int64(2), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -145,7 +145,7 @@ func TestCreateBatchTxBindsGiantMetadataAndSettingsAsText(t *testing.T) {
 			SourceMetadata: map[string]any{"sourceMode": "giant_material"},
 		}},
 		GiantAutomationPlan:  map[string]any{"presetId": "preset"},
-		InitialBatchSettings: SettingsPatch{"automationMode": json.RawMessage(`"full_auto"`)},
+		InitialBatchSettings: SettingsPatch{"automationMode": json.RawMessage(`"full_auto"`), "shuihuoProject": json.RawMessage("true")},
 	}, "")
 	if err != nil {
 		t.Fatal(err)
@@ -444,6 +444,35 @@ func TestMySQLProductionTextNeverWritesOriginalColumn(t *testing.T) {
 	_, err = writer.SaveBookProductionText(context.Background(), "owner", "batch", "book", SaveBookProductionTextInput{SourceText: "新稿", SourceMetadata: map[string]any{"stage": "done"}, ExpectedRevision: 3})
 	if !errors.Is(err, stop) {
 		t.Fatalf("save: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStoredShuihuoProjectMarkerIsCanonicalAndImmutable(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	rows := sqlmock.NewRows([]string{"batch_id", "patch_json"}).AddRow("legacy", `{"shuihuoProject":true}`).AddRow("wrong-case", `{"SHUIHUOPROJECT":true}`).AddRow("wrong-type", `{"shuihuoProject":"true"}`).AddRow("wrapped", `{"patch":{"shuihuoProject":true}}`)
+	mock.ExpectQuery("SELECT batch_id,patch_json FROM batch_factory_v12_settings_patches").WithArgs("alice").WillReturnRows(rows)
+	flags, err := NewMySQLStore(db).ListShuihuoProjectBatchIDs(context.Background(), "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(flags) != 1 || !flags["legacy"] {
+		t.Fatalf("stored project ids = %#v", flags)
+	}
+	legacy := normalizeLegacyNestedPatch(SettingsPatch{"shuihuoProject": []byte("true"), "patch": []byte(`{"shuihuoProject":false,"aspectRatio":"3:4"}`)})
+	saved := ApplySparseUpdate(legacy, SettingsUpdate{Patch: SettingsPatch{"shuihuoProject": []byte("false")}, RestoreKeys: []string{"shuihuoProject"}})
+	if !saved.IsShuihuoProject() || string(saved["aspectRatio"]) != `"3:4"` {
+		t.Fatalf("legacy project settings = %#v", saved)
+	}
+	ordinary := normalizeLegacyNestedPatch(SettingsPatch{"patch": []byte(`{"patch":{"shuihuoProject":true}}`)})
+	if ordinary.IsShuihuoProject() {
+		t.Fatal("wrapped setting conferred project ownership")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

@@ -284,8 +284,8 @@ func createBatchTx(ctx context.Context, tx *sql.Tx, owner string, input CreateBa
 		}
 		batch.Books = append(batch.Books, book)
 	}
-	if len(input.InitialBatchSettings) > 0 {
-		encoded, err := json.Marshal(input.InitialBatchSettings)
+	if initial := input.initialSettings(); len(initial) > 0 {
+		encoded, err := json.Marshal(initial)
 		if err != nil {
 			return Batch{}, ErrInvalid
 		}
@@ -297,7 +297,7 @@ func createBatchTx(ctx context.Context, tx *sql.Tx, owner string, input CreateBa
 			return Batch{}, err
 		}
 		batch.Revision = initialRevision
-		batch.SettingsState = SettingsState{Patch: cloneSettingsPatch(input.InitialBatchSettings), Revision: initialRevision}
+		batch.SettingsState = SettingsState{Patch: initial, Revision: initialRevision}
 	}
 	return batch, nil
 }
@@ -777,10 +777,8 @@ func (s *MySQLStore) ListShuihuoProjectBatchIDs(ctx context.Context, owner strin
 		if err := rows.Scan(&batchID, &patchJSON); err != nil {
 			return nil, err
 		}
-		var patch struct {
-			ShuihuoProject json.RawMessage `json:"shuihuoProject"`
-		}
-		if json.Unmarshal([]byte(patchJSON), &patch) == nil && strings.TrimSpace(string(patch.ShuihuoProject)) == "true" {
+		var patch SettingsPatch
+		if json.Unmarshal([]byte(patchJSON), &patch) == nil && patch.IsShuihuoProject() {
 			flags[batchID] = true
 		}
 	}
@@ -1645,6 +1643,7 @@ func isAIReasoningPresetConfig(raw json.RawMessage) bool {
 	return json.Unmarshal(raw, &value) == nil && value.Type == "ai-reasoning-preset"
 }
 func (s *MySQLStore) CreateConfigVersion(ctx context.Context, owner string, version ConfigVersion) (ConfigVersion, error) {
+	version.Config, _ = userConfigJSON(version.Config)
 	if strings.TrimSpace(owner) == "" || strings.TrimSpace(version.Name) == "" || !validConfigVersionJSON(version.Config) {
 		return ConfigVersion{}, ErrInvalid
 	}
