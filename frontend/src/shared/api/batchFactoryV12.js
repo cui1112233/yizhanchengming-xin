@@ -631,8 +631,33 @@ export function searchN8ComicWorks(query, options = {}) {
   return apiRequest(`${bf11Path('comic-publish/works')}?query=${encodeURIComponent(value)}`, options);
 }
 
-export function publishComicCollection(batchId, bookId, collectionId, payload) {
+function assertCollectionKind(kind, payload) {
+  if ((payload?.kind && payload.kind !== kind) || payload?.collections?.some(item => item.kind !== kind)) {
+    throw new Error('漫画与文本不能一起上传，请分开选择。');
+  }
+}
+
+export async function publishComicCollection(batchId, bookId, collectionId, payload) {
+  assertCollectionKind('comic', payload);
   return apiRequest(`${comicCollectionsPath(batchId, bookId)}/${id(collectionId)}/publish`, { method: 'POST', body: body(payload) });
+}
+
+function textCollectionPublishPath(batchId, bookId, collectionId) {
+  return bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/text-collections/${id(collectionId)}/publish`);
+}
+
+export async function publishTextCollection(batchId, bookId, collectionId, payload = {}) {
+  assertCollectionKind('text', payload);
+  const request = payload.force && !payload.requestKey
+    ? { ...payload, requestKey: globalThis.crypto?.randomUUID?.() || `text-${Date.now()}-${Math.random().toString(36).slice(2)}` }
+    : payload;
+  return apiRequest(textCollectionPublishPath(batchId, bookId, collectionId), {
+    method: 'POST', body: body(request), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS
+  });
+}
+
+export function getTextPublishStatus(batchId, bookId, collectionId, options = {}) {
+  return apiRequest(textCollectionPublishPath(batchId, bookId, collectionId), options);
 }
 
 export function getComicCollectionPublishRecord(batchId, bookId, collectionId, options = {}) {
@@ -947,6 +972,8 @@ export default {
 	getN8ComicPublishAudioCategories,
 	getN8ComicPublishAudios,
 	publishComicCollection,
+	publishTextCollection,
+	getTextPublishStatus,
 	getComicCollectionPublishRecord,
   getConfigVersions,
   createConfigVersion,

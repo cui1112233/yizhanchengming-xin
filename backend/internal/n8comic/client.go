@@ -87,6 +87,10 @@ type CreateCarouselRequest struct {
 	AudioID           int64
 }
 
+// ErrCarouselReceiptPending means N8 accepted the create call without returning
+// an identifier. Submitting it again could create a duplicate carousel.
+var ErrCarouselReceiptPending = errors.New("N8 创建漫画合集成功但未返回合集 ID")
+
 type PublishResult struct {
 	CarouselID int64   `json:"carouselId"`
 	ImageIDs   []int64 `json:"imageIds"`
@@ -259,7 +263,7 @@ func (c *Client) CreateCarousel(ctx context.Context, input CreateCarouselRequest
 		return 0, err
 	}
 	if created.CarouselID <= 0 {
-		return 0, fmt.Errorf("N8 创建漫画合集成功但未返回合集 ID")
+		return 0, ErrCarouselReceiptPending
 	}
 	return created.CarouselID, nil
 }

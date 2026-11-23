@@ -321,6 +321,14 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	registerComicDirectRoutes(v12, options.N8ComicPublisher, options.ComicDirectRecordPath, options.Now)
 	registerN8ComicPublishRoutes(v12, options.N8ComicPublisher)
+	if options.Store != nil {
+		options.N8ComicPublisher.configureCollectionClaim(options.RedisURL)
+		textPublisher := textCollectionPublisher{repo: options.TextRepository, n8: options.N8ComicPublisher}
+		textPublisher.route(v12, options)
+		if options.AutomationCoordinator != nil && options.AutomationCoordinator.textPublish == nil {
+			options.AutomationCoordinator.textPublish = textPublisher.automation
+		}
+	}
 	if options.NovelFetchFetcher != nil {
 		registerV12FetchOriginalsRoute(v12, options.Store, options.NovelFetchStore, options.NovelFetchFetcher, batchFetchClassification{
 			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,

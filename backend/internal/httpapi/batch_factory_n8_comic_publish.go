@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
+	"qiantie/backend/internal/collectionpublish"
 	"regexp"
 	"sort"
 	"strconv"
@@ -26,7 +26,7 @@ const n8ComicPublishDraftKind = "n8-comic-publish"
 // errN8ComicCarouselIncomplete 表示漫画图片已经上传（imageIDs 可直接复用），
 // 但 N8 合集还没有创建完成。它是可续建状态：既不能当成发布成功，也不是
 // 内容审核失败，重试时只需要复用 imageIDs 重新建合集。
-var errN8ComicCarouselIncomplete = errors.New("N8 漫画图片已上传，但合集尚未创建完成")
+var errN8ComicCarouselIncomplete = collectionpublish.ErrIncomplete
 
 type n8ComicPublishSettings struct {
 	ProducerAdminName          string  `json:"producerAdminName"`
@@ -453,18 +453,10 @@ type N8ComicWorkDirectory interface {
 	SearchWorks(context.Context, string) ([]n8catalog.Work, error)
 }
 
-type N8ComicPublishRecord struct {
-	Status            string    `json:"status"`
-	Name              string    `json:"name"`
-	ProducerAdminName string    `json:"producerAdminName"`
-	AudioCategoryID   int64     `json:"audioCategoryId"`
-	WorkIDs           []int64   `json:"workIds"`
-	CarouselID        int64     `json:"carouselId"`
-	ImageIDs          []int64   `json:"imageIds"`
-	PublishedAt       time.Time `json:"publishedAt"`
-}
+type N8ComicPublishRecord collectionpublish.Record
 
 type BatchFactoryN8ComicPublisher struct {
+	claimCollection       func(context.Context, collectionpublish.PublishRequest) (func(), error)
 	Store                 batchfactoryv11.Store
 	LocalFiles            *localartifact.Store
 	Client                N8ComicClient
@@ -532,6 +524,7 @@ func (p *BatchFactoryN8ComicPublisher) workTitleMap() *n8WorkTitleMap {
 }
 
 type n8ComicPublishInput struct {
+	collectionPublishSelection
 	ProducerAdminName string  `json:"producerAdminName"`
 	AudioCategoryID   int64   `json:"audioCategoryId"`
 	AudioID           int64   `json:"audioId"`
@@ -641,6 +634,9 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 		if !decodeJSON(w, r, &input) {
 			return
 		}
+		if !input.validate(w, collectionpublish.CollectionKindComic, r.PathValue("collectionId")) {
+			return
+		}
 		record, err := publisher.Publish(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("collectionId"), input)
 		if err != nil {
 			if errors.Is(err, batchfactoryv11.ErrUpstream) {
@@ -666,7 +662,12 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "漫画发布记录存储尚未配置"})
 			return
 		}
-		record, found := publisher.savedRecord(r.Context(), owner, r.PathValue("batchId"), r.PathValue("collectionId"))
+		record, found, err := (collectionDraftRecords{publisher.Store}).Load(r.Context(), collectionpublish.PublishRequest{Kind: collectionpublish.CollectionKindComic, Owner: owner, BatchID: r.PathValue("batchId"), BookID: r.PathValue("bookId"), CollectionID: r.PathValue("collectionId")})
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		found = found && record.Confirmed()
 		if !found {
 			writeJSON(w, http.StatusOK, map[string]any{"published": false, "publish": nil})
 			return
@@ -973,128 +974,59 @@ func uniqueProducerAccounts(values []string) []string {
 }
 
 func (p *BatchFactoryN8ComicPublisher) Publish(ctx context.Context, owner, batchID, bookID, collectionID string, input n8ComicPublishInput) (N8ComicPublishRecord, error) {
+	req := collectionpublish.PublishRequest{Kind: collectionpublish.CollectionKindComic, Owner: owner, BatchID: batchID, BookID: bookID, CollectionID: collectionID, Producer: strings.TrimSpace(input.ProducerAdminName), AudioCategoryID: input.AudioCategoryID, AudioID: input.AudioID, WorkIDs: input.WorkIDs, Force: input.Force, Collections: input.Collections, RequestKey: input.RequestKey}
+	if err := input.check(req.Kind, collectionID); err != nil {
+		return N8ComicPublishRecord{}, err
+	}
 	if p == nil || p.Store == nil || p.LocalFiles == nil || p.Client == nil || !p.Client.Configured() {
 		return N8ComicPublishRecord{}, fmt.Errorf("N8 漫画发布接口尚未配置")
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if saved, ok := p.savedRecord(ctx, owner, batchID, collectionID); ok && !input.Force {
-		return saved, nil
-	}
-	input.ProducerAdminName = strings.TrimSpace(input.ProducerAdminName)
-	missing := make([]string, 0, 4)
-	if input.ProducerAdminName == "" {
-		missing = append(missing, "制作者")
-	}
-	if input.AudioCategoryID <= 0 {
-		missing = append(missing, "音频分类")
-	}
-	if input.AudioID <= 0 {
-		missing = append(missing, "音频")
-	}
-	if len(input.WorkIDs) == 0 {
-		missing = append(missing, "关联作品")
-	}
-	if len(missing) > 0 {
-		return N8ComicPublishRecord{}, fmt.Errorf("漫画发布设置不完整：缺少%s", strings.Join(missing, "、"))
-	}
-
-	batch, err := p.Store.GetBatch(ctx, owner, batchID)
-	if err != nil {
-		return N8ComicPublishRecord{}, err
-	}
-	var book *batchfactoryv11.Book
-	for index := range batch.Books {
-		if batch.Books[index].ID == bookID {
-			book = &batch.Books[index]
-			break
+	rec, err := p.collectionService().Publish(ctx, req, func(ctx context.Context, r *collectionpublish.PublishRequest) (collectionpublish.Collection, error) {
+		var out collectionpublish.Collection
+		if err := collectionpublish.ValidateMapping(*r); err != nil {
+			return out, err
 		}
-	}
-	if book == nil {
-		return N8ComicPublishRecord{}, batchfactoryv11.ErrNotFound
-	}
-	comicStore, ok := p.Store.(batchfactoryv11.ComicPageStore)
-	if !ok {
-		return N8ComicPublishRecord{}, fmt.Errorf("漫画合集存储尚未配置")
-	}
-	collections, err := comicStore.ListComicCollections(ctx, owner, batchID, bookID)
-	if err != nil {
-		return N8ComicPublishRecord{}, err
-	}
-	var collection *batchfactoryv11.ComicCollection
-	for index := range collections {
-		if collections[index].ID == collectionID {
-			collection = &collections[index]
-			break
+		batch, err := p.Store.GetBatch(ctx, owner, batchID)
+		if err != nil {
+			return out, err
 		}
-	}
-	if collection == nil {
-		return N8ComicPublishRecord{}, batchfactoryv11.ErrNotFound
-	}
-	items := append([]batchfactoryv11.ComicCollectionItem(nil), collection.Items...)
-	sort.SliceStable(items, func(i, j int) bool { return items[i].Ordinal < items[j].Ordinal })
-	images := make([]n8comic.ImageInput, 0, len(items))
-	for _, item := range items {
-		if strings.TrimSpace(item.StorageRef) == "" {
-			return N8ComicPublishRecord{}, fmt.Errorf("漫画第 %d 页没有可上传的本地主图", item.Ordinal)
+		book, ok := findBatchBookByID(batch, bookID)
+		if !ok {
+			return out, batchfactoryv11.ErrNotFound
 		}
-		file, openErr := p.LocalFiles.Open(item.StorageRef)
-		if openErr != nil {
-			return N8ComicPublishRecord{}, fmt.Errorf("读取漫画第 %d 页失败：%w", item.Ordinal, openErr)
+		comicStore, ok := p.Store.(batchfactoryv11.ComicPageStore)
+		if !ok {
+			return out, fmt.Errorf("漫画合集存储尚未配置")
 		}
-		content, readErr := io.ReadAll(io.LimitReader(file, 64<<20))
-		closeErr := file.Close()
-		if readErr != nil {
-			return N8ComicPublishRecord{}, fmt.Errorf("读取漫画第 %d 页失败：%w", item.Ordinal, readErr)
+		list, err := comicStore.ListComicCollections(ctx, owner, batchID, bookID)
+		if err != nil {
+			return out, err
 		}
-		if closeErr != nil {
-			return N8ComicPublishRecord{}, fmt.Errorf("关闭漫画第 %d 页文件失败：%w", item.Ordinal, closeErr)
-		}
-		images = append(images, n8comic.ImageInput{FileName: fmt.Sprintf("%s-%02d%s", collection.ID, item.Ordinal, comicImageExtension(item.MediaType)), MediaType: item.MediaType, Content: content})
-	}
-
-	now := time.Now()
-	if p.Now != nil {
-		now = p.Now()
-	}
-	name, err := n8ComicCollectionName(input.ProducerAdminName, book.Title, now)
-	if err != nil {
-		return N8ComicPublishRecord{}, err
-	}
-	// 上一次可能已经上传了全部/部分图片但建合集失败。复用这些 imageIDs，
-	// 本轮只上传缺图并重新创建合集，避免整本图片重传。
-	var uploadedIDs []int64
-	if saved, ok := p.savedUploadedRecord(ctx, owner, batchID, collectionID); ok && len(saved.ImageIDs) == len(images) {
-		uploadedIDs = saved.ImageIDs
-	}
-	result, err := p.Client.Publish(ctx, n8comic.PublishRequest{ProducerAdminName: input.ProducerAdminName, Name: name, Images: images, WorkIDs: input.WorkIDs, AudioCategoryID: input.AudioCategoryID, AudioID: input.AudioID, UploadedImageIDs: uploadedIDs})
-	if err != nil {
-		if uploaded := countComicPublishImageIDs(result.ImageIDs); uploaded > 0 {
-			// 只要已经有一部分图片入库，就把它们持久化，标记为独立终态
-			// upload_incomplete；不能返回 nil，否则自动化会把“合集未创建”
-			// 误记成发布完成。
-			record := N8ComicPublishRecord{Status: "upload_incomplete", Name: name, ProducerAdminName: input.ProducerAdminName, AudioCategoryID: input.AudioCategoryID, WorkIDs: append([]int64(nil), input.WorkIDs...), ImageIDs: append([]int64(nil), result.ImageIDs...), PublishedAt: now}
-			encoded, encodeErr := json.Marshal(record)
-			if encodeErr != nil {
-				return N8ComicPublishRecord{}, encodeErr
+		for _, c := range list {
+			if c.ID != collectionID {
+				continue
 			}
-			if _, saveErr := p.Store.SaveDraft(ctx, owner, batchfactoryv11.Draft{Key: collectionID, Kind: n8ComicPublishDraftKind, Scope: batchID, Content: string(encoded)}); saveErr != nil {
-				return N8ComicPublishRecord{}, fmt.Errorf("N8 图片已上传，但保存上传记录失败：%w", saveErr)
+			out.Kind = req.Kind
+			out.ID = c.ID
+			out.Name, err = p.collectionName(req.Producer, book.Title)
+			if err != nil {
+				return out, err
 			}
-			return record, fmt.Errorf("%w：%v", errN8ComicCarouselIncomplete, err)
+			for _, item := range c.Items {
+				page, err := p.publishPage(ctx, c.ID, item.Ordinal, item.StorageRef, item.MediaType, "")
+				if err != nil {
+					return out, err
+				}
+				out.Pages = append(out.Pages, page)
+			}
+			return out, nil
 		}
-		return N8ComicPublishRecord{}, err
+		return out, batchfactoryv11.ErrNotFound
+	})
+	if err == nil && !rec.Confirmed() {
+		err = fmt.Errorf("漫画合集正在等待上传回执")
 	}
-	record := N8ComicPublishRecord{Status: "published", Name: name, ProducerAdminName: input.ProducerAdminName, AudioCategoryID: input.AudioCategoryID, WorkIDs: append([]int64(nil), input.WorkIDs...), CarouselID: result.CarouselID, ImageIDs: append([]int64(nil), result.ImageIDs...), PublishedAt: now}
-	encoded, err := json.Marshal(record)
-	if err != nil {
-		return N8ComicPublishRecord{}, err
-	}
-	if _, err := p.Store.SaveDraft(ctx, owner, batchfactoryv11.Draft{Key: collectionID, Kind: n8ComicPublishDraftKind, Scope: batchID, Content: string(encoded)}); err != nil {
-		return N8ComicPublishRecord{}, fmt.Errorf("N8 已发布，但保存本地发布记录失败：%w", err)
-	}
-	return record, nil
+	return N8ComicPublishRecord(rec), err
 }
 
 func comicImageExtension(mediaType string) string {
@@ -1118,36 +1050,10 @@ func (p *BatchFactoryN8ComicPublisher) savedRecord(ctx context.Context, owner, b
 		return N8ComicPublishRecord{}, false
 	}
 	var record N8ComicPublishRecord
-	if json.Unmarshal([]byte(draft.Content), &record) != nil || record.Status != "published" || record.CarouselID <= 0 || len(record.ImageIDs) == 0 {
+	if json.Unmarshal([]byte(draft.Content), &record) != nil || !collectionpublish.Record(record).Confirmed() {
 		return N8ComicPublishRecord{}, false
 	}
 	return record, true
-}
-
-// savedUploadedRecord 读取上次“图片已上传、合集未完成”的记录，用于续建时
-// 复用 imageIDs。兼容历史上写入的 uploaded 记录。
-func (p *BatchFactoryN8ComicPublisher) savedUploadedRecord(ctx context.Context, owner, batchID, collectionID string) (N8ComicPublishRecord, bool) {
-	draft, err := p.Store.GetDraft(ctx, owner, collectionID, n8ComicPublishDraftKind, batchID)
-	if err != nil {
-		return N8ComicPublishRecord{}, false
-	}
-	var record N8ComicPublishRecord
-	if json.Unmarshal([]byte(draft.Content), &record) != nil || (record.Status != "uploaded" && record.Status != "upload_incomplete") || len(record.ImageIDs) == 0 {
-		return N8ComicPublishRecord{}, false
-	}
-	return record, true
-}
-
-// countComicPublishImageIDs 统计已经拿到 N8 图片 ID 的页数；0 表示还没
-// 有任何图片入库，不需要写 upload_incomplete 记录。
-func countComicPublishImageIDs(ids []int64) int {
-	count := 0
-	for _, id := range ids {
-		if id > 0 {
-			count++
-		}
-	}
-	return count
 }
 
 func n8ComicCollectionName(producer, title string, now time.Time) (string, error) {
