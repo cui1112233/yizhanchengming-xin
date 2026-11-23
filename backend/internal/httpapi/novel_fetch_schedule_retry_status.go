@@ -36,10 +36,6 @@ func novelFetchScheduleGenerationDecision(ctx context.Context, store novelfetchw
 	if queue == novelfetchworkshop.TaskStatusStopped || status == novelfetchworkshop.TaskStatusStopped {
 		return novelFetchGenerationDecision{status: "stopped"}
 	}
-	if strings.EqualFold(firstText(meta["originalStatus"], meta["original_status"]), "too_short") ||
-		strings.EqualFold(firstText(meta["aiStatus"], meta["ai_status"]), "skipped_short_original") {
-		return novelFetchGenerationDecision{status: "completed", skipReason: novelFetchShortOriginalSkipReason}
-	}
 	if meta["manualOnly"] == true || meta["manual_only"] == true || meta["manualOriginalFetchRequired"] == true ||
 		meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta) ||
 		novelFetchGenerationSignal(firstText(meta["aiStatus"], meta["ai_status"])) == novelfetchworkshop.TaskStatusFailed {
@@ -65,6 +61,10 @@ func novelFetchScheduleGenerationDecision(ctx context.Context, store novelfetchw
 			novelfetchworkshop.TaskStatusWaitingConfig, novelfetchworkshop.TaskStatusWaitingLogin:
 			return novelFetchGenerationDecision{status: state}
 		}
+	}
+	if strings.EqualFold(firstText(meta["originalStatus"], meta["original_status"]), "too_short") ||
+		strings.EqualFold(firstText(meta["aiStatus"], meta["ai_status"]), "skipped_short_original") {
+		return novelFetchGenerationDecision{status: "completed", skipReason: novelFetchShortOriginalSkipReason}
 	}
 	switch status {
 	case novelfetchworkshop.TaskStatusCompleted, novelfetchworkshop.TaskStatusPendingSubmit, novelfetchworkshop.TaskStatusUploadPending:

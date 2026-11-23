@@ -285,6 +285,9 @@ func prepareNovelFetchScheduleTasks(ctx context.Context, store novelfetchworksho
 				continue
 			}
 			if reason != "" {
+				if reason == novelFetchShortOriginalSkipReason && scheduleOwnsBook(doc.Meta, item) {
+					trackBook(doc)
+				}
 				skippedIDs = append(skippedIDs, doc.BookID)
 				skipped = append(skipped, map[string]any{"book_id": doc.BookID, "reason": reason})
 				if !scheduleSkipFinishesBook(reason) {
@@ -346,6 +349,11 @@ func filterDueScheduleBooks(ctx context.Context, store novelfetchworkshop.Store,
 		}
 		reason, observe := scheduleBookDisposition(ctx, store, owner, doc, item)
 		owned := scheduleOwnsBook(doc.Meta, item)
+		if owned && reason == novelFetchShortOriginalSkipReason {
+			books.observed = append(books.observed, id)
+			skipped = append(skipped, map[string]any{"book_id": id, "reason": reason})
+			continue
+		}
 		if observe && owned {
 			books.observed = append(books.observed, id)
 			books.allComplete = false

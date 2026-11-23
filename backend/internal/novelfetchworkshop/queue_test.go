@@ -2,10 +2,15 @@ package novelfetchworkshop
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"qiantie/backend/internal/mergeworker"
 )
 
 func TestMemoryQueueClaimAckAndRetry(t *testing.T) {
@@ -86,6 +91,74 @@ func TestMemoryQueuePreservesScheduledAutoSubmit(t *testing.T) {
 	}
 }
 
+func TestMemoryQueueCancelledBookRejectsWholeEnqueue(t *testing.T) {
+	ctx := context.Background()
+	q := NewMemoryQueue()
+	job := ProcessJob{ID: "cancelled-batch", Owner: "owner", BatchID: "batch", PlatformID: "2", BookIDs: []string{"free", "stopped"}}
+	if err := q.CancelBooks(ctx, job.Owner, []string{"stopped"}); err != nil {
+		t.Fatal(err)
+	}
+	queued, existing, err := q.EnqueueUniqueBooks(ctx, job, time.Hour)
+	if queued || existing != "" || !errors.Is(err, ErrBookCancelled) {
+		t.Errorf("cancelled batch queued=%v existing=%q err=%v", queued, existing, err)
+	}
+	if len(q.pending) != 0 || len(q.dedupe) != 0 {
+		t.Fatalf("rejected batch left pending=%d dedupe=%d", len(q.pending), len(q.dedupe))
+	}
+	if err := q.ClearCancelledBooks(ctx, job.Owner, []string{"stopped"}); err != nil {
+		t.Fatal(err)
+	}
+	queued, _, err = q.EnqueueUniqueBooks(ctx, job, time.Hour)
+	if !queued || err != nil || len(q.pending) != 1 {
+		t.Fatalf("explicit retry queued=%v pending=%d err=%v", queued, len(q.pending), err)
+	}
+}
+
+func TestRedisQueueCancelledBookRejectsWholeEnqueue(t *testing.T) {
+	url := os.Getenv("V88_NOVEL_FETCH_TEST_REDIS_URL")
+	if url == "" {
+		t.Skip("explicit isolated Redis endpoint required")
+	}
+	prefix := fmt.Sprintf("cancel-enqueue-test:%d", time.Now().UnixNano())
+	transport, err := mergeworker.NewRedisStore(url, prefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	q := NewRedisQueueWithDo(prefix, RedisDoFunc(transport.Do))
+	job := ProcessJob{ID: "mixed", Owner: "owner", BatchID: "batch", PlatformID: "2", BookIDs: []string{"free", "stopped", "free"}}
+	if err = q.CancelBooks(ctx, job.Owner, []string{"stopped"}); err != nil {
+		t.Fatal(err)
+	}
+	defer q.ClearCancelledBooks(ctx, job.Owner, []string{"stopped"})
+	queued, existing, err := q.EnqueueUniqueBooks(ctx, job, time.Hour)
+	if queued || existing != "" || !errors.Is(err, ErrBookCancelled) {
+		t.Fatalf("queued=%v existing=%q err=%v", queued, existing, err)
+	}
+	count, err := transport.Do(ctx, "EXISTS", q.jobKey(job.ID), q.pendingKey(), q.bookDedupeKey(job.Owner, "2", "free"), q.bookDedupeKey(job.Owner, "2", "stopped"))
+	if err != nil || count != int64(0) {
+		t.Fatalf("rejected batch left keys: %v %v", count, err)
+	}
+	marked, err := q.IsBookCancelled(ctx, job.Owner, "stopped")
+	if err != nil || !marked {
+		t.Fatal(marked, err)
+	}
+	if err := q.ClearCancelledBooks(ctx, job.Owner, []string{"stopped"}); err != nil {
+		t.Fatal(err)
+	}
+	queued, _, err = q.EnqueueUniqueBooks(ctx, job, time.Hour)
+	if err != nil || !queued {
+		t.Fatal(queued, err)
+	}
+	got, err := q.Claim(ctx, time.Second)
+	if err != nil || got.ID != job.ID {
+		t.Fatal(got, err)
+	}
+	if err = q.Ack(ctx, got); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRedisQueueUsesPendingProcessingAndLeaseKeys(t *testing.T) {
 	fake := &fakeRedisQueueDo{}
 	queue := NewRedisQueueWithDo("qiantie:test:novel", fake.Do)
@@ -133,8 +206,9 @@ func TestRedisQueueEnqueueUniqueBooksUsesAtomicPerBookKeys(t *testing.T) {
 	if err != nil || !queued || existingID != job.ID {
 		t.Fatalf("first book enqueue queued=%v existingID=%q err=%v", queued, existingID, err)
 	}
-	if len(fake.commands) != 1 || fake.commands[0][0] != "EVAL" || fake.commands[0][2] != "4" {
-		t.Fatalf("expected one atomic eval for two book locks plus job/list keys: %v", fake.commands)
+	if len(fake.commands) != 1 || fake.commands[0][0] != "EVAL" || fake.commands[0][2] != "6" ||
+		!slices.Equal(fake.commands[0][7:9], []string{queue.cancelKey(job.Owner, "book-a"), queue.cancelKey(job.Owner, "book-b")}) {
+		t.Fatalf("expected one atomic eval with both book locks and cancellation keys: %v", fake.commands)
 	}
 	job.BookIDs = []string{"book-b", "book-c"}
 	queued, existingID, err = queue.EnqueueUniqueBooks(context.Background(), job, time.Hour)

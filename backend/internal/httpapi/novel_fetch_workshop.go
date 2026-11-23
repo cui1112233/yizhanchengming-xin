@@ -1007,14 +1007,42 @@ func updateWorkshopTaskRuntimeState(ctx context.Context, store novelfetchworksho
 	return store.PutDocument(ctx, owner, document)
 }
 
-func setNovelFetchBookQueueState(ctx context.Context, store novelfetchworkshop.Store, owner, bookID, jobID, batchID, status string) error {
+// Import metadata and snapshots must not overwrite a concurrent stop.
+type manualImportStore struct{ novelfetchworkshop.Store }
+
+func (s manualImportStore) PutDocument(ctx context.Context, owner string, doc novelfetchworkshop.Document) error {
+	_, err := s.CompareAndSwapDocument(ctx, owner, doc)
+	return err
+}
+
+func manualImportConflict(err error) bool {
+	return errors.Is(err, novelfetchworkshop.ErrBookCancelled) || errors.Is(err, novelfetchworkshop.ErrDocumentChanged)
+}
+
+func writeManualImportError(w http.ResponseWriter, err error, status int, message string) {
+	if manualImportConflict(err) {
+		status, message = http.StatusConflict, "书籍已停止或状态已更新，请刷新任务列表"
+	}
+	writeJSON(w, status, map[string]any{"error": message})
+}
+
+type manualQueuedBook struct {
+	before  novelfetchworkshop.Document
+	version string
+}
+
+func setManualBookQueueState(ctx context.Context, store novelfetchworkshop.Store, owner, bookID, jobID, batchID, status, message string) (manualQueuedBook, error) {
 	document, err := store.GetDocument(ctx, owner, bookID)
 	if err != nil {
-		return err
+		return manualQueuedBook{}, err
 	}
-	if document.Meta == nil {
-		document.Meta = map[string]any{}
+	if novelFetchStopped(firstText(document.Meta["status"], document.Meta["taskStatus"], document.Meta["task_status"])) ||
+		novelFetchStopped(firstText(document.Meta["queueState"], document.Meta["queue_state"])) {
+		return manualQueuedBook{}, novelfetchworkshop.ErrBookCancelled
 	}
+	before := document
+	document.Meta = cloneAnyMap(document.Meta)
+	document.Logs = append([]any(nil), document.Logs...)
 	document.Meta["status"] = status
 	document.Meta["queueState"] = status
 	document.Meta["currentProcessJobId"] = jobID
@@ -1023,7 +1051,34 @@ func setNovelFetchBookQueueState(ctx context.Context, store novelfetchworkshop.S
 	}
 	delete(document.Meta, "error")
 	appendNovelFetchDocumentLog(&document, "queue_"+status, "任务已进入小说获取队列", time.Now().UTC())
-	return store.PutDocument(ctx, owner, document)
+	if message != "" {
+		document.Meta["error"] = message
+		appendNovelFetchDocumentLog(&document, "process_"+status, message, time.Now().UTC())
+	}
+	version, err := store.CompareAndSwapDocument(ctx, owner, document)
+	return manualQueuedBook{before: before, version: version}, err
+}
+
+// Only undo our own queued version. A stop, a retry, or a worker may already own the row.
+func undoManualQueuedBooks(ctx context.Context, store novelfetchworkshop.Store, owner string, books []manualQueuedBook, message, existingJobID string) error {
+	var firstErr error
+	for _, book := range books {
+		doc := book.before
+		doc.UpdatedAt = book.version
+		if message != "" {
+			doc.Meta["status"], doc.Meta["queueState"], doc.Meta["error"] = "waiting_retry", "waiting_retry", message
+			delete(doc.Meta, "currentProcessJobId")
+			if existingJobID != "" {
+				doc.Meta["currentProcessJobId"] = existingJobID
+			}
+			appendNovelFetchDocumentLog(&doc, "process_waiting_retry", message, time.Now().UTC())
+		}
+		_, err := store.CompareAndSwapDocument(ctx, owner, doc)
+		if err != nil && !errors.Is(err, novelfetchworkshop.ErrDocumentChanged) && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 func markNovelFetchTaskQueued(ctx context.Context, store novelfetchworkshop.Store, owner, bookID, jobID, batchID string, at time.Time) error {
@@ -2727,9 +2782,9 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		batchID := fmt.Sprintf("batch-%d", time.Now().UnixNano())
-		result, err := workshopProcessResult(req.Context(), store, queue, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt)
+		result, err := workshopProcessResult(req.Context(), manualImportStore{store}, queue, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
+			writeManualImportError(w, err, http.StatusInternalServerError, "保存任务失败")
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
@@ -2881,9 +2936,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		normalized := input.InputNormalized || strings.TrimSpace(firstText(input.InputFormat, input.InputFormatLegacy)) != ""
 		metadata := workshopInputMetadata{Format: firstText(input.ParseMode, input.InputFormat, input.InputFormatLegacy), ColumnPreset: firstText(input.ColumnPresetID, input.ColumnPreset, input.ColumnPresetLegacy), ColumnOrder: columnOrder, Normalized: normalized}
 		documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(input.InputText, input.MaxTxt, metadata)
-		result, bookIDs, skippedBookIDs, err := workshopProcessParsedResult(req.Context(), store, queue, identity.Username, documents, parsed, emptyIDs, duplicates, input.PlatformID, batchID, metadata, input.SelectedVersions)
+		importStore := manualImportStore{store}
+		result, bookIDs, skippedBookIDs, err := workshopProcessParsedResult(req.Context(), importStore, queue, identity.Username, documents, parsed, emptyIDs, duplicates, input.PlatformID, batchID, metadata, input.SelectedVersions)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
+			writeManualImportError(w, err, http.StatusInternalServerError, "保存任务失败")
 			return
 		}
 		result["skippedExistingBookIds"] = skippedBookIDs
@@ -2905,8 +2961,8 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		processJob := novelfetchworkshop.ProcessJob{ID: id, Owner: identity.Username, BatchID: batchID, BookIDs: bookIDs, PlatformID: input.PlatformID, MaxTxt: input.MaxTxt, SensitiveAIEnabled: input.SensitiveAIEnabled, AutoSubmit: true, SelectedVersions: input.SelectedVersions, RewriteMethods: input.RewriteMethods, TextModelID: textModelID}
-		if err := novelFetchSnapshotBeforeQueue(req.Context(), store, processJob); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存执行参数失败"})
+		if err := novelFetchSnapshotBeforeQueue(req.Context(), importStore, processJob); err != nil {
+			writeManualImportError(w, err, http.StatusInternalServerError, "保存执行参数失败")
 			return
 		}
 		jobView["result"] = result
@@ -2939,8 +2995,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 				continue
 			}
 			conflictBookIDs = append(conflictBookIDs, bookID)
-			_ = setNovelFetchBookQueueState(req.Context(), store, identity.Username, bookID, existingID, "", "waiting_retry")
-			_ = updateWorkshopTaskRuntimeState(req.Context(), store, identity.Username, bookID, "waiting_retry", "该书已有任务在运行，已跳过本次开始")
+			if _, err := setManualBookQueueState(req.Context(), store, identity.Username, bookID, existingID, "", "waiting_retry", "该书已有任务在运行，已跳过本次开始"); err != nil {
+				writeManualImportError(w, err, http.StatusInternalServerError, "保存任务等待状态失败")
+				return
+			}
 		}
 		if len(queuedBookIDs) == 0 {
 			_ = updateWorkshopRun(store, processJob, "duplicate_skipped", "同一书籍已有有效队列任务", now, true)
@@ -2958,28 +3016,40 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		processJob.BookIDs = queuedBookIDs
+		staged := make([]manualQueuedBook, 0, len(queuedBookIDs))
+		undo := func(message, existing string) bool {
+			if err := undoManualQueuedBooks(req.Context(), store, identity.Username, staged, message, existing); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "恢复书籍排队状态失败"})
+				return false
+			}
+			return true
+		}
 		for _, bookID := range queuedBookIDs {
-			if err := setNovelFetchBookQueueState(req.Context(), store, identity.Username, bookID, id, batchID, "queued"); err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务排队状态失败"})
+			written, err := setManualBookQueueState(req.Context(), store, identity.Username, bookID, id, batchID, "queued", "")
+			if err != nil {
+				if undo("", "") {
+					writeManualImportError(w, err, http.StatusInternalServerError, "保存任务排队状态失败")
+				}
 				return
 			}
+			staged = append(staged, written)
 		}
 		if err := store.PutRun(req.Context(), identity.Username, novelfetchworkshop.RunRecord{RunID: id, BookID: batchID, Stage: "novel_fetch_process", Status: "queued", TextModelID: textModelID, ModelID: "novel-fetch-workshop", ModelDisplayName: "小说获取完整流程", StartedAt: now}); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务审计失败"})
+			if undo("", "") {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务审计失败"})
+			}
 			return
 		}
 		queued, existingID, enqueueErr := uniqueQueue.EnqueueUniqueBooks(req.Context(), processJob, 24*time.Hour)
 		if enqueueErr != nil {
-			_ = updateWorkshopRun(store, processJob, "failed", enqueueErr.Error(), now, true)
-			for _, bookID := range queuedBookIDs {
-				document, getErr := store.GetDocument(req.Context(), identity.Username, bookID)
-				if getErr == nil && document.Meta != nil {
-					delete(document.Meta, "currentProcessJobId")
-					_ = store.PutDocument(req.Context(), identity.Username, document)
-				}
-				_ = updateWorkshopTaskRuntimeState(req.Context(), store, identity.Username, bookID, "waiting_retry", enqueueErr.Error())
+			runStatus, message := "failed", enqueueErr.Error()
+			if errors.Is(enqueueErr, novelfetchworkshop.ErrBookCancelled) {
+				runStatus, message = "stopped", ""
 			}
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Redis 任务队列不可用"})
+			_ = updateWorkshopRun(store, processJob, runStatus, enqueueErr.Error(), now, true)
+			if undo(message, "") {
+				writeManualImportError(w, enqueueErr, http.StatusServiceUnavailable, "Redis 任务队列不可用")
+			}
 			return
 		}
 		if !queued {
@@ -2987,9 +3057,8 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			if strings.TrimSpace(existingID) == "" {
 				existingID = id
 			}
-			for _, bookID := range queuedBookIDs {
-				_ = setNovelFetchBookQueueState(req.Context(), store, identity.Username, bookID, existingID, "", "waiting_retry")
-				_ = updateWorkshopTaskRuntimeState(req.Context(), store, identity.Username, bookID, "waiting_retry", "同一书籍已有有效队列任务，已跳过本次开始")
+			if !undo("同一书籍已有有效队列任务，已跳过本次开始", existingID) {
+				return
 			}
 			jobView["id"] = existingID
 			jobView["existing"] = true

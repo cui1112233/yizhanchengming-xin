@@ -1665,11 +1665,6 @@ func TestNovelFetchWorkerIsolatesCorruptPersistenceCheckpoint(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if tc.cancelled {
-				if err := queue.CancelBooks(ctx, owner, []string{corruptBookID}); err != nil {
-					t.Fatal(err)
-				}
-			}
 			var corruptCalls, normalCalls atomic.Int32
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Query().Get("bookid") == corruptBookID {
@@ -1692,6 +1687,12 @@ func TestNovelFetchWorkerIsolatesCorruptPersistenceCheckpoint(t *testing.T) {
 			for _, job := range []novelfetchworkshop.ProcessJob{corrupt, normal} {
 				if queued, _, err := queue.EnqueueUniqueBooks(ctx, job, time.Hour); err != nil || !queued {
 					t.Fatalf("enqueue %s: queued=%t err=%v", job.ID, queued, err)
+				}
+			}
+			if tc.cancelled {
+				// The worker must observe a stop that arrived after admission.
+				if err := queue.CancelBooks(ctx, owner, []string{corruptBookID}); err != nil {
+					t.Fatal(err)
 				}
 			}
 			for _, wantID := range []string{corrupt.ID, normal.ID} {

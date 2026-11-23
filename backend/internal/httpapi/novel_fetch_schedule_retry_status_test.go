@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -539,6 +541,216 @@ func TestGenerateOnlyScheduleSettlesAfterShortOriginal(t *testing.T) {
 	after, err := store.GetDocument(ctx, "tester", doc.BookID)
 	if err != nil || after.Meta["originalStatus"] != "too_short" || after.Meta["aiStatus"] != "skipped_short_original" || !reflect.DeepEqual(after.Logs, skipped.Logs) {
 		t.Fatalf("short skip reason or processing history changed: doc=%+v err=%v", after, err)
+	}
+}
+
+func TestGenerateOnlyScheduleShortSkipYieldsToCurrentState(t *testing.T) {
+	for _, tc := range []struct {
+		key      string
+		value    any
+		want     string
+		tracking bool
+	}{
+		{"manualOriginalFetchRequired", true, "failed", false},
+		{"manualOnly", true, "failed", false},
+		{"rewriteValidationHold", true, "failed", false},
+		{"queueState", "processing", "running", true},
+		{"aiStatus", "failed", "failed", false},
+		{"status", "failed", "waiting_retry", true},
+	} {
+		t.Run(tc.key, func(t *testing.T) {
+			ctx := context.Background()
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := &uniqueRecordingNovelFetchQueue{}
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+				"status": "completed", "originalStatus": "too_short", "aiStatus": "skipped_short_original",
+			}}
+			doc.Meta[tc.key] = tc.value
+			item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+			item["pending_book_ids"] = nil
+			if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{item}, novelFetchAutomationConfigKey: map[string]any{"enabled": true}}); err != nil {
+				t.Fatal(err)
+			}
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			row := storedSubmissionEvidenceSchedule(t, store)
+			if row["status"] != tc.want || row["retry_tracking"] != tc.tracking || len(queue.jobs) != 0 {
+				t.Fatalf("new %s=%v: status=%v tracking=%v jobs=%d", tc.key, tc.value, row["status"], row["retry_tracking"], len(queue.jobs))
+			}
+		})
+	}
+}
+
+func TestGenerateOnlyScheduleKeepsShortAndCancelledBooksAtFirstDispatchAndRetry(t *testing.T) {
+	for _, entry := range []string{"first", "retry"} {
+		t.Run(entry, func(t *testing.T) {
+			ctx := context.Background()
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := &uniqueRecordingNovelFetchQueue{}
+			now := time.Now().UTC()
+			item := createPreparedSchedule(t, store, map[string]any{"run_at": now.Add(time.Hour).Format(time.RFC3339Nano), "input_text": "12345678901 短书\n12345678902 取消", "selected_versions": []string{"ai1"}, "auto_submit": false})
+			ids := scheduleStringSlice(item["book_ids"])
+			for i, id := range ids {
+				doc, err := store.GetDocument(ctx, "tester", id)
+				if err != nil {
+					t.Fatal(err)
+				}
+				delete(doc.Meta, "scheduledHold")
+				doc.Meta["status"], doc.Meta["queueState"] = "completed", "completed"
+				if i == 0 {
+					doc.Meta["originalStatus"] = "too_short"
+				} else {
+					doc.Meta["queueState"] = "cancelled"
+				}
+				if err := store.PutDocument(ctx, "tester", doc); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if entry == "retry" {
+				item["status"], item["retry_tracking"] = "waiting_retry", true
+				if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{item}}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now.Add(2*time.Hour)); err != nil {
+				t.Fatal(err)
+			}
+			row := storedSubmissionEvidenceSchedule(t, store)
+			if row["status"] != "completed" || !slices.Contains(scheduleStringSlice(row["book_ids"]), ids[0]) || !slices.Contains(scheduleStringSlice(row["book_ids"]), ids[1]) || len(scheduleStringSlice(row["pending_book_ids"])) != 0 || len(queue.jobs) != 0 {
+				t.Fatalf("status=%v books=%v pending=%v jobs=%d", row["status"], row["book_ids"], row["pending_book_ids"], len(queue.jobs))
+			}
+		})
+	}
+}
+
+type manualImportTestQueue interface {
+	novelfetchworkshop.ProcessQueue
+	novelfetchworkshop.ProcessCancellationQueue
+	novelfetchworkshop.ProcessBookDedupQueue
+	novelfetchworkshop.ProcessBookConflictQueue
+}
+
+type manualImportStopQueue struct {
+	manualImportTestQueue
+	afterPreflight func()
+	beforeEnqueue  func()
+	afterEnqueue   func()
+	enqueueErr     error
+}
+
+func (q *manualImportStopQueue) ConflictingBookIDs(ctx context.Context, job novelfetchworkshop.ProcessJob) (map[string]string, error) {
+	conflicts, err := q.manualImportTestQueue.ConflictingBookIDs(ctx, job)
+	if q.afterPreflight != nil {
+		q.afterPreflight()
+	}
+	return conflicts, err
+}
+
+func (q *manualImportStopQueue) EnqueueUniqueBooks(ctx context.Context, job novelfetchworkshop.ProcessJob, ttl time.Duration) (bool, string, error) {
+	if q.beforeEnqueue != nil {
+		q.beforeEnqueue()
+	}
+	if q.enqueueErr != nil {
+		return false, "", q.enqueueErr
+	}
+	ok, id, err := q.manualImportTestQueue.EnqueueUniqueBooks(ctx, job, ttl)
+	if q.afterEnqueue != nil {
+		q.afterEnqueue()
+	}
+	return ok, id, err
+}
+
+func (q *manualImportStopQueue) Claim(ctx context.Context, _ time.Duration) (novelfetchworkshop.ProcessJob, error) {
+	<-ctx.Done()
+	return novelfetchworkshop.ProcessJob{}, ctx.Err()
+}
+
+type manualImportStopStore struct {
+	*novelfetchworkshop.MemoryStore
+	beforeQueuedWrite func()
+}
+
+func (s *manualImportStopStore) CompareAndSwapDocument(ctx context.Context, owner string, doc novelfetchworkshop.Document) (string, error) {
+	if s.beforeQueuedWrite != nil && doc.Meta["status"] == "queued" {
+		s.beforeQueuedWrite()
+	}
+	return s.MemoryStore.CompareAndSwapDocument(ctx, owner, doc)
+}
+
+func TestManualProcessStartStopAfterPreflight(t *testing.T) {
+	for _, timing := range []string{"after preflight", "between read and queued write", "after queued state", "during enqueue error", "after successful enqueue"} {
+		t.Run(timing, func(t *testing.T) {
+			ctx := context.Background()
+			store := &manualImportStopStore{MemoryStore: novelfetchworkshop.NewMemoryStore()}
+			queue := &manualImportStopQueue{manualImportTestQueue: novelfetchworkshop.NewMemoryQueue()}
+			if url := os.Getenv("V88_NOVEL_FETCH_TEST_REDIS_URL"); url != "" {
+				prefix := fmt.Sprintf("manual-stop-test:%d", time.Now().UnixNano())
+				transport, err := mergeworker.NewRedisStore(url, prefix)
+				if err != nil {
+					t.Fatal(err)
+				}
+				queue.manualImportTestQueue = novelfetchworkshop.NewRedisQueueWithDo(prefix, novelfetchworkshop.RedisDoFunc(transport.Do))
+				t.Cleanup(func() { _ = queue.ClearCancelledBooks(ctx, "tester", []string{"12345678901"}) })
+			}
+			now := time.Now()
+			const id = "12345678901"
+			if err := store.PutConfig(ctx, "tester", map[string]any{novelFetchAutomationConfigKey: map[string]any{"enabled": false}}); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.PutDocument(ctx, "tester", novelfetchworkshop.Document{BookID: id, Meta: map[string]any{"status": "failed"}}); err != nil {
+				t.Fatal(err)
+			}
+			h := NewRouter(RouterOptions{BridgeSecret: "manual-race", Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+			stop := func() {
+				resp := doNovelFetchRequest(t, h, http.MethodPost, "/api/novel-fetch-workshop/process/stop", map[string]any{"ids": []string{id}}, now, "manual-race")
+				if resp.Code != http.StatusOK {
+					t.Fatalf("stop returned %d", resp.Code)
+				}
+			}
+			want := http.StatusConflict
+			switch timing {
+			case "after preflight":
+				queue.afterPreflight = stop
+			case "between read and queued write":
+				store.beforeQueuedWrite = stop
+			case "after queued state":
+				queue.beforeEnqueue = stop
+			case "during enqueue error":
+				queue.beforeEnqueue = stop
+				queue.enqueueErr = errors.New("injected queue failure")
+				want = http.StatusServiceUnavailable
+			case "after successful enqueue":
+				queue.afterEnqueue = stop
+				want = http.StatusAccepted
+			}
+			resp := doNovelFetchRequest(t, h, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"input_text": id, "selected_versions": []string{"ai1"}}, now, "manual-race")
+			cancelled, err := queue.IsBookCancelled(ctx, "tester", id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			doc, err := store.GetDocument(ctx, "tester", id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			job, err := queue.manualImportTestQueue.Claim(ctx, 5*time.Millisecond)
+			if timing == "after successful enqueue" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				w := workshopProcessWorker{store: store, queue: queue, registry: newWorkshopProcessRegistry()}
+				if err := w.process(ctx, job); err != nil {
+					t.Fatal(err)
+				}
+				if done, _ := w.registry.get("tester", job.ID); done["status"] != "stopped" {
+					t.Fatalf("worker ran cancelled job: %v", done["status"])
+				}
+				_, err = queue.manualImportTestQueue.Claim(ctx, 5*time.Millisecond)
+			}
+			if resp.Code != want || !cancelled || doc.Meta["status"] != "stopped" || doc.Meta["queueState"] != "stopped" || !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Fatalf("start=%d cancelled=%v status=%v queueState=%v queued job=%v claim=%v", resp.Code, cancelled, doc.Meta["status"], doc.Meta["queueState"], job.ID, err)
+			}
+		})
 	}
 }
 

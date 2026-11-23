@@ -11,6 +11,7 @@ import (
 )
 
 var ErrNotFound = errors.New("novel fetch workshop record not found")
+var ErrDocumentChanged = errors.New("novel fetch document changed")
 
 type Document struct {
 	BookID           string             `json:"bookId"`
@@ -91,6 +92,9 @@ type Store interface {
 	BodyStore
 	GetDocument(context.Context, string, string) (Document, error)
 	PutDocument(context.Context, string, Document) error
+	// CompareAndSwapDocument uses the previously read UpdatedAt, or inserts if it is empty.
+	// On success it returns the version of this exact write.
+	CompareAndSwapDocument(context.Context, string, Document) (string, error)
 	ListDocuments(context.Context, string) ([]Document, error)
 	DeleteDocuments(context.Context, string, []string) (DeleteResult, error)
 	GetConfig(context.Context, string) (map[string]any, error)
@@ -218,13 +222,37 @@ func (s *MemoryStore) GetDocument(_ context.Context, owner, bookID string) (Docu
 func (s *MemoryStore) PutDocument(_ context.Context, owner string, document Document) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	_, err := s.putDocument(owner, document, false)
+	return err
+}
+
+func (s *MemoryStore) CompareAndSwapDocument(_ context.Context, owner string, document Document) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.putDocument(owner, document, true)
+}
+
+func nextDocumentWriteTime(previous time.Time) time.Time {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	if !now.After(previous) {
+		return previous.Add(time.Microsecond)
+	}
+	return now
+}
+
+func (s *MemoryStore) putDocument(owner string, document Document, conditional bool) (string, error) {
 	document = normalizeDocument(document)
-	document.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	current := s.docs[owner][document.BookID].UpdatedAt
+	if conditional && current != document.UpdatedAt {
+		return "", ErrDocumentChanged
+	}
+	previous, _ := time.Parse(time.RFC3339Nano, current)
+	document.UpdatedAt = nextDocumentWriteTime(previous).Format(time.RFC3339Nano)
 	if s.docs[owner] == nil {
 		s.docs[owner] = map[string]Document{}
 	}
 	s.docs[owner][document.BookID] = cloneDocument(document)
-	return nil
+	return document.UpdatedAt, nil
 }
 
 func (s *MemoryStore) ListDocuments(_ context.Context, owner string) ([]Document, error) {

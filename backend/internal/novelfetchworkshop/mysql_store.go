@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"qiantie/backend/internal/safepath"
 )
 
@@ -70,8 +71,50 @@ func (s *MySQLStore) PutDocument(ctx context.Context, owner string, document Doc
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO novel_fetch_workshop_documents(owner_username,book_id,document_json,created_at,updated_at) VALUES(?,?,CAST(? AS CHAR CHARACTER SET utf8mb4),CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE document_json=VALUES(document_json), updated_at=CURRENT_TIMESTAMP(6)`, owner, document.BookID, string(raw))
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO novel_fetch_workshop_documents(owner_username,book_id,document_json,created_at,updated_at) VALUES(?,?,CAST(? AS CHAR CHARACTER SET utf8mb4),CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE document_json=VALUES(document_json), updated_at=GREATEST(CURRENT_TIMESTAMP(6), TIMESTAMPADD(MICROSECOND,1,updated_at))`, owner, document.BookID, string(raw))
 	return err
+}
+
+func (s *MySQLStore) CompareAndSwapDocument(ctx context.Context, owner string, document Document) (string, error) {
+	document = normalizeDocument(document)
+	if document.BookID == "" {
+		return "", errors.New("book id is required")
+	}
+	var previous time.Time
+	var err error
+	if document.UpdatedAt != "" {
+		previous, err = time.Parse(time.RFC3339Nano, document.UpdatedAt)
+		if err != nil {
+			return "", err
+		}
+	}
+	next := nextDocumentWriteTime(previous)
+	document.UpdatedAt = next.Format(time.RFC3339Nano)
+	raw, err := json.Marshal(document)
+	if err != nil {
+		return "", err
+	}
+	if previous.IsZero() {
+		_, err = s.DB.ExecContext(ctx, `INSERT INTO novel_fetch_workshop_documents(owner_username,book_id,document_json,created_at,updated_at) VALUES(?,?,CAST(? AS CHAR CHARACTER SET utf8mb4),?,?)`, owner, document.BookID, string(raw), next, next)
+		var duplicate *mysql.MySQLError
+		if errors.As(err, &duplicate) && duplicate.Number == 1062 {
+			return "", ErrDocumentChanged
+		}
+	} else {
+		var result sql.Result
+		result, err = s.DB.ExecContext(ctx, `UPDATE novel_fetch_workshop_documents SET document_json=CAST(? AS CHAR CHARACTER SET utf8mb4), updated_at=? WHERE owner_username=? AND book_id=? AND updated_at=?`, string(raw), next, owner, document.BookID, previous.UTC())
+		if err == nil {
+			var n int64
+			n, err = result.RowsAffected()
+			if err == nil && n == 0 {
+				return "", ErrDocumentChanged
+			}
+		}
+	}
+	if err != nil {
+		return "", err
+	}
+	return document.UpdatedAt, nil
 }
 
 func (s *MySQLStore) ListDocuments(ctx context.Context, owner string) ([]Document, error) {

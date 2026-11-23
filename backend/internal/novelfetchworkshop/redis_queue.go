@@ -24,6 +24,9 @@ type RedisQueue struct {
 const enqueueUniqueBooksScript = `
 local count = tonumber(ARGV[4])
 for i = 1, count do
+  if redis.call('EXISTS', KEYS[count + 2 + i]) == 1 then return {-1, ''} end
+end
+for i = 1, count do
   local existing = redis.call('GET', KEYS[i])
   if existing then return {0, existing} end
 end
@@ -219,6 +222,7 @@ func (q *RedisQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, ttl
 	}
 	seen := map[string]bool{}
 	keys := make([]string, 0, len(job.BookIDs)+2)
+	cancelKeys := make([]string, 0, len(job.BookIDs))
 	for _, bookID := range job.BookIDs {
 		bookID = strings.TrimSpace(bookID)
 		if bookID == "" || seen[bookID] {
@@ -226,6 +230,7 @@ func (q *RedisQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, ttl
 		}
 		seen[bookID] = true
 		keys = append(keys, q.bookDedupeKey(job.Owner, job.PlatformID, bookID))
+		cancelKeys = append(cancelKeys, q.cancelKey(job.Owner, bookID))
 	}
 	if len(keys) == 0 {
 		return false, "", fmt.Errorf("source book ids are required for unique enqueue")
@@ -238,6 +243,7 @@ func (q *RedisQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, ttl
 	}
 	bookKeyCount := len(keys)
 	keys = append(keys, q.jobKey(job.ID), q.pendingKey())
+	keys = append(keys, cancelKeys...)
 	args := []string{"EVAL", enqueueUniqueBooksScript, strconv.Itoa(len(keys))}
 	args = append(args, keys...)
 	args = append(args, job.ID, strconv.Itoa(seconds), string(body), strconv.Itoa(bookKeyCount))
@@ -249,7 +255,11 @@ func (q *RedisQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, ttl
 	if !ok || len(result) < 2 {
 		return false, "", fmt.Errorf("unexpected redis response for unique novel fetch enqueue: %T", value)
 	}
-	queued := strings.TrimSpace(fmt.Sprint(result[0])) == "1"
+	outcome := strings.TrimSpace(fmt.Sprint(result[0]))
+	if outcome == "-1" {
+		return false, "", ErrBookCancelled
+	}
+	queued := outcome == "1"
 	existingID := strings.TrimSpace(fmt.Sprint(result[1]))
 	return queued, existingID, nil
 }
