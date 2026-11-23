@@ -1,4 +1,5 @@
 import { LONG_RUNNING_API_TIMEOUT_MS, apiRequest } from './client.js';
+import { stageLargeIntake } from './batchIntakeTransport.js';
 
 // The module name remains for import compatibility while the production
 // workbench has moved to the V12 public contract.
@@ -245,12 +246,16 @@ export function generateConfiguredImage(payload = {}) {
   return apiRequest(bf11Path('image-generation'), { method: 'POST', body: body(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
-export function createNovelFetchIntake(payload) {
-  return apiRequest(bf11Path('intakes/novel-fetch'), { method: 'POST', body: body(payload) });
+function putIntakeChunk(chunk) {
+  return apiRequest(bf11Path('intakes/source-chunks'), { method: 'POST', body: body(chunk) });
 }
 
-export function createManualIntake(payload) {
-  return apiRequest(bf11Path('intakes/manual'), { method: 'POST', body: body(payload) });
+export async function createNovelFetchIntake(payload) {
+  return apiRequest(bf11Path('intakes/novel-fetch'), { method: 'POST', body: body(await stageLargeIntake(payload, putIntakeChunk)) });
+}
+
+export async function createManualIntake(payload) {
+  return apiRequest(bf11Path('intakes/manual'), { method: 'POST', body: body(await stageLargeIntake(payload, putIntakeChunk)) });
 }
 
 export function createPrivateComicTask(payload = {}) {

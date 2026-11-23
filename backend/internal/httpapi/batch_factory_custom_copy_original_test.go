@@ -18,6 +18,18 @@ type customCopyConcurrentStore struct {
 	changed bool
 }
 
+func TestCustomCopyLegacyTextRequiresAuthoritativeReselection(t *testing.T) {
+	ctx := context.Background()
+	s := batchfactoryv11.NewMemoryStore()
+	b, err := s.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "批次", Books: []batchfactoryv11.CreateBookInput{{Title: "书", SourceText: "处理稿", TxtText: "处理稿", SourceMetadata: map[string]any{"sourceMode": "custom_copy", "customCopyRecordId": "999"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = reuseCustomCopyOriginal(ctx, s, "alice", b.ID, b.Books[0]); err == nil {
+		t.Fatal("should require reselecting unverified original")
+	}
+}
+
 func (s *customCopyConcurrentStore) CaptureBookSource(ctx context.Context, owner, batchID, bookID string, input batchfactoryv11.CaptureBookSourceInput) (batchfactoryv11.Book, error) {
 	if !s.changed {
 		s.changed = true
@@ -35,7 +47,7 @@ func (s *customCopyConcurrentStore) CaptureBookSource(ctx context.Context, owner
 func TestCustomCopyOriginalRetriesConcurrentMetadataSave(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
-	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "copy", Books: []batchfactoryv11.CreateBookInput{{Title: "书", SourceText: "打码版", TxtText: "原文坏词保持", SourceMetadata: map[string]any{"sourceMode": "novel_fetch", "customCopyRecordId": "280893", "processingStatus": "failed"}}}})
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "copy", Books: []batchfactoryv11.CreateBookInput{{Title: "书", SourceText: "打码版", TxtText: "原文坏词保持", SourceMetadata: map[string]any{"sourceMode": "novel_fetch", "customCopyRecordId": "280893", "rawSourceStatus": "verified", "rawSourceOrigin": "custom_copy", "processingStatus": "failed"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +61,7 @@ func TestCustomCopyRetryKeepsOriginalWithoutSensitiveProcessing(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
 	const original = "这是坏词原文\n第二行保持不变。"
-	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "文案获取", InitialBatchSettings: batchfactoryv11.SettingsPatch{"sensitiveAIEnabled": json.RawMessage(`true`)}, Books: []batchfactoryv11.CreateBookInput{{Title: "书", SourceText: "旧打码文案", TxtText: original, SourceMetadata: map[string]any{"sourceMode": "custom_copy", "customCopyRecordId": "280893", "processingStatus": "failed", "sourceContentVersion": "sensitive", "sensitiveReviewRequired": true, "gender": "女频", "style": "现代悬疑"}}}})
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "文案获取", InitialBatchSettings: batchfactoryv11.SettingsPatch{"sensitiveAIEnabled": json.RawMessage(`true`)}, Books: []batchfactoryv11.CreateBookInput{{Title: "书", SourceText: "旧打码文案", TxtText: original, SourceMetadata: map[string]any{"sourceMode": "custom_copy", "customCopyRecordId": "280893", "rawSourceStatus": "verified", "rawSourceOrigin": "custom_copy", "processingStatus": "failed", "sourceContentVersion": "sensitive", "sensitiveReviewRequired": true, "gender": "女频", "style": "现代悬疑"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +81,7 @@ func TestCustomCopyRetryKeepsOriginalWithoutSensitiveProcessing(t *testing.T) {
 func TestCustomCopyForcedFetchReusesSelectedOriginal(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()
 	const original = "不替换的坏词文案。"
-	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "copy", Books: []batchfactoryv11.CreateBookInput{{Title: "书", BookID: "2100242549395006289", Platform: "15", SourceText: original, TxtText: original, SourceMetadata: map[string]any{"sourceMode": "custom_copy", "customCopyRecordId": "280893"}}}})
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "copy", Books: []batchfactoryv11.CreateBookInput{{Title: "书", BookID: "2100242549395006289", Platform: "15", SourceText: original, TxtText: original, SourceMetadata: map[string]any{"sourceMode": "custom_copy", "customCopyRecordId": "280893", "rawSourceStatus": "verified", "rawSourceOrigin": "custom_copy"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}

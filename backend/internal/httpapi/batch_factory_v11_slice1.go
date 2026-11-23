@@ -68,7 +68,7 @@ func deleteBatchWithRetention(ctx context.Context, store batchfactoryv11.Store, 
 	return store.DeleteBatch(ctx, owner, batchID)
 }
 
-func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, catalog *prompt.Catalog) {
+func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, catalog *prompt.Catalog, sources intakeChunks) {
 	registerPrivateCustomizationComicRoute(mux, store, catalog)
 	mux.HandleFunc("POST /api/batch-factory/v11/intakes/manual", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -138,8 +138,25 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 				books[index].SourceMetadata["platformName"] = strings.TrimSpace(input.PlatformName)
 			}
 		}
+		read := intakeSourceRead{chunks: sources}
+		committed := false
+		defer func() { read.finish(context.WithoutCancel(r.Context()), committed) }()
+		if err = read.hydrate(r.Context(), owner, books, true); err != nil {
+			writeJSON(w, 422, map[string]string{"error": err.Error()})
+			return
+		}
+		intakeBooks := books
+		create := batchfactoryv11.CreateBatchInput{Title: input.Title, InitialBatchSettings: input.InitialBatchSettings}
+		if len(read.leases) > 0 {
+			create.Books = books
+			intakeBooks = append([]batchfactoryv11.CreateBookInput(nil), books...)
+			for i := range intakeBooks {
+				intakeBooks[i].SourceText = ""
+				intakeBooks[i].TxtText = ""
+			}
+		}
 		intake, err := store.CreateIntake(r.Context(), owner, batchfactoryv11.NovelFetchIntakeInput{
-			Books: books,
+			Books: intakeBooks,
 			Metadata: map[string]any{
 				"sourceMode": "manual_original", "platformId": input.PlatformID, "platformName": strings.TrimSpace(input.PlatformName), "parseMode": input.ParseMode,
 				"columnPresetId": input.ColumnPresetID, "columnOrder": input.ColumnOrder, "inputText": input.InputText,
@@ -151,11 +168,12 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			writeStoreError(w, err)
 			return
 		}
-		batch, err := store.CreateBatchFromIntake(r.Context(), owner, intake.ID, batchfactoryv11.CreateBatchInput{Title: input.Title, InitialBatchSettings: input.InitialBatchSettings})
+		batch, err := store.CreateBatchFromIntake(r.Context(), owner, intake.ID, create)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
+		committed = true
 		writeJSON(w, http.StatusCreated, map[string]any{"batch": batch, "intake": intake})
 	})
 	mux.HandleFunc("POST /api/batch-factory/v11/intakes/novel-fetch", func(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +186,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		if !decodeJSON(w, r, &input) {
 			return
 		}
-		intake, err := store.CreateIntake(r.Context(), owner, input)
+		intake, err := sources.createNovelIntake(r.Context(), owner, store, input)
 		if err != nil {
 			writeStoreError(w, err)
 			return

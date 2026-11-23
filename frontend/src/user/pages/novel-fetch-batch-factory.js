@@ -21,14 +21,13 @@ export function batchFactorySourceText(detail = {}, version = 'sensitive') {
     return textValue(detail.processedText || detail.original || '');
   }
   if (selected === 'original') {
-    return textValue(detail.originalRaw || detail.original || detail.processedText || '');
+    return textValue(batchFactoryRawSourceText(detail));
   }
   return textValue(versions[selected]);
 }
 
 export function batchFactoryRawSourceText(detail = {}) {
-  const source = detail?.originalRaw ?? detail?.rawData ?? detail?.original ?? detail?.processedText ?? '';
-  return typeof source === 'string' ? source : '';
+  return [detail?.originalRaw, detail?.rawData].find(value => typeof value === 'string' && value.trim() && value.trim() !== '[object Object]') || '';
 }
 
 export function batchFactorySourceMetadata(detail = {}, version = 'sensitive', fallback = {}) {

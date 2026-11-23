@@ -42,6 +42,57 @@ func TestV12FetchOriginalsUsesGoNovelFetcherAndKeepsRawText(t *testing.T) {
 	}
 }
 
+func TestFailedProcessingRetriesOnlyVerifiedRawAndKeepsCaptureSize(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		for _, verified := range []bool{false, true} {
+			ctx := context.Background()
+			store := batchfactoryv11.NewMemoryStore()
+			old := strings.Repeat("旧", 850)
+			up := strings.Repeat("新", 850)
+			meta := map[string]any{"processingStatus": "failed", "contentCaptureCharacters": 150}
+			if verified {
+				meta["rawSourceStatus"] = "verified"
+				meta["rawSourceOrigin"] = "bookstore_raw"
+			}
+			b, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "批次", Books: []batchfactoryv11.CreateBookInput{{Title: "甲", BookID: "777777", Platform: "3", TxtText: old, SourceMetadata: meta}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				json.NewEncoder(w).Encode(map[string]any{"code": 200, "data": up})
+			}))
+			fetcher := &novelfetchworkshop.UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}
+			if auto {
+				c := NewBatchAutomationCoordinator(store, nil, nil, nil, nil, nil, nil, nil, nil)
+				c.SetSourceFetcher(fetcher)
+				_, err = c.ensureAutomationSource(ctx, "alice", b.ID, b.Books[0])
+			} else {
+				now := time.Unix(100, 0)
+				api := NewRouter(RouterOptions{Slice: 1, BridgeSecret: "secret", Now: func() time.Time { return now }, Store: store, NovelFetchFetcher: fetcher})
+				rec := signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/batch-factory/v12/batches/"+b.ID+"/books/"+b.Books[0].ID+"/fetch-original", map[string]any{})
+				if rec.Code != 200 {
+					t.Fatalf("status=%d %s", rec.Code, rec.Body.String())
+				}
+			}
+			server.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			updated, _ := store.GetBatch(ctx, "alice", b.ID)
+			want, callsWant := up, 1
+			if verified {
+				want, callsWant = old, 0
+			}
+			book := updated.Books[0]
+			if calls != callsWant || book.TxtText != want || len([]rune(book.SourceText)) != 150 {
+				t.Fatalf("auto=%v verified=%v upstream calls=%d raw matches=%v processed chars=%d", auto, verified, calls, book.TxtText == want, len([]rune(book.SourceText)))
+			}
+		}
+	}
+}
+
 func TestV12FetchOriginalsAppliesNovelFetchRulesAndKeepsRawSource(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

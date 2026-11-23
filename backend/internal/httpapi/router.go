@@ -267,8 +267,10 @@ func NewRouter(options RouterOptions) http.Handler {
 	// V12 is the public workbench namespace. Keep its capability contract on
 	// Go even while a few legacy V12 adapters still bridge to Node.
 	if options.Store != nil && options.Slice >= 1 {
-		registerSliceOneRoutes(v11, options.Store, options.PresetCatalog)
-		registerV12IntakeRoutes(v12, options.Store)
+		sources := newIntakeChunks(options)
+		sources.register(v12)
+		registerSliceOneRoutes(v11, options.Store, options.PresetCatalog, sources)
+		registerV12IntakeRoutes(v12, options.Store, sources)
 		registerV12PublishClassificationRoute(v12, options.Store, batchFetchClassification{
 			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
 			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,

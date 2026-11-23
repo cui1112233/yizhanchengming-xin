@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
@@ -45,11 +44,8 @@ func reuseCustomCopyOriginal(ctx context.Context, store batchfactoryv11.Store, o
 
 func captureCustomCopyOriginal(ctx context.Context, store batchfactoryv11.Store, owner, batchID string, book batchfactoryv11.Book) (batchfactoryv11.Book, error) {
 	source := book.TxtText
-	if strings.TrimSpace(source) == "" {
-		source = book.SourceText
-	}
-	if strings.TrimSpace(source) == "" {
-		return book, fmt.Errorf("所选文案正文缺失，请重新通过“文案获取”选择文案")
+	if !hasVerifiedBatchOriginal(book) {
+		return book, fmt.Errorf("所选文案缺少可确认的完整原文，请重新通过“文案获取”选择文案")
 	}
 	if book.SourceText == source && book.SourceMetadata["sourceMode"] == "custom_copy" && book.SourceMetadata["sourceContentVersion"] == "original" && book.SourceMetadata["processingStatus"] == "done" && book.SourceMetadata["sensitiveStatus"] == "skipped" && book.SourceMetadata["sensitiveReviewRequired"] != true {
 		return book, nil
@@ -77,5 +73,5 @@ func captureCustomCopyOriginal(ctx context.Context, store batchfactoryv11.Store,
 	meta["sensitiveHitCount"] = 0
 	meta["sensitiveHits"] = nil
 	meta["sensitiveFixed"] = nil
-	return store.CaptureBookSource(ctx, owner, batchID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: source, RawSourceText: source, ReplaceSource: true, SourceMetadata: meta, ExpectedRevision: book.Revision})
+	return store.CaptureBookSource(ctx, owner, batchID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: source, ReplaceSource: true, SourceMetadata: meta, ExpectedRevision: book.Revision})
 }

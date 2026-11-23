@@ -20,6 +20,15 @@ func normalizeNovelFetchBook(book CreateBookInput) CreateBookInput {
 	book.SourceTaskID = strings.TrimSpace(book.SourceTaskID)
 	book.Platform = strings.TrimSpace(book.Platform)
 	book.TxtFileName = strings.TrimSpace(book.TxtFileName)
+	if book.SourceMetadata["sourceMode"] == "novel_fetch" {
+		if _, valid := normalizeCapturedSourceText(book.OriginalRaw); valid {
+			book.TxtText = book.OriginalRaw
+			book.SourceMetadata = sourceWriteMetadata(book.SourceMetadata, nil, book.OriginalRaw, "novel_fetch_original_raw")
+		} else {
+			book.SourceMetadata = sourceReadMetadata(book.SourceMetadata)
+		}
+	}
+	book.OriginalRaw = ""
 	if book.TxtFileName == "" && book.BookID != "" {
 		book.TxtFileName = book.BookID + ".txt"
 	}

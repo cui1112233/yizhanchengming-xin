@@ -25,6 +25,7 @@ type ManualIntakeInput struct {
 	ScheduledAt              string            `json:"scheduledAt,omitempty"`
 	SourceTextByBookID       map[string]string `json:"sourceTextByBookId,omitempty"`
 	RawSourceTextByBookID    map[string]string `json:"rawSourceTextByBookId,omitempty"`
+	SourceRefsByBookID       map[string]string `json:"sourceRefsByBookId,omitempty"`
 	// SourceMetadataByBookID carries authoritative fetch facts (for example 121
 	// category/genre). Manual columns keep precedence when the book is created.
 	SourceMetadataByBookID map[string]map[string]any `json:"sourceMetadataByBookId,omitempty"`
@@ -45,6 +46,7 @@ type ManualIntakeGroup struct {
 	// 用它替代顶层同名 map，使跨书城撞 ID 的两本书各取各的正文。
 	SourceTextByBookID     map[string]string         `json:"sourceTextByBookId,omitempty"`
 	RawSourceTextByBookID  map[string]string         `json:"rawSourceTextByBookId,omitempty"`
+	SourceRefsByBookID     map[string]string         `json:"sourceRefsByBookId,omitempty"`
 	SourceMetadataByBookID map[string]map[string]any `json:"sourceMetadataByBookId,omitempty"`
 }
 type manualRow struct {
@@ -514,26 +516,32 @@ func ParseManualBookList(input ManualIntakeInput) ([]CreateBookInput, error) {
 				meta["genderSource"] = strings.TrimSpace(source)
 			}
 		}
-		sourceText, _ := normalizeCapturedSourceText(input.SourceTextByBookID[id])
-		raw := input.RawSourceTextByBookID[id]
-		origin := "bookstore_raw"
-		if recordID, ok := meta["customCopyRecordId"].(string); ok && strings.TrimSpace(recordID) != "" {
-			raw, origin = input.SourceTextByBookID[id], "custom_copy"
-		}
-		if _, valid := normalizeCapturedSourceText(raw); !valid {
-			raw = ""
-		}
-		meta = sourceWriteMetadata(meta, nil, raw, origin)
-		if fetchedMeta["processingStatus"] == "failed" && sourceText == "" {
-			for _, key := range []string{"processingStatus", "processError", "processRetryable", "originalStatus", "queueStage"} {
+		book := CreateBookInput{ID: id, BookID: id, Title: title, Platform: input.PlatformID, SourceMetadata: meta, SourceRef: input.SourceRefsByBookID[id]}
+		book.SetManualSource(input.SourceTextByBookID[id], input.RawSourceTextByBookID[id])
+		if fetchedMeta["processingStatus"] == "failed" && book.SourceText == "" {
+			for _, key := range []string{"processingStatus", "processError", "processRetryable", "originalStatus", "queueStage", "maxTxt"} {
 				if value, ok := fetchedMeta[key]; ok {
-					meta[key] = value
+					book.SourceMetadata[key] = value
 				}
 			}
 		}
-		out = append(out, CreateBookInput{ID: id, BookID: id, Title: title, Platform: input.PlatformID, SourceText: sourceText, TxtText: raw, SourceMetadata: meta})
+		out = append(out, book)
 	}
 	return out, nil
+}
+
+// SetManualSource applies the same provenance rules to inline and staged input.
+func (book *CreateBookInput) SetManualSource(production, raw string) {
+	book.SourceText, _ = normalizeCapturedSourceText(production)
+	origin := "bookstore_raw"
+	if recordID, ok := book.SourceMetadata["customCopyRecordId"].(string); ok && strings.TrimSpace(recordID) != "" {
+		origin = "custom_copy"
+	}
+	if _, valid := normalizeCapturedSourceText(raw); !valid {
+		raw = ""
+	}
+	book.TxtText = raw
+	book.SourceMetadata = sourceWriteMetadata(book.SourceMetadata, nil, raw, origin)
 }
 
 // ParseGroupedManualBookLists 按书城分组解析粘贴文本。每组复用
@@ -549,12 +557,13 @@ func ParseGroupedManualBookLists(base ManualIntakeInput) ([]CreateBookInput, err
 		groupInput.PlatformID = strings.TrimSpace(group.PlatformID)
 		groupInput.PlatformName = strings.TrimSpace(group.PlatformName)
 		groupInput.InputText = group.InputText
-		if group.SourceTextByBookID != nil || group.RawSourceTextByBookID != nil {
+		groupInput.SourceRefsByBookID = group.SourceRefsByBookID
+		if group.SourceTextByBookID != nil || group.RawSourceTextByBookID != nil || group.SourceRefsByBookID != nil {
 			groupInput.SourceTextByBookID = group.SourceTextByBookID
 		}
 		// The top-level raw copy belongs to the top-level source map. A group
 		// with its own texts may contain the same ID from another bookstore.
-		inheritSource := group.SourceTextByBookID == nil && (base.PlatformID == group.PlatformID || (base.PlatformID == "" && len(base.Groups) == 1))
+		inheritSource := group.SourceTextByBookID == nil && group.SourceRefsByBookID == nil && (base.PlatformID == group.PlatformID || (base.PlatformID == "" && len(base.Groups) == 1))
 		if !inheritSource || group.RawSourceTextByBookID != nil {
 			groupInput.RawSourceTextByBookID = group.RawSourceTextByBookID
 		}

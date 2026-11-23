@@ -1821,7 +1821,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
           title,
           platform: String(meta.platformId || row.platformId || row.platform_id || ''),
           sourceText,
-          txtText: rawSourceText || sourceText,
+          originalRaw: rawSourceText,
           sourceMetadata: {
             ...batchFactorySourceMetadata(detail, requestedVersion, {
               style: row.style || '',

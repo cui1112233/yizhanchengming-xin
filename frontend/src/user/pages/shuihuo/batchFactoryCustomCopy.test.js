@@ -12,6 +12,7 @@ test('requires explicit choice and imports exactly selected version under real p
   const groups = selectedCopyGroups([], [{ bookId, copies }], { [bookId]: '280893' });
   assert.equal(groups[0].platformId, '15');
   assert.equal(groups[0].sourceTextByBookId[bookId], '第二份\n完整结尾');
+  assert.equal(groups[0].rawSourceTextByBookId[bookId], '第二份\n完整结尾');
   assert.equal(groups[0].sourceMetadataByBookId[bookId].customCopyRecordId, '280893');
   assert.throws(() => selectedCopyGroups([], [{ bookId, copies: [] }], { [bookId]: '280894' }));
 });

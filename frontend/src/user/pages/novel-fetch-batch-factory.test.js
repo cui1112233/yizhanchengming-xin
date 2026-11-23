@@ -19,6 +19,13 @@ test('keeps complete raw text separate from the selected production version', ()
   assert.equal(batchFactoryRawSourceText(detail), '完整原始正文');
 });
 
+test('a legacy edited copy cannot attest to a complete original', () => {
+  const legacy = { original: '已截取', processedText: '已处理' };
+  assert.equal(batchFactoryRawSourceText(legacy), '');
+  assert.equal(batchFactorySourceText(legacy, 'original'), '');
+  assert.equal(batchFactoryRawSourceText({ ...legacy, originalRaw: '', rawData: ' 完整\n' }), ' 完整\n');
+});
+
 test('carries classification provenance and processing state into the intake', () => {
   const metadata = batchFactorySourceMetadata({
     bookId: 'task-123',
@@ -41,6 +48,6 @@ test('carries classification provenance and processing state into the intake', (
 
 test('only exposes AI versions available for every selected book', () => {
   const details = [{ processedText: '一', versions: { ai1: 'AI1一', ai2: 'AI2一' } }, { processedText: '二', versions: { ai1: 'AI1二' } }];
-  assert.deepEqual(batchFactoryAvailableVersions(details), ['sensitive', 'original', 'ai1']);
+  assert.deepEqual(batchFactoryAvailableVersions(details), ['sensitive', 'ai1']);
   assert.equal(batchFactoryVersionLabel('ai1'), 'AI1');
 });

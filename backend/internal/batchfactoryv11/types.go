@@ -172,6 +172,8 @@ type CreateBookInput struct {
 	Platform       string             `json:"platform,omitempty"`
 	SourceText     string             `json:"sourceText,omitempty"`
 	TxtText        string             `json:"txtText,omitempty"`
+	OriginalRaw    string             `json:"originalRaw,omitempty"`
+	SourceRef      string             `json:"sourceRef,omitempty"`
 	TxtFileName    string             `json:"txtFileName,omitempty"`
 	SourceMetadata map[string]any     `json:"sourceMetadata,omitempty"`
 	Videos         []CreateVideoInput `json:"videos,omitempty"`

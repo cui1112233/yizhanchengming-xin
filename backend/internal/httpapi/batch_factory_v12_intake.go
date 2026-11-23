@@ -21,7 +21,7 @@ type batchShuihuoProjectLister interface {
 // durable Go batch store as the V11 workbench routes. The browser uses V12 for
 // the handoff, while the production workbench continues reading the intake
 // through its V11-compatible contract.
-func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
+func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store, sources intakeChunks) {
 	mux.HandleFunc("GET /api/batch-factory/v12/batches/summary", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -94,7 +94,7 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 			writeStoreError(w, batchfactoryv11.ErrInvalid)
 			return
 		}
-		intake, err := store.CreateIntake(r.Context(), owner, input)
+		intake, err := sources.createNovelIntake(r.Context(), owner, store, input)
 		if err != nil {
 			writeStoreError(w, err)
 			return

@@ -320,6 +320,20 @@ func summarizeBatchProcessingStages(trace []map[string]any) []any {
 	return stages
 }
 
+func hasVerifiedBatchOriginal(book batchfactoryv11.Book) bool {
+	return book.SourceMetadata["rawSourceStatus"] == "verified" && strings.TrimSpace(book.TxtText) != ""
+}
+
+func bookCaptureCharacters(book batchfactoryv11.Book) int {
+	for _, key := range []string{"maxTxt", "contentCaptureCharacters"} {
+		n, err := strconv.Atoi(fmt.Sprint(book.SourceMetadata[key]))
+		if err == nil && n >= 100 && n <= 100000 {
+			return n
+		}
+	}
+	return 4000
+}
+
 func batchFetchResultFromStoredRaw(book batchfactoryv11.Book, maxTxt int) novelfetchworkshop.FetchAndProcessResult {
 	if maxTxt <= 0 {
 		maxTxt = 4000
@@ -766,7 +780,7 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "小说不存在"})
 			return
 		}
-		maxTxt := 4000
+		maxTxt := bookCaptureCharacters(*book)
 		var input struct {
 			MaxTxt   int    `json:"maxTxt"`
 			Platform string `json:"platform"`
@@ -784,8 +798,9 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "reused", "reused": true, "book": original, "length": len([]rune(original.SourceText)), "sourceMetadata": original.SourceMetadata})
 			return
 		}
-		retryProcessing := strings.EqualFold(stringValue(book.SourceMetadata["processingStatus"]), "failed") && strings.TrimSpace(book.TxtText) != ""
-		if !input.Force && !retryProcessing && strings.TrimSpace(book.SourceText) != "" {
+		processingFailed := strings.EqualFold(stringValue(book.SourceMetadata["processingStatus"]), "failed")
+		retryProcessing := processingFailed && hasVerifiedBatchOriginal(*book)
+		if !input.Force && !processingFailed && strings.TrimSpace(book.SourceText) != "" {
 			writeJSON(w, http.StatusOK, map[string]any{
 				"ok": true, "status": "reused", "reused": true, "book": *book,
 				"length": len([]rune(book.SourceText)), "sourceMetadata": book.SourceMetadata,
@@ -794,8 +809,6 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 		}
 		if input.MaxTxt != 0 {
 			maxTxt = input.MaxTxt
-		} else if retryProcessing && targetNumber(book.SourceMetadata["maxTxt"]) > 0 {
-			maxTxt = int(targetNumber(book.SourceMetadata["maxTxt"]))
 		}
 		if maxTxt < 100 || maxTxt > 100000 {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "字数参数无效"})
@@ -844,7 +857,11 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 		if processErr != nil {
 			productionText = ""
 		}
-		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, ReplaceTitle: true, SourceBookID: bookID, SourceTitle: fetchedBookSourceTitle(result, book.Title), SourceMetadata: metadata, ExpectedRevision: book.Revision})
+		origin := "bookstore_raw"
+		if retryProcessing {
+			origin = firstMetadataString(book.SourceMetadata, "rawSourceOrigin")
+		}
+		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, RawSourceOrigin: origin, ReplaceSource: true, ReplaceTitle: true, SourceBookID: bookID, SourceTitle: fetchedBookSourceTitle(result, book.Title), SourceMetadata: metadata, ExpectedRevision: book.Revision})
 		if err != nil {
 			writeStoreError(w, err)
 			return

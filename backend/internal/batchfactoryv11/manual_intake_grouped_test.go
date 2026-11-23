@@ -95,6 +95,17 @@ func TestParseGroupedManualBookListsEmpty(t *testing.T) {
 	}
 }
 
+func TestNovelFetchIntakeOnlyTrustsExplicitOriginalRaw(t *testing.T) {
+	var input NovelFetchIntakeInput
+	if err := json.Unmarshal([]byte(`{"books":[{"id":"1","sourceText":"处理","txtText":"处理","sourceMetadata":{"sourceMode":"novel_fetch"}},{"id":"2","sourceText":"处理","originalRaw":" 全文\n","sourceMetadata":{"sourceMode":"novel_fetch"}}]}`), &input); err != nil {
+		t.Fatal(err)
+	}
+	books := normalizeNovelFetchIntake(input).Books
+	if books[0].SourceMetadata["rawSourceStatus"] != "unverified" || books[1].TxtText != " 全文\n" || books[1].SourceText != "处理" || books[1].SourceMetadata["rawSourceStatus"] != "verified" || books[1].SourceMetadata["rawSourceOrigin"] != "novel_fetch_original_raw" {
+		t.Fatalf("incorrect intake provenance: %+v", books)
+	}
+}
+
 func TestRawOnlyGroupNeverInheritsAnotherProductionText(t *testing.T) {
 	var input ManualIntakeInput
 	if err := json.Unmarshal([]byte(`{"sourceTextByBookId":{"737092":"其他书城的生产文"},"groups":[{"platformId":"3","inputText":"737092 甲","sourceTextByBookId":{},"rawSourceTextByBookId":{"737092":"原文甲"},"sourceMetadataByBookId":{"737092":{"processingStatus":"failed","processError":"处理失败"}}}]}`), &input); err != nil {

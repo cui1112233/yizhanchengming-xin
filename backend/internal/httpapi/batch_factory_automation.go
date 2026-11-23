@@ -3061,8 +3061,9 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 		}
 		book = original
 	}
-	if strings.EqualFold(stringValue(book.SourceMetadata["processingStatus"]), "failed") && strings.TrimSpace(book.TxtText) != "" {
-		maxTxt := int(targetNumber(book.SourceMetadata["maxTxt"]))
+	processingFailed := strings.EqualFold(stringValue(book.SourceMetadata["processingStatus"]), "failed")
+	if processingFailed && hasVerifiedBatchOriginal(book) {
+		maxTxt := bookCaptureCharacters(book)
 		fetched := batchFetchResultFromStoredRaw(book, maxTxt)
 		fetched, metadata, processErr := prepareBatchFetchedSource(ctx, c.ttsStore, owner, book.BookID, fetched, c.classification, c.batchSensitiveConfigFor(ctx, owner, batchID, book))
 		for key, value := range book.SourceMetadata {
@@ -3075,7 +3076,7 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 			productionText = ""
 		}
 		updated, err := c.captureAutomationSource(ctx, owner, batchID, book, batchfactoryv11.CaptureBookSourceInput{
-			SourceText: productionText, RawSourceText: fetched.OriginalRaw, ReplaceSource: true, ReplaceTitle: true,
+			SourceText: productionText, RawSourceText: fetched.OriginalRaw, RawSourceOrigin: firstMetadataString(book.SourceMetadata, "rawSourceOrigin"), ReplaceSource: true, ReplaceTitle: true,
 			SourceTitle: fetchedBookSourceTitle(fetched, book.Title), SourceMetadata: metadata,
 		})
 		if err != nil {
@@ -3089,7 +3090,7 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 	if isDirectFirstSourceBlocked(book) && len(productionLines(book)) == 0 && firstMetadataString(book.SourceMetadata, "giantMaterialId", "qingyuMaterialId") == "" {
 		return book, fmt.Errorf("书城原文获取失败，等待人工处理：%s", reasonOrDefault(strings.TrimSpace(stringValue(book.SourceMetadata["originalReadError"])), "请手动重试直取或确认后使用 OCR"))
 	}
-	if len(productionLines(book)) > 0 {
+	if !processingFailed && len(productionLines(book)) > 0 {
 		// A previous candidate can fail first and a sibling can later succeed.
 		// Source text is the authority: once it exists, remove the obsolete intake
 		// failure so later automation runs and the UI do not keep reporting it.
@@ -3140,27 +3141,7 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 	if bookID == "" {
 		return book, fmt.Errorf("正文尚未获取，且缺少小说编号")
 	}
-	captureCharacters := 4000
-	if value, ok := book.SourceMetadata["contentCaptureCharacters"]; ok {
-		switch typed := value.(type) {
-		case int:
-			captureCharacters = typed
-		case int64:
-			captureCharacters = int(typed)
-		case float64:
-			captureCharacters = int(typed)
-		case json.Number:
-			if parsed, parseErr := typed.Int64(); parseErr == nil {
-				captureCharacters = int(parsed)
-			}
-		}
-	}
-	if captureCharacters < 1000 {
-		captureCharacters = 1000
-	}
-	if captureCharacters > 100000 {
-		captureCharacters = 100000
-	}
+	captureCharacters := bookCaptureCharacters(book)
 	fetched, resolvedBookID, fallbackFrom, err, attempts := fetchBatchSourceWithGiantCandidate(ctx, c.fetcher, c.giantMaterialResolver, book, bookID, platform, captureCharacters)
 	if err != nil {
 		displayErr := batchFetchDisplayError(err, book)

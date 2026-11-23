@@ -14,6 +14,7 @@ export function selectedCopyGroups(groups, results, selections, options = []) {
     next = next.map(group => group.platformId !== copy.platform ? group : {
       ...group,
       sourceTextByBookId: { ...group.sourceTextByBookId, [copy.bookId]: copy.content },
+      rawSourceTextByBookId: { ...group.rawSourceTextByBookId, [copy.bookId]: copy.content },
       sourceMetadataByBookId: { ...group.sourceMetadataByBookId, [copy.bookId]: {
         bookName: copy.title, sourceMode: 'custom_copy', customCopyRecordId: copy.id,
         customCopyCreatedAt: copy.createdAt, customCopyPlatform: copy.platform
