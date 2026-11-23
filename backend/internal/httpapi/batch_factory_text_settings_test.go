@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/png"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -77,5 +78,30 @@ func TestBatchFactoryTextCoverSparseSettings(t *testing.T) {
 	snap, err := bookTextSnapshot(textRequest{settings: effectiveTextSettings(batch, book)})
 	if err != nil || snap.Cover.Layout.FontID != "ma-shan-zheng" || snap.Cover.Layout.FontSize != 56 || snap.Cover.Layout.Align != "right" || snap.Cover.Layout.Padding != 0 || snap.Cover.Background.Color != "#123456" {
 		t.Fatalf("cover resolved to %+v, error %v", snap, err)
+	}
+}
+
+// The front-end save/reopen test produces this exact settings payload.
+func TestBatchFactoryTextSavedProfileResolvesForPublish(t *testing.T) {
+	data, err := os.ReadFile("testdata/text_profile_snapshot.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch, book := publishFieldsFixture(t, `{"websiteProfileId":"121-4","organization":"3","bookCategory":"已有分类"}`)
+	if err := json.Unmarshal(data, &book.SettingsState.Patch); err != nil {
+		t.Fatal(err)
+	}
+	fields, err := buildPublishFields(batch, book, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key, expected := range map[string]string{"organization": "7", "jieya_num": "8", "gunping_num": "0", "font_color_styles": "[1,2]"} {
+		if fields[key] != expected {
+			t.Errorf("publish field %s = %q, want %q", key, fields[key], expected)
+		}
+	}
+	var publish map[string]any
+	if err := json.Unmarshal(effectiveTextSettings(batch.SettingsState.Patch, book.SettingsState.Patch)["publishSettings"], &publish); err != nil || publish["bookCategory"] != "已有分类" {
+		t.Fatalf("book did not inherit category: %v, %v", publish, err)
 	}
 }

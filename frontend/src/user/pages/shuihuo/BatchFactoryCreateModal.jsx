@@ -864,7 +864,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     destroyOnClose={false}
   >
     <Alert type="info" showIcon message="首次批量统一配置" description="配置会在创建批量时一次性保存为该批量默认值；后续仍可在工作台的“统一配置”继续修改，单书覆盖不会被清空。" />
-    {batchMode === 'text' ? <TextProductionSettingsForm open={initialSettingsOpen} value={normalizeTextProductionConfig(initialBatchSettings)} profiles={initialBatchSettings.publishSettings?.websiteProfiles} onChange={changes=>setInitialBatchSettings(current=>applyTextProductionChanges(current,changes))}/> : <Tabs items={[
+    {batchMode === 'text' ? <TextProductionSettingsForm open={initialSettingsOpen} value={normalizeTextProductionConfig(initialBatchSettings)} onChange={changes=>setInitialBatchSettings(current=>applyTextProductionChanges(current,changes))}/> : <Tabs items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} sections={['models', 'audio']} active={initialSettingsOpen} /> },
       { key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm productionMode={initialBatchSettings.productionMode} value={initialBatchSettings.aiPromptConfig} onChange={aiPromptConfig => setInitialBatchSettings(current => ({ ...current, aiPromptConfig }))} /> },
       { key: 'publish', label: '发布统一', children: isComicProduction ? <BatchFactoryComicPublishSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} /> : <BatchFactoryPublishSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} active={initialSettingsOpen} /> }

@@ -1,0 +1,11 @@
+{
+  "publishSettings": {
+    "websiteProfileId": "121-8",
+    "versionProfile": "解压",
+    "organization": "7",
+    "websiteProfiles": [
+      {"id":"121-4","name":"滚屏","organization":"3","advanced":{}},
+      {"id":"121-8","config_id":"8","name":"解压","organization":"7","advanced":{"jieyaNum":8,"gunpingNum":0,"book_category":"new","fontColorStyles":[1,2]}}
+    ]
+  }
+}

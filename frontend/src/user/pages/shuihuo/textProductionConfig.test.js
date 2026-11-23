@@ -1,6 +1,44 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TEXT_PRODUCTION_CONFIG_KEYS, defaultTextProductionConfig, normalizeTextProductionConfig, textProductionBookOverride, updateTextProductionSettings } from './textProductionConfig.js';
+import { readFileSync } from 'node:fs';
+import { TEXT_PRODUCTION_CONFIG_KEYS, TEXT_PRODUCTION_SECTIONS, applyTextProductionChanges, defaultTextProductionConfig, normalizeTextProductionConfig, textProductionBookOverride, updateTextProductionSettings, textProfileChanges } from './textProductionConfig.js';
+
+test('新建及统一保存配置档后重新打开有名称、组织、分类及发布参数，单书覆盖可独立还原', () => {
+  const id = 'publishSettings.websiteProfileId';
+  const catalog = 'publishSettings.websiteProfiles';
+  const profiles = [
+    {id:'121-4',name:'滚屏',organization:'3'},
+    {id:'121-8',config_id:'8',name:'解压',advanced:{organization_id:7,jieyaNum:8,gunpingNum:0,book_category:'new',password:'secret',fontColorStyles:[1,2]},apiKey:'secret'}
+  ];
+  const batch = applyTextProductionChanges({publishSettings:{bookCategory:'已有分类'}},textProfileChanges(profiles,'121-4'));
+  const reopen = settings => JSON.parse(JSON.stringify(settings));
+  const override = applyTextProductionChanges({},textProfileChanges(profiles,'121-8'));
+  const fixture = new URL('../../../../../backend/internal/httpapi/testdata/text_profile_snapshot.json',import.meta.url);
+  assert.deepEqual(override,JSON.parse(readFileSync(fixture,'utf8')));
+  const book = textProductionBookOverride(reopen(batch),reopen(override));
+  assert.equal(book.value[id],'121-8');
+  assert.equal(book.value[catalog][1].name,'解压');
+  assert.equal(override.publishSettings.versionProfile,'解压');
+  assert.equal(override.publishSettings.organization,'7');
+  assert.equal(book.value['publishSettings.bookCategory'],'已有分类');
+  assert.deepEqual(override.publishSettings.websiteProfiles[1].advanced,{jieyaNum:8,gunpingNum:0,book_category:'new',fontColorStyles:[1,2]});
+  assert.ok(!JSON.stringify(override).includes('secret'));
+  const restored = applyTextProductionChanges(override,{[id]:undefined});
+  assert.deepEqual(restored,{});
+  assert.equal(textProductionBookOverride(batch,restored).value[id],'121-4');
+  const refreshed = applyTextProductionChanges(batch,textProfileChanges(profiles.slice(1),'121-4'));
+  assert.equal(refreshed.publishSettings.websiteProfileId,'');
+  assert.equal(refreshed.publishSettings.organization,'');
+  assert.equal(refreshed.publishSettings.bookCategory,'已有分类');
+});
+
+test('取文失败策略和生产失败说明分开，修改生产模式保留既有取文策略', () => {
+  const fields = TEXT_PRODUCTION_SECTIONS.find(section=>section.key==='models').fields;
+  assert.match(fields.find(field=>field.key==='sensitiveAIOnFailure').label,/取文阶段/);
+  assert.match(fields.find(field=>field.key==='sensitiveMode').aiHint,/停止生产并显示失败原因/);
+  const saved = applyTextProductionChanges({sensitiveAIOnFailure:'review'},{sensitiveMode:'ai'});
+  assert.deepEqual(saved,{sensitiveMode:'ai',sensitiveAIOnFailure:'review'});
+});
 
 test('同一套字段覆盖三个表单，实际边距、段距和标红保留零值', () => {
   for (const key of ['textModelId','sensitiveMode','sensitiveAIModels','sensitiveAIOnFailure','highlightReuseEnabled','contentRange','textPageTarget','imageAspectRatio','textFontId','textFontSize','textFontWeight','textLineHeight','textParagraphSpacing','textPadding','textAlign','textColor','textHighlightColor','textMaxHeightRatio','textBackground','textCover.background','textCover.layout.fontId','textCover.layout.fontSize','textCover.layout.align','comicPublishSettings.producerAdminName','comicPublishSettings.organizationId','publishSettings.websiteProfileId','publishSettings.bookCategory','textAutoCollection','textAutoUpload','textUploadRetryLimit']) assert.ok(TEXT_PRODUCTION_CONFIG_KEYS.includes(key),key);

@@ -1,4 +1,5 @@
 import { normalizeSensitiveMode, SENSITIVE_MODE_OPTIONS } from './batchFactoryBookConfigRegions.js';
+import { reconcileSyncedWebsiteProfiles, websiteProfileOrganization } from './batchFactoryWebsiteProfiles.js';
 
 const fonts = [{ value: 'noto-sans-sc', label: 'Noto Sans SC · 黑体' }, { value: 'ma-shan-zheng', label: 'Ma Shan Zheng · 手写体' }];
 const options = values => values.map(value => ({ value, label: String(value) }));
@@ -9,9 +10,9 @@ const solid = { kind: 'color', color: '#111318' };
 export const TEXT_PRODUCTION_SECTIONS = [
   { key: 'models', label: '模型配置', fields: [
     field('textModelId','文本模型','model',''),
-    field('sensitiveMode','敏感内容处理','choice','system',{options:SENSITIVE_MODE_OPTIONS}),
+    field('sensitiveMode','敏感内容处理','choice','system',{options:SENSITIVE_MODE_OPTIONS,aiHint:'生产阶段会调用文本模型。AI 优化失败会停止生产并显示失败原因。'}),
     field('sensitiveAIModels','AI 修复模型','models',[]),
-    field('sensitiveAIOnFailure','失败时策略','choice','review',{options:[{value:'review',label:'自动打码并继续'},{value:'fail',label:'判为失败'}]}),
+    field('sensitiveAIOnFailure','取文阶段未处理命中词','choice','review',{options:[{value:'review',label:'打码并标记待复核'},{value:'fail',label:'停止取文'}]}),
     field('highlightReuseEnabled','按关键词标红','switch',false)
   ]},
   { key:'layout', label:'排版配置', fields:[
@@ -47,6 +48,37 @@ export const TEXT_PRODUCTION_SECTIONS = [
   ]}
 ];
 const fields = TEXT_PRODUCTION_SECTIONS.flatMap(section => section.fields);
+const profileId = 'publishSettings.websiteProfileId';
+const profileCatalog = 'publishSettings.websiteProfiles';
+const profileSnapshotKeys = [profileCatalog, 'publishSettings.versionProfile','publishSettings.organization'];
+const safeProfileFields = ['id','name','config_id','enabled','source','is_default','platform_id','gender','style','book_category','bookCategory'];
+// The sync response also carries account settings and arbitrary upstream
+// config_data. Persist only profile metadata and the publish form's fields.
+const safeAdvancedFields = [
+  'tl5','ziti','zitidx','biaohong','biaohongReuse','biaohong_reuse','keywords',
+  'jieyaNum','jieya_num','jieyaAiHead','jieya_ai_head','jieyaSpeed','jieya_speed','jieyaPitch','jieya_pitch',
+  'fontColorStyles','font_color_styles','gunpingNum','gunping_num','gunpingSpeed','gunping_speed',
+  'jieyaAiHeadHorizontalFlip','jieya_ai_head_horizontal_flip','aiHeadVideoMode','jieya_ai_head_video_mode',
+  'book_category','bookCategory'
+];
+const scalar = value => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+function safeFields(source, keys) {
+  const result = {};
+  for (const key of keys) {
+    const value = source?.[key];
+    if (scalar(value) || (Array.isArray(value) && value.every(scalar))) result[key] = value;
+  }
+  return result;
+}
+export function textProfileChanges(catalog, selectedId) {
+  const profiles = (Array.isArray(catalog) ? catalog : []).filter(profile=>profile?.id).map(profile=>({
+    ...safeFields(profile,safeProfileFields),
+    organization: websiteProfileOrganization(profile),
+    advanced: safeFields(profile.advanced ?? profile.config_data,safeAdvancedFields)
+  }));
+  const {publishSettings} = reconcileSyncedWebsiteProfiles({websiteProfileId:selectedId},profiles);
+  return Object.fromEntries(Object.entries(publishSettings).map(([key,value])=>['publishSettings.'+key,value]));
+}
 export const TEXT_PRODUCTION_CONFIG_KEYS = Object.freeze(fields.map(item => item.key));
 const read = (object, path) => path.split('.').reduce((v,k) => v?.[k], object);
 function write(object, keys, value) {
@@ -77,6 +109,7 @@ export function textProductionBookOverride(batchPatch = {}, bookPatch = {}) {
     if (scoped !== undefined) explicitKeys.push(key);
     value[key] = scoped ?? explicitValue(batchPatch,key) ?? (from ? value[from] : structuredClone(initial));
   }
+  value[profileCatalog] = read(bookPatch,profileCatalog) ?? read(batchPatch,profileCatalog) ?? [];
   return {value,explicitKeys};
 }
 export const normalizeTextProductionConfig = settings => textProductionBookOverride(settings).value;
@@ -88,11 +121,14 @@ export function updateTextProductionSettings(current = {}, changes = {}) {
   const next = {...current}, touched = new Set();
   const set = (key,v) => {const keys=key.split('.');touched.add(keys[0]);write(next,keys,v);};
   for (const [key,value] of Object.entries(changes)) {
-    if (!TEXT_PRODUCTION_CONFIG_KEYS.includes(key)) continue;
+    if (!TEXT_PRODUCTION_CONFIG_KEYS.includes(key) && !profileSnapshotKeys.includes(key)) continue;
     set(key,value);
     if (key === 'contentRange') set('contentCaptureCharacters',value);
     else if (legacyKeys[key] && explicitValue(current,legacyKeys[key]) !== undefined)
       set(legacyKeys[key],undefined);
+  }
+  if (Object.hasOwn(changes,profileId) && changes[profileId] === undefined) {
+    for (const key of profileSnapshotKeys) set(key,undefined);
   }
   const patch = {}, restoreKeys = [];
   for (const k of touched) {

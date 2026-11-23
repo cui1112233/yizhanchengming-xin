@@ -5,7 +5,7 @@ import { getN8ComicPublishStatus } from '../../../shared/api/batchFactoryV12';
 import { syncWebSubmitConfigs } from '../../../shared/api/novelFetch';
 import { listPersonalTextBackgrounds, uploadPersonalTextBackground } from '../../../shared/api/batchFactoryText';
 import { producerAccountOptions } from './batchFactoryComicPublishAccounts';
-import { TEXT_PRODUCTION_SECTIONS } from './textProductionConfig';
+import { TEXT_PRODUCTION_SECTIONS, textProfileChanges } from './textProductionConfig';
 
 function ColorPicker({ label, value, onChange }) {
   const [draft, setDraft] = useState(value);
@@ -44,7 +44,7 @@ function BackgroundPicker({value,items,onChange,onUploaded}) {
 
 // All three entry points render this form. value is the resolved display
 // model while changes contain only the path the person actually touched.
-export default function TextProductionSettingsForm({value, explicitKeys=[], onChange, onRestore, scope='batch', profiles=[], open=true}) {
+export default function TextProductionSettingsForm({value, explicitKeys=[], onChange, onRestore, scope='batch', open=true}) {
   const [tab,setTab]=useState('models');
   const [directory,setDirectory]=useState({});
   const [models,setModels]=useState([]);
@@ -52,6 +52,11 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
   const [syncedProfiles,setSyncedProfiles]=useState(null);
   const [error,setError]=useState('');
   const [syncing,setSyncing]=useState(false);
+  const profileId = 'publishSettings.websiteProfileId';
+  const profiles = syncedProfiles ?? value['publishSettings.websiteProfiles'] ?? [];
+  useEffect(() => {
+    if (!open) setSyncedProfiles(null);
+  }, [open]);
   useEffect(()=>{
     if (!open) return;
     let alive=true;
@@ -68,7 +73,16 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
   },[tab,open]);
   const syncProfiles=async()=>{
     setSyncing(true);
-    try {setSyncedProfiles((await syncWebSubmitConfigs({persist:false})).groups || []);}
+    try {
+      const result = await syncWebSubmitConfigs({persist:false});
+      if (!Array.isArray(result.groups)) throw new Error('网站配置档目录格式错误');
+      const changes = textProfileChanges(result.groups,value[profileId]);
+      setSyncedProfiles(changes['publishSettings.websiteProfiles']);
+      if (scope !== 'book' || explicitKeys.includes(profileId)) {
+        onChange(changes);
+        if (value[profileId] && !changes[profileId]) message.warning('原网站配置档已失效，请重新选择');
+      }
+    }
     catch(e){message.error(e.message || '网站配置档同步失败');}
     finally{setSyncing(false);}
   };
@@ -77,13 +91,13 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
       case 'model': case 'models':return models;
       case 'producer':return producerAccountOptions(directory.producerAccounts,value[field.key],value['comicPublishSettings.organizationId'],directory.producerAccountOrganizations);
       case 'organization':return (directory.organizations || []).map(o=>({value:String(o.id),label:o.name || String(o.id)}));
-      case 'profile':return (syncedProfiles || profiles).map(p=>({value:String(p.id),label:p.name || String(p.id)}));
+      case 'profile':return profiles.map(p=>({value:String(p.id),label:p.name || String(p.id)}));
       default:return field.options;
     }
   };
   const control=field=>{
     const v=value[field.key];
-    const set=next=>onChange({[field.key]:next});
+    const set=next=>onChange(field.type==='profile' ? textProfileChanges(profiles,next) : {[field.key]:next});
     const attrs={'aria-label':field.label};
     if(field.type==='background')return <BackgroundPicker value={v} items={backgrounds} onChange={set} onUploaded={item=>setBackgrounds(old=>[item,...old.filter(x=>x.id!==item.id)])}/>;
     if(field.type==='switch')return <Switch {...attrs} checked={v} onChange={set}/>;
@@ -95,7 +109,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
     }
     if(field.type==='input')return <Input {...attrs} value={v} onChange={e=>set(e.target.value)}/>;
     const many=field.type==='models';
-    const disabled=(many || field.key==='sensitiveAIOnFailure') && value.sensitiveMode!=='ai';
+    const disabled=many && value.sensitiveMode!=='ai';
     return <Select {...attrs} showSearch optionFilterProp="label" style={{minWidth:150}} mode={many?'multiple':undefined}
       allowClear={field.type!=='choice'} disabled={disabled} options={choices(field)}
       placeholder={many?'默认使用文本模型':'请选择'} value={v==='' ? undefined : v} onChange={n=>set(n ?? (many?[]:''))}/>;
@@ -107,7 +121,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
         <span><b>{field.label}</b>{scope==='book' && <small>{own?' · 本书覆盖':' · 继承'}</small>}</span>
         {control(field)}
         {scope==='book' && own && <Button size="small" type="link" onClick={()=>onRestore(field.key)}>恢复继承</Button>}
-        {field.key==='sensitiveMode' && <small>{value.sensitiveMode==='ai'?'执行 AI 优化时会调用文本模型。':value.sensitiveMode==='off'?'直接使用生产稿。':'系统优化在本地执行。'}</small>}
+        {field.key==='sensitiveMode' && <small>{value.sensitiveMode==='ai'?field.aiHint:value.sensitiveMode==='off'?'直接使用生产稿。':'系统优化在本地执行。'}</small>}
         {field.key==='highlightReuseEnabled' && <small>复用已有标红词，本地排版。</small>}
         {field.key==='textFontId' && value[field.key]==='ma-shan-zheng' && <small>部分字回退到 Noto Sans SC。</small>}
         {field.type==='profile' && <Button size="small" loading={syncing} onClick={syncProfiles}>同步网站配置档</Button>}
