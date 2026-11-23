@@ -75,15 +75,20 @@ func textReceiptPointers(meta map[string]any, rec cp.Record, load func(string) (
 	if current == "" || current == rec.CollectionID || old.CollectionID == "" || old.IntentID != rec.IntentID || old.RunID != rec.RunID || old.RequestKey != rec.RequestKey {
 		nextCurrent = rec.CollectionID
 	}
-	if rec.Confirmed() && (!rec.Reused && (!old.Confirmed() || old.IntentID != rec.IntentID) || nextLast == "") {
+	physicalSuccess := rec.Confirmed() && !rec.Reused && (!old.Confirmed() || old.IntentID != rec.IntentID)
+	if physicalSuccess || rec.Confirmed() && nextLast == "" {
 		nextLast = rec.CollectionID
 	}
-	if current == nextCurrent && last == nextLast {
+	clearArchive := physicalSuccess && meta["textLastPublishedArchiveKey"] != nil
+	if current == nextCurrent && last == nextLast && !clearArchive {
 		return meta, false, nil
 	}
 	out := maps.Clone(meta)
 	if out == nil {
 		out = map[string]any{}
+	}
+	if clearArchive {
+		delete(out, "textLastPublishedArchiveKey")
 	}
 	out["textCollectionId"] = nextCurrent
 	if nextLast != "" {

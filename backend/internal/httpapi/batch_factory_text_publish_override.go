@@ -20,6 +20,40 @@ type textPublishOverride struct {
 
 var textConfirmationKey = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 
+type textConfirmationBindings map[string]string
+
+func (keys textConfirmationBindings) add(s txt.Scope, id string, o textPublishOverride) error {
+	if !o.Force && o.RequestKey == "" {
+		return nil
+	}
+	if !textConfirmationKey.MatchString(o.RequestKey) {
+		return fmt.Errorf("%w：上传确认编号无效", batchfactoryv11.ErrInvalid)
+	}
+	scope := textPublishRequest(s, id).TextKeyScope()
+	if bound, ok := keys[o.RequestKey]; ok && bound != scope {
+		return batchfactoryv11.ErrConflict
+	}
+	keys[o.RequestKey] = scope
+	return nil
+}
+
+func (keys textConfirmationBindings) bind(ctx context.Context, store batchfactoryv11.Store) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	binder, ok := store.(interface {
+		BindTextPublishKeys(context.Context, map[string]string) error
+	})
+	if !ok {
+		return batchfactoryv11.ErrUnavailable
+	}
+	err := binder.BindTextPublishKeys(ctx, keys)
+	if errors.Is(err, batchfactoryv11.ErrConflict) {
+		return fmt.Errorf("%w: 上传确认编号归属冲突，请重新确认", err)
+	}
+	return err
+}
+
 // Resolve every override before writing a job. The database lookup pins the
 // collection to the authenticated owner, batch and explicitly selected book.
 func (c *BatchAutomationCoordinator) textPublishOverrides(ctx context.Context, owner, batchID string, rawIDs, raw any) (map[string]textPublishOverride, error) {
@@ -43,17 +77,10 @@ func (c *BatchAutomationCoordinator) textPublishOverrides(ctx context.Context, o
 	for _, bookID := range ids {
 		selected[bookID] = true
 	}
-	bindings := map[string]string{}
+	bindings := textConfirmationBindings{}
 	for bookID, o := range overrides {
-		if o.Force || o.RequestKey != "" {
-			if !textConfirmationKey.MatchString(o.RequestKey) {
-				return nil, fmt.Errorf("%w：上传确认编号无效", batchfactoryv11.ErrInvalid)
-			}
-			scope, _ := json.Marshal([]string{owner, batchID, bookID, o.CollectionID})
-			if bound, ok := bindings[o.RequestKey]; ok && bound != string(scope) {
-				return nil, batchfactoryv11.ErrConflict
-			}
-			bindings[o.RequestKey] = string(scope)
+		if err := bindings.add(txt.Scope{Owner: owner, BatchID: batchID, BookID: bookID}, o.CollectionID, o); err != nil {
+			return nil, err
 		}
 		if !selected[bookID] || strings.TrimSpace(bookID) == "" || strings.TrimSpace(o.CollectionID) == "" || len(o.CollectionID) > 64 {
 			return nil, fmt.Errorf("%w：请为所选书籍填写准确的文本合集", batchfactoryv11.ErrInvalid)
@@ -74,16 +101,8 @@ func (c *BatchAutomationCoordinator) textPublishOverrides(ctx context.Context, o
 			return nil, fmt.Errorf("%w：所选文本合集尚未就绪", batchfactoryv11.ErrConflict)
 		}
 	}
-	if len(bindings) > 0 {
-		binder, ok := c.store.(interface {
-			BindTextPublishKeys(context.Context, map[string]string) error
-		})
-		if !ok {
-			return nil, batchfactoryv11.ErrUnavailable
-		}
-		if err := binder.BindTextPublishKeys(ctx, bindings); err != nil {
-			return nil, err
-		}
+	if err := bindings.bind(ctx, c.store); err != nil {
+		return nil, err
 	}
 	return overrides, nil
 }

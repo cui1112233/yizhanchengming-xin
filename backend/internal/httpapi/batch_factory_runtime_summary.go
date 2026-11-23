@@ -79,7 +79,7 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 				"runs":         summary.Runs,
 				"availability": summary.Availability,
 			}
-			if err := addWorkflowPublishSummary(r.Context(), store, owner, batch.ID, book.ID, firstMetadataString(book.SourceMetadata, "textCollectionId"), summary.Runs, stageSummary, firstMetadataString(book.SourceMetadata, "textLastPublishedCollectionId")); err != nil {
+			if err := addWorkflowPublishSummary(r.Context(), store, owner, batch.ID, book.ID, book.SourceMetadata, summary.Runs, stageSummary); err != nil {
 				stageSummary["textPublishReadError"] = err.Error()
 			}
 			if summary.LastFailed != nil {

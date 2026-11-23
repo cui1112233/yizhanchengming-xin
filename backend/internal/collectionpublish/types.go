@@ -2,6 +2,7 @@ package collectionpublish
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -38,6 +39,13 @@ type PublishRequest struct {
 	RequestKey                                             string
 	Collections                                            []Reference
 }
+
+// TextKeyScope keeps the exact byte representation used by the first key registry.
+func (r PublishRequest) TextKeyScope() string {
+	encoded, _ := json.Marshal([]string{r.Owner, r.BatchID, r.BookID, r.CollectionID})
+	return string(encoded)
+}
+
 type Page struct {
 	Ordinal int
 	Image   n8comic.ImageInput

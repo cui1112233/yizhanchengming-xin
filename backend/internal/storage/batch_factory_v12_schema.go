@@ -351,6 +351,7 @@ func V12Migrations() []Migration {
 		{Version: 1200114, SQL: []string{`CREATE TABLE IF NOT EXISTS batch_factory_v12_text_publish_keys (
 	request_key VARBINARY(128) PRIMARY KEY, scope_digest BINARY(32) NOT NULL
 ) ENGINE=InnoDB`}, CallbackChecksum: "batch-factory-v12-text-publish-keys-v1"},
+		{Version: 1200115, Adopt: adoptTextPublishReceipts, CallbackChecksum: "batch-factory-v12-text-receipt-backfill-v1"},
 	}
 }
 

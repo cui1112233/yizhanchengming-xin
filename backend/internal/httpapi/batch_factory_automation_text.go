@@ -18,7 +18,28 @@ import (
 
 // The publisher saves an owner-scoped receipt under the immutable collection ID.
 // Read the current attempt and its last confirmed predecessor independently.
-func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store, owner, batchID, bookID, manualCollectionID string, runs []batchfactoryv11.BookStageRun, summary map[string]any, historyCollectionIDs ...string) error {
+func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store, owner, batchID, bookID string, metadata map[string]any, runs []batchfactoryv11.BookStageRun, summary map[string]any) error {
+	manualCollectionID := firstMetadataString(metadata, "textCollectionId")
+	historyID := firstMetadataString(metadata, "textLastPublishedCollectionId")
+	var historyTime time.Time
+	// Some upgraded books have their most recent physical success only in the
+	// immutable archive. Keep that receipt separate from the current attempt.
+	if archiveKey := firstMetadataString(metadata, "textLastPublishedArchiveKey"); archiveKey != "" && historyID != "" {
+		draft, err := store.GetDraft(ctx, owner, archiveKey, textPublishDraftKind+"-history", batchID)
+		if err != nil && !errors.Is(err, batchfactoryv11.ErrNotFound) {
+			return err
+		}
+		if err == nil {
+			var archived cp.Record
+			if err := json.Unmarshal([]byte(draft.Content), &archived); err != nil {
+				return err
+			}
+			h := archived.HistoricalPublished()
+			if h != nil && h.Kind == cp.CollectionKindText && h.BookID == bookID && h.CollectionID == historyID {
+				summary["textLastPublishedRecord"], historyTime = *h, h.PublishedAt
+			}
+		}
+	}
 	var uploads []batchfactoryv11.BookStageRun
 	for _, r := range runs {
 		if r.Stage == "text_publish" && r.CollectionID != "" {
@@ -30,13 +51,12 @@ func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store,
 	if len(uploads) > 0 {
 		latest = uploads[0]
 	}
-	ids := append([]string{manualCollectionID}, historyCollectionIDs...)
+	ids := []string{manualCollectionID, historyID}
 	for _, r := range uploads {
 		ids = append(ids, r.CollectionID)
 	}
 	seen := map[string]bool{}
 	manualCurrent := false
-	var historyTime time.Time
 	for _, id := range ids {
 		if id == "" || seen[id] {
 			continue
@@ -73,7 +93,7 @@ func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store,
 			}
 		}
 		history := rec.HistoricalPublished()
-		if scoped(history) && (len(historyCollectionIDs) == 0 || historyCollectionIDs[0] == "" || id == historyCollectionIDs[0]) {
+		if scoped(history) && (historyID == "" || id == historyID) {
 			published := history.PublishedAt
 			if published.IsZero() {
 				published = draft.UpdatedAt

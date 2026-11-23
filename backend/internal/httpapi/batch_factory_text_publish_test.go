@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -116,6 +118,31 @@ func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 	if g := call("GET", nil); g.Published || g.Publish != nil {
 		t.Fatal(g)
 	}
+	foreignScopes := [][]string{
+		{"bob", s.BatchID, s.BookID, "text-c"},
+		{s.Owner, "other-batch", s.BookID, "text-c"},
+		{s.Owner, s.BatchID, "other-book", "text-c"},
+		{s.Owner, s.BatchID, s.BookID, "other-collection"},
+	}
+	for i, scope := range foreignScopes {
+		key := "foreign-" + strconv.Itoa(i)
+		encoded, _ := json.Marshal(scope)
+		if err := store.BindTextPublishKeys(ctx, map[string]string{key: string(encoded)}); err != nil {
+			t.Fatal(err)
+		}
+		for _, force := range []bool{true, false} {
+			resp := signedJSONRequest(t, api, now, s.Owner, "POST", path, map[string]any{"force": force, "requestKey": key})
+			if resp.Code != http.StatusConflict || client.calls != 0 || client.readbackCalls != 0 {
+				t.Fatalf("foreign scope %d force=%t: HTTP %d calls=%d reads=%d", i, force, resp.Code, client.calls, client.readbackCalls)
+			}
+		}
+	}
+	for _, invalid := range []string{"", "bad key!"} {
+		resp := signedJSONRequest(t, api, now, s.Owner, "POST", path, map[string]any{"force": true, "requestKey": invalid})
+		if resp.Code != http.StatusBadRequest || client.calls != 0 {
+			t.Fatalf("invalid confirmation: HTTP %d calls=%d", resp.Code, client.calls)
+		}
+	}
 	automatic := textCollectionPublisher{n8: p, repo: repo}
 	confirmed, err := automatic.automation(ctx, txt.EnsureRequest{Scope: s, FrozenSettings: settings, PublishRunID: "run-1", PublishAttempt: 1, PublishRequestKey: "request-1"}, repo.collection)
 	if err != nil || !confirmed {
@@ -143,6 +170,12 @@ func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 		t.Fatalf("manual upload created runs: %v %v", runs, err)
 	}
 	second := call("POST", map[string]any{"force": true, "requestKey": "another-upload"})
+	coord := &BatchAutomationCoordinator{store: store, textPublishCollection: func(_ context.Context, _ txt.Scope, id string) (txt.Collection, error) {
+		return txt.Collection{ID: id, Status: "ready"}, nil
+	}}
+	if _, err := coord.textPublishOverrides(ctx, s.Owner, s.BatchID, []string{s.BookID}, map[string]textPublishOverride{s.BookID: {CollectionID: "other-collection", Force: true, RequestKey: "another-upload"}}); !errors.Is(err, batchfactoryv11.ErrConflict) {
+		t.Fatalf("manual confirmation reused by automation on another collection: %v", err)
+	}
 	if second.Published || second.Publish.Status != "pending" || second.LastPublished == nil || second.LastPublished.IntentID != first.Publish.IntentID {
 		t.Fatal(second)
 	}
@@ -180,6 +213,35 @@ func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 	reused := reply.Publish
 	if reused.RunID != "next-run" || reused.Attempt != 2 || reused.RequestKey != "next-key" || reused.IntentID != second.Publish.IntentID || reused.LastPublished.RequestKey != "another-upload" || client.calls != 2 {
 		t.Fatal(reused)
+	}
+	// Simulate an interrupted manual upload written before key ownership was
+	// enforced. Reading it remains possible, but continuing it must not submit.
+	legacy := *first.Publish
+	legacy.IntentID, legacy.RunID, legacy.RequestKey = "old-dispatch", "", "foreign-0"
+	legacy.Status, legacy.Phase = "uploading", "preparing"
+	saveLegacy := func() {
+		t.Helper()
+		if _, err := store.SaveDraft(ctx, s.Owner, batchfactoryv11.Draft{Scope: s.BatchID, Key: "text-c", Kind: textPublishDraftKind, Content: string(mustJSON(legacy))}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	saveLegacy()
+	if got := call("GET", nil); got.Publish.IntentID != legacy.IntentID {
+		t.Fatal(got)
+	}
+	if got := signedJSONRequest(t, api, now, s.Owner, "POST", path, map[string]any{}); got.Code != http.StatusConflict || client.calls != 2 {
+		t.Fatalf("resumed another scope's stored confirmation: HTTP %d calls=%d", got.Code, client.calls)
+	}
+	legacy.Status = "pending"
+	saveLegacy()
+	beforeReads := client.readbackCalls
+	if got := signedJSONRequest(t, api, now, s.Owner, "POST", path, map[string]any{}); got.Code != http.StatusConflict || client.readbackCalls != beforeReads || client.calls != 2 {
+		t.Fatalf("continued pending foreign confirmation: HTTP %d reads=%d calls=%d", got.Code, client.readbackCalls, client.calls)
+	}
+	legacy.Status = "failed"
+	saveLegacy()
+	if got := call("POST", map[string]any{"force": true, "requestKey": "fresh-after-failure"}); got.Publish.RequestKey != "fresh-after-failure" || client.calls != 3 {
+		t.Fatalf("fresh confirmed recovery: %+v calls=%d", got, client.calls)
 	}
 	foreign := signedJSONRequest(t, api, now, "bob", http.MethodGet, path, nil)
 	if foreign.Code != 404 {

@@ -52,8 +52,8 @@ func TestV12H3KernelSchemaPersistsTimelineCompilationAndProductionTrace(t *testi
 
 func TestV12MigrationsRegisterH3KernelAfterUpgradeAudit(t *testing.T) {
 	migrations := V12Migrations()
-	if len(migrations) != 14 {
-		t.Fatalf("V12 migration count=%d, want 14: %+v", len(migrations), migrations)
+	if len(migrations) != 15 {
+		t.Fatalf("V12 migration count=%d, want 15: %+v", len(migrations), migrations)
 	}
 	for i, migration := range migrations {
 		if int(migration.Version) != 1200101+i {

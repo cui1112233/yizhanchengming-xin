@@ -44,6 +44,98 @@ func (r workflowFailSecondPage) SaveSystemPageArtifact(ctx context.Context, s tx
 	return r.Repository.SaveSystemPageArtifact(ctx, s, id, rev, file)
 }
 
+func verifyTextPublishUpgrade(t *testing.T, ctx context.Context, db *sql.DB) {
+	t.Helper()
+	migrations := storage.V12Migrations()
+	if err := storage.RunMigrations(ctx, db, append(storage.V11Migrations(), migrations[:13]...)); err != nil {
+		t.Fatal(err)
+	}
+	store := batchfactoryv11.NewMySQLStore(db)
+	const owner = "upgrade<&>"
+	batch, err := store.CreateBatch(ctx, owner, batchfactoryv11.CreateBatchInput{Title: "旧数据", Books: []batchfactoryv11.CreateBookInput{{Title: "旧书", SourceMetadata: map[string]any{"textCollectionId": "B"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0].ID
+	record := func(collection, key, status string, hour int) cp.Record {
+		return cp.Record{Kind: cp.CollectionKindText, BookID: book, CollectionID: collection, IntentID: "intent-" + key, RequestKey: key, Status: status, CarouselID: 7, ImageIDs: []int64{8}, PublishedAt: time.Date(2026, 1, 1, hour, 0, 0, 0, time.UTC)}
+	}
+	save := func(rec cp.Record, history bool) {
+		kind, key := textPublishDraftKind, rec.CollectionID
+		if history {
+			kind += "-history"
+			key = archivedPublishKey(rec.CollectionID, rec.RequestKey)
+		}
+		if _, err := store.SaveDraft(ctx, owner, batchfactoryv11.Draft{Scope: batch.ID, Key: key, Kind: kind, Content: string(mustJSON(rec))}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	save(record("older", "shared-legacy", "published", 1), false)
+	save(record("older", "other-archive", "published", 2), true)
+	save(record("A", "legacy-A", "published", 3), false)
+	// The original confirmation may be archived after a later attempt.
+	save(record("A", "latest-archived-A", "published", 4), true)
+	pending := record("B", "shared-legacy", "pending", 4)
+	save(pending, false)
+	save(record("failed", "legacy-failed", "failed", 5), false)
+	save(record("already-bound", "prior-binding", "failed", 6), false)
+	if _, err := store.CreateBookStageRun(ctx, batchfactoryv11.BookStageRun{Owner: owner, BatchID: batch.ID, BookID: book, Stage: "text_publish", Status: batchfactoryv11.ProductionRunning, Attempt: 1, RequestID: "interrupted-stage", InputRevision: strings.Repeat("a", 64) + "scheduled-c"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := storage.RunMigrations(ctx, db, migrations[:14]); err != nil {
+		t.Fatal(err)
+	}
+	scope := func(id string) string { b, _ := json.Marshal([]string{owner, batch.ID, book, id}); return string(b) }
+	if err := store.BindTextPublishKeys(ctx, map[string]string{"prior-binding": scope("different")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := storage.RunMigrations(ctx, db, migrations); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"shared-legacy", "prior-binding"} {
+		for _, id := range []string{"older", "B", "already-bound", "different"} {
+			if err := store.BindTextPublishKeys(ctx, map[string]string{key: scope(id)}); !errors.Is(err, batchfactoryv11.ErrConflict) {
+				t.Fatalf("ambiguous binding %s %s: %v", key, id, err)
+			}
+		}
+	}
+	if err := store.BindTextPublishKeys(ctx, map[string]string{"interrupted-stage": scope("unrelated")}); !errors.Is(err, batchfactoryv11.ErrConflict) {
+		t.Fatalf("unclaimed legacy stage confirmation: %v", err)
+	}
+	for key, id := range map[string]string{"legacy-A": "A", "other-archive": "older", "fresh-choice": "B", "interrupted-stage": "scheduled-c"} {
+		if err := store.BindTextPublishKeys(ctx, map[string]string{key: scope(id)}); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.BindTextPublishKeys(ctx, map[string]string{key: scope("other")}); !errors.Is(err, batchfactoryv11.ErrConflict) {
+			t.Fatalf("key %s stolen: %v", key, err)
+		}
+	}
+	for _, status := range []string{"pending", "failed"} {
+		if status == "failed" {
+			pending.Status = status
+			if err := (collectionDraftRecords{store}).Save(ctx, textPublishRequest(txt.Scope{Owner: owner, BatchID: batch.ID, BookID: book}, "B"), pending); err != nil {
+				t.Fatal(err)
+			}
+		}
+		idx, err := store.GetBatchRuntimeIndex(ctx, owner, batch.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := idx.Books[0].SourceMetadata
+		out := map[string]any{}
+		if err := addWorkflowPublishSummary(ctx, store, owner, batch.ID, book, m, nil, out); err != nil {
+			t.Fatal(err)
+		}
+		wantStatus := status
+		if status == "pending" {
+			wantStatus = "upload_pending_confirm"
+		}
+		if m["textCollectionId"] != "B" || m["textLastPublishedCollectionId"] != "A" || workflowReceiptJSON(out["textPublishRecord"])["status"] != wantStatus || workflowReceiptJSON(out["textLastPublishedRecord"])["collectionId"] != "A" || workflowReceiptJSON(out["textLastPublishedRecord"])["requestKey"] != "latest-archived-A" {
+			t.Fatalf("upgrade status=%s metadata=%v summary=%v", status, m, out)
+		}
+	}
+}
+
 // This full-schema fixture must use its own disposable database; the lighter
 // TEXT_REPO_TEST_DSN fixtures intentionally create only a minimal books table.
 func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
@@ -57,9 +149,7 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 	}
 	defer db.Close()
 	ctx := context.Background()
-	if err = storage.RunMigrations(ctx, db, append(storage.V11Migrations(), storage.V12Migrations()...)); err != nil {
-		t.Fatal(err)
-	}
+	verifyTextPublishUpgrade(t, ctx, db)
 	store := batchfactoryv11.NewMySQLStore(db)
 	if err := store.BindTextPublishKeys(ctx, map[string]string{"already-claimed": "scope-a"}); err != nil {
 		t.Fatal(err)
@@ -310,7 +400,7 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 			t.Fatalf("%s: pointers %+v", state, meta)
 		}
 		out := map[string]any{}
-		if err := addWorkflowPublishSummary(ctx, store, scope.Owner, scope.BatchID, scope.BookID, fixed.ID, nil, out, last); err != nil {
+		if err := addWorkflowPublishSummary(ctx, store, scope.Owner, scope.BatchID, scope.BookID, meta, nil, out); err != nil {
 			t.Fatal(err)
 		}
 		if workflowReceiptJSON(out["textPublishRecord"])["collectionId"] != fixed.ID || workflowReceiptJSON(out["textLastPublishedRecord"])["collectionId"] != last {
@@ -404,7 +494,7 @@ func TestAutomationTextPublishPendingResumesSameAttemptAndSeparatesHistory(t *te
 			t.Fatalf("wrong projection %+v", current)
 		}
 		out := map[string]any{}
-		if err := addWorkflowPublishSummary(ctx, s, "alice", b.ID, book.ID, "", summary.Runs, out); err != nil {
+		if err := addWorkflowPublishSummary(ctx, s, "alice", b.ID, book.ID, nil, summary.Runs, out); err != nil {
 			t.Fatal(err)
 		}
 		return out
@@ -446,7 +536,7 @@ func TestAutomationTextManualPublishSummaryUsesBookCollection(t *testing.T) {
 			t.Fatal(err)
 		}
 		out := map[string]any{}
-		if err := addWorkflowPublishSummary(ctx, s, "alice", b.ID, id, "manual-collection", nil, out); err != nil {
+		if err := addWorkflowPublishSummary(ctx, s, "alice", b.ID, id, map[string]any{"textCollectionId": "manual-collection"}, nil, out); err != nil {
 			t.Fatal(err)
 		}
 		rec := workflowReceiptJSON(out["textPublishRecord"])
@@ -480,7 +570,7 @@ func TestAutomationTextNewerManualReceiptSupersedesFinishedRun(t *testing.T) {
 	saved("auto", map[string]any{"runId": "run-1", "attempt": 1, "requestKey": "key-1", "carouselId": 1, "imageIds": []int{9}, "status": "published"})
 	read := func(runs ...batchfactoryv11.BookStageRun) map[string]any {
 		out := map[string]any{}
-		if err := addWorkflowPublishSummary(ctx, store, "alice", batch.ID, bookID, "manual", runs, out); err != nil {
+		if err := addWorkflowPublishSummary(ctx, store, "alice", batch.ID, bookID, map[string]any{"textCollectionId": "manual"}, runs, out); err != nil {
 			t.Fatal(err)
 		}
 		return out

@@ -125,6 +125,33 @@ func (d collectionDraftRecords) Load(ctx context.Context, r cp.PublishRequest) (
 	}
 	return rec, true, nil
 }
+
+// A POST can inherit an interrupted upload's stored key even if the caller
+// supplied none. Verify that key before preparation, readback or dispatch.
+// GET status can still inspect a quarantined legacy receipt.
+type textSubmissionRecords struct{ collectionDraftRecords }
+
+func (d textSubmissionRecords) Load(ctx context.Context, r cp.PublishRequest) (cp.Record, bool, error) {
+	rec, found, err := d.collectionDraftRecords.Load(ctx, r)
+	if err != nil || !found || rec.RequestKey == "" || rec.RequestKey == r.RequestKey {
+		return rec, found, err
+	}
+	switch rec.Status {
+	case "uploading", "pending", "upload_incomplete", "uploaded":
+	default:
+		return rec, true, nil
+	}
+	keys := textConfirmationBindings{}
+	s := txt.Scope{Owner: r.Owner, BatchID: r.BatchID, BookID: r.BookID}
+	if err := keys.add(s, r.CollectionID, textPublishOverride{RequestKey: rec.RequestKey}); err != nil {
+		return cp.Record{}, false, err
+	}
+	if err := keys.bind(ctx, d.store); err != nil {
+		return cp.Record{}, false, err
+	}
+	return rec, true, nil
+}
+
 func (d collectionDraftRecords) Save(ctx context.Context, r cp.PublishRequest, rec cp.Record) error {
 	var archive *batchfactoryv11.Draft
 	if prev := rec.LastPublished; prev != nil && prev.RequestKey != "" && (rec.Status == "uploading" || rec.Status == "pending" || rec.RunID != "" && rec.IntentID == prev.IntentID) {
@@ -266,7 +293,7 @@ func (t textCollectionPublisher) route(m *http.ServeMux, options RouterOptions) 
 			switch {
 			case errors.Is(err, cp.ErrMixedKinds), errors.Is(err, cp.ErrInvalid):
 				writeJSON(w, 400, map[string]string{"error": err.Error()})
-			case errors.Is(err, txt.ErrNotFound), errors.Is(err, txt.ErrNotReady), errors.Is(err, batchfactoryv11.ErrNotFound):
+			case errors.Is(err, txt.ErrNotFound), errors.Is(err, txt.ErrNotReady), errors.Is(err, batchfactoryv11.ErrNotFound), errors.Is(err, batchfactoryv11.ErrConflict), errors.Is(err, batchfactoryv11.ErrInvalid), errors.Is(err, batchfactoryv11.ErrUnavailable):
 				return err
 			default:
 				writeJSON(w, 502, map[string]any{"error": err.Error(), "publish": rec})
@@ -317,7 +344,16 @@ func (t textCollectionPublisher) publish(ctx context.Context, s txt.Scope, book 
 	req.Force = in.Force
 	req.RequestKey = in.RequestKey
 	req.Collections = in.Collections
-	return p.collectionService().Publish(ctx, req, func(ctx context.Context, r *cp.PublishRequest) (cp.Collection, error) {
+	keys := textConfirmationBindings{}
+	if err := keys.add(s, id, textPublishOverride{Force: in.Force, RequestKey: in.RequestKey}); err != nil {
+		return cp.Record{}, err
+	}
+	if err := keys.bind(ctx, p.Store); err != nil {
+		return cp.Record{}, err
+	}
+	svc := p.collectionService()
+	svc.Records = textSubmissionRecords{collectionDraftRecords{p.Store}}
+	return svc.Publish(ctx, req, func(ctx context.Context, r *cp.PublishRequest) (cp.Collection, error) {
 		var out cp.Collection
 		if t.repo == nil || p.LocalFiles == nil || p.Client == nil || !p.Client.Configured() {
 			return out, fmt.Errorf("文本发布服务尚未配置")
