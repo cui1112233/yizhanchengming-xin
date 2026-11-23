@@ -170,22 +170,42 @@ func NewRouter(options RouterOptions) http.Handler {
 		})
 	}
 	comicGenerationGate := newComicPageGenerationGate()
+	batchProduction := options.Production
+	if batchProduction == nil && options.AutomationCoordinator != nil && options.AutomationCoordinator.stages != nil {
+		batchProduction = options.AutomationCoordinator.stages.Production
+	}
 	if options.Production == nil && options.Store != nil {
 		// Read-only status is safe before the production slice is enabled. Keep
 		// the service disabled for all write/submit operations.
 		options.Production = &batchfactoryv11.ProductionService{Store: options.Store, Compiler: options.Compiler}
 	}
+	// The independent Shuihuo project routes use the original production service.
+	// Every Batch Factory entry shares this scoped service, including resumed jobs.
+	if batchProduction == nil {
+		batchProduction = options.Production
+	}
+	if batchProduction != nil && batchProduction.Store != nil {
+		verifier := &BatchAutomationCoordinator{store: batchProduction.Store, ttsStore: runtimeCatalogStore}
+		if verifier.ttsStore == nil && options.AutomationCoordinator != nil {
+			verifier.ttsStore = options.AutomationCoordinator.ttsStore
+		}
+		scoped := *batchProduction
+		scoped.PreparedBook = func(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.Book, error) {
+			return verifier.batchSensitiveStage(ctx, owner, batchID, bookID, false, true)
+		}
+		batchProduction = &scoped
+	}
 	if options.AutomationCoordinator == nil && options.Store != nil && options.AutomationStatusReader != nil {
 		var providerSync func(context.Context, string) error
-		if options.Production != nil && options.Production.ProviderRegistry != nil {
+		if batchProduction != nil && batchProduction.ProviderRegistry != nil {
 			providerSync = func(ctx context.Context, owner string) error {
-				return syncShuihuoConfiguredVideoModels(ctx, options.Store, options.Production.ProviderRegistry, owner, runtimeCatalogStore)
+				return syncShuihuoConfiguredVideoModels(ctx, options.Store, batchProduction.ProviderRegistry, owner, runtimeCatalogStore)
 			}
 		}
 		automationStages := &batchfactoryv11.BookStageService{
-			Store: options.Store, Director: options.Director, Production: options.Production,
+			Store: options.Store, Director: options.Director, Production: batchProduction,
 			ImageReady:           shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner),
-			VideoReady:           shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production),
+			VideoReady:           shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, batchProduction),
 			TextProviderResolver: runtimeTextProviderResolver,
 		}
 		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, automationStages, options.Merge, options.External, runtimeCatalogStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
@@ -202,6 +222,9 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator.SetComicBookGenerator(comicGenerator.generateBook)
 	}
 	if options.AutomationCoordinator != nil {
+		if options.AutomationCoordinator.stages != nil {
+			options.AutomationCoordinator.stages.Production = batchProduction
+		}
 		options.AutomationCoordinator.SetGiantMaterialResolver(options.GiantMaterialResolver)
 		options.AutomationCoordinator.SetAutomationStateStore(options.AutomationStateStore)
 		if options.AutomationStatusReader != nil {
@@ -260,18 +283,10 @@ func NewRouter(options RouterOptions) http.Handler {
 			}
 		}()
 	}
-	stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, TextProviderResolver: runtimeTextProviderResolver}
+	stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: batchProduction, TextProviderResolver: runtimeTextProviderResolver}
 	manualProduction := &BatchAutomationCoordinator{store: options.Store, ttsStore: runtimeCatalogStore, stages: stageService}
 	stageService.PrepareProductionText = func(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.Book, error) {
 		return manualProduction.runBatchSensitiveStage(ctx, owner, batchID, bookID, true)
-	}
-	if options.Production != nil && options.Store != nil {
-		scoped := *options.Production
-		scoped.PreparedBook = func(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.Book, error) {
-			return manualProduction.batchSensitiveStage(ctx, owner, batchID, bookID, false, true)
-		}
-		options.Production = &scoped
-		stageService.Production = &scoped
 	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
@@ -317,7 +332,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerDirectorRoutes(v11, options.Director, options.Store, stageService)
 		if options.LocalArtifacts != nil {
 			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner)
-			stageService.VideoReady = shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)
+			stageService.VideoReady = shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, batchProduction)
 			stageService.ImageGenerator = func(ctx context.Context, owner, batchID, bookID string) error {
 				batch, err := options.Store.GetBatch(ctx, owner, batchID)
 				if err != nil {
@@ -365,8 +380,8 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.Compiler != nil {
 		registerV12CompilerRoutes(v12, options.Compiler)
 	}
-	if options.Production != nil {
-		registerProductionStatusRoute(v12, options.Production, "v12")
+	if batchProduction != nil {
+		registerProductionStatusRoute(v12, batchProduction, "v12")
 	}
 	// Merge status is a persisted read and does not require the external merge
 	// adapter. Keep it available in the early slices without advertising merge
@@ -378,12 +393,12 @@ func NewRouter(options RouterOptions) http.Handler {
 	if mergeStatus != nil {
 		registerMergeStatusRoute(v12, mergeStatus, "v12")
 	}
-	if options.Production != nil && options.Slice >= 4 {
-		registerProductionRoutes(v11, options.Production, runtimeCatalogStore)
+	if batchProduction != nil && options.Slice >= 4 {
+		registerProductionRoutes(v11, batchProduction, runtimeCatalogStore)
 		if output, ok := options.MergeOutput.(interface {
 			PutUploadedMP4(context.Context, string, string) (string, error)
 		}); ok {
-			registerVideoUploadRoutes(v11, options.Production, options.Merge, options.LocalArtifacts, output)
+			registerVideoUploadRoutes(v11, batchProduction, options.Merge, options.LocalArtifacts, output)
 		}
 	}
 	// Completed local merge artifacts must remain readable in the ordinary
@@ -451,7 +466,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	// the V11 source mux. This keeps the advertised surface and the real
 	// handlers from drifting apart as slices are enabled.
 	gates := capabilityGates{
-		ProductionEnabled: options.Production != nil && options.Production.Enabled,
+		ProductionEnabled: batchProduction != nil && batchProduction.Enabled,
 		MergeEnabled:      options.Merge != nil && options.Merge.Enabled,
 		Publish121:        publish121Available,
 		PublishYadi:       publishYadiAvailable,
@@ -483,13 +498,13 @@ func NewRouter(options RouterOptions) http.Handler {
 	registerBatchExecutionRoutes(v12, auth, options.BatchExecutionService)
 	RegisterBatchFactoryScheduleRoutes(v12, auth, options.UserDataDir, options.Now)
 	var videoProviderRegistry batchfactoryv11.VideoProviderRegistry
-	if options.Production != nil {
-		videoProviderRegistry = options.Production.ProviderRegistry
+	if batchProduction != nil {
+		videoProviderRegistry = batchProduction.ProviderRegistry
 	}
 	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, videoProviderRegistry, options.Store, "v12", runtimeCatalogStore)
 	if options.Store != nil {
-		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner), VideoReady: shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)}
-		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
+		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: batchProduction, ImageReady: shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner), VideoReady: shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, batchProduction)}
+		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, batchProduction, mergeStatus, options.AutomationStatusReader, "v12")
 	}
 	mfaFile := ""
 	if options.MemberProfileStore != nil {

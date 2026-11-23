@@ -1634,6 +1634,10 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入图片或配音任务，请先使用视频任务"})
 				return
 			}
+			if !isShuihuoProjectBatch(batch) {
+				writeStoreError(w, batchfactoryv11.ErrNotFound)
+				return
+			}
 			if production.ProviderRegistry != nil {
 				if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), store, production.ProviderRegistry, owner, catalogStore); syncErr != nil {
 					writeStoreError(w, syncErr)
@@ -1666,6 +1670,10 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				ModelID   string `json:"modelId,omitempty"`
 			}
 			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if !isShuihuoProjectBatch(batch) {
+				writeStoreError(w, batchfactoryv11.ErrNotFound)
 				return
 			}
 			if production.ProviderRegistry != nil {
