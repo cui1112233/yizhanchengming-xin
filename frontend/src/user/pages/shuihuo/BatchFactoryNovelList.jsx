@@ -183,9 +183,9 @@ import { batchFactoryUploadIntent } from './batchFactoryUploadIntent.js';
 import { agentCanvasURL, bindBatchFactoryBookAndNavigate } from '../agent-canvas-batch-factory.js';
 import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts.js';
 import * as textApi from '../../../shared/api/batchFactoryText.js';
-import { publishTextCollection } from '../../../shared/api/batchFactoryV12.js';
+import { getTextPublishStatus, publishTextCollection } from '../../../shared/api/batchFactoryV12.js';
 import automationStages from './automationStages.json';
-import { collectionUploadKind, retryTextStage, textModelPreflightReasons } from './batchFactoryNovelListHelpers.js';
+import { collectionUploadKind, retryTextStage, retryTextUpload, textModelPreflightReasons } from './batchFactoryNovelListHelpers.js';
 import TextMediaDialog from './TextMediaDialog.jsx';
 import { ComicReferenceChips } from './ComicReferenceChips.jsx';
 import { removablePageReferences } from './comicReferenceMaterials.js';
@@ -3339,9 +3339,15 @@ function BatchLogs({ stageSummaries, automationStatus, productionStatus, mergeSt
   if (productionMode === 'text') {
     for (const record of books) {
       const summary = stageSummaries?.[record.id];
-      if (!summary?.runs?.length || automationBooks.some(item => automationBookRecord(item)?.id === record.id)) continue;
+      if (!summary?.runs?.length && !summary?.textPublishRecord) continue;
+      const index = automationBooks.findIndex(item => automationBookRecord(item)?.id === record.id);
+      const manual = summary.textPublishSource === 'manual' || (!summary.runs?.length && summary.textPublishRecord);
+      if (index >= 0 && !manual) continue;
       const step = batchFactoryBookState(record, {productionMode, stageSummary:summary});
-      automationBooks.push({bookId:record.id, title:record.title, stage:step.key, status:step.status, message:step.detail});
+      const log = {...automationBooks[index], bookId:record.id, title:record.title,
+        stage:step.key, status:step.status, message:step.detail, manualUpload:Boolean(manual), error:''};
+      if (index >= 0) automationBooks[index] = log;
+      else automationBooks.push(log);
     }
   }
   const automationCounts = automationStatus?.counts || {};
@@ -3392,7 +3398,7 @@ function BatchLogs({ stageSummaries, automationStatus, productionStatus, mergeSt
 		const logs = Array.isArray(book.logs) ? book.logs : [];
 		const expanded = expandedBooks[book.bookId] ?? (productionMode === 'text' && timeline.some(step => step.status === 'failed'));
 		return <section key={`automation-${book.bookId}`}>
-			<strong>自动生产 · {record?.title || book.title || book.bookId}</strong>
+			<strong>{book.manualUpload ? '手动上传' : '自动生产'} · {record?.title || book.title || book.bookId}</strong>
 			<span>{automationStageLabel(book.stage)} · {retryQueued ? '重试排队中' : automationStatusLabel(book.status)}{book.status === 'failed' && book.failureCategoryLabel ? <em style={{ marginLeft: 6, padding: '1px 8px', borderRadius: 10, fontStyle: 'normal', fontSize: 12, border: '1px solid currentColor', color: book.failureCategory === 'billed_not_retrieved' ? '#f59e0b' : book.failureCategory === 'config_missing' || book.failureCategory === 'external_work_missing' ? '#ef4444' : '#38bdf8' }}>{book.failureCategoryLabel}</em> : null} · 完成率 {percent}% · {book.updatedAt || '—'}</span>
 			<p>{retryQueued ? '已接受手动重试，正在等待生产工位；无需再次点击重试。' : automationBookDetail(book) || batchFactoryVisibleError(book.message) || '等待自动生产'}{Number(book.retryCount || 0) > 0 ? ` · 自动重试 ${Math.min(3, Number(book.retryCount || 0))}/3` : ''}{book.retryAt ? ` · 下次重试：北京时间 ${formatBeijingDatetimeLocal(book.retryAt)}` : ''}{visibleAutomationError ? ` · ${batchFactoryVisibleError(visibleAutomationError)}` : ''}</p>
 			{visibleAutomationError ? <BatchFactoryErrorNotice compact title="自动生产失败" stageText={automationStageLabel(book.stage)} error={visibleAutomationError} /> : null}
@@ -3792,7 +3798,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 		}
 		setPendingMediaPrompt(null);
 	}, [books, mediaBook, pendingMediaPrompt]);
-	const batchProgress = batchFactoryBatchProgress(books, { productionStatus, mergeStatus, stageSummaries, productionMode: batchProductionMode });
+	const batchProgress = batchFactoryBatchProgress(books, { productionStatus, mergeStatus, stageSummaries, productionMode: batchProductionMode,
+    runMode: automationStatus?.runMode, textAutoUpload: batch?.settingsState?.patch?.textAutoUpload });
 	const progressSegments = [
 		{ key: 'uploaded', label: '上传成功', count: batchProgress.uploaded },
 		{ key: 'failed', label: '异常', count: batchProgress.failed },
@@ -4788,26 +4795,30 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   async function retryLastFailedStage(book, videoId = '', textModelId = '') {
     if (!batch?.id || !book?.id || actionBusy) return;
     if (effectiveBookSettings(batch, book).productionMode === 'text') {
-      if (automationBookIsActive(automationStatus, book.id)) { message.info('这本书正在自动生产中。'); return; }
       setActionBusy(stageActionKey('retry', book.id));
       try {
         const runtime = await loadRuntimeStatus({quiet:true});
-        const summary = runtime?.stageSummaries?.[book.id] || stageSummaries[book.id];
-        const automation = runtime?.automation || automationStatus;
-        if (automationBookIsActive(automation, book.id)) { message.info('这本书正在自动生产中。'); return; }
+        if (!runtime) throw Error('无法读取当前的重试状态，请刷新后重试。');
+        const summary = runtime.stageSummaries?.[book.id];
+        const automation = runtime.automation;
+        if (summary?.textPublishSource !== 'manual' && automationBookIsActive(automation, book.id)) { message.info('这本书正在自动生产中。'); return; }
         const entry = automationBookForCard(automation, batch.id, book.id);
         const failure = batchFactoryBookState(book, {stageSummary:summary, productionMode:'text', automationBook:entry});
-        if (failure.status !== 'failed') { message.info('当前书没有失败的文本步骤。'); return; }
-        const stage = failure.failedStep?.key || failure.failedStage?.stage;
-        const run = summary?.runs?.findLast(item => item.stage === stage);
-        const failed = {...run, stage, errorMessage:run?.errorMessage || failure.detail, collectionId:run?.collectionId || (!run && entry?.textCollectionId)};
-        if (stage === 'text_publish' && !failed.collectionId) {
-          openTextBook(book, 'collections');
-          message.info('这条失败记录缺少合集编号，请选择要上传的文本合集。');
+        const retryable = automationBookNeedsRetry(automation, book.id);
+        if (failure.status !== 'failed' && (!retryable || summary?.textPublishSource === 'manual')) { message.info('当前书没有失败的文本步骤。'); return; }
+        const stage = failure.failedStep?.key || failure.failedStage?.stage || retryable?.stage;
+        if (stage === 'text_publish') {
+          const result = await retryTextUpload({getTextPublishStatus, publishTextCollection, retryBatchAutomation}, batch.id, book.id, summary,
+            () => window.confirm('这个文本合集已上传，确认再次上传？'));
+          if (result === 'select') { openTextBook(book, 'collections'); message.info('请在文本媒体库选择要上传的合集。'); }
+          if (result === 'pending') message.info('已提交，等待上传确认');
+          if (result === 'published') message.info('当前文本合集已上传');
+          if (result === 'retried') message.success('已重试文本上传');
           return;
         }
-        await retryTextStage({...textApi, publishTextCollection}, batch.id, book.id, failed);
-        if (automationBookNeedsRetry(automation, book.id) || !['text_collection','text_render','text_publish'].includes(stage)) {
+        const run = summary?.runs?.findLast(item => item.stage === stage);
+        await retryTextStage(textApi, batch.id, book.id, {...run, stage, errorMessage:run?.errorMessage || failure.detail});
+        if (retryable || !['text_collection','text_render'].includes(stage)) {
           await retryBatchAutomation(batch.id, [book.id]);
         }
         message.success('已重试文本步骤');
@@ -5109,6 +5120,17 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         message.error('所选小说均未通过执行前检查，没有可提交的小说。');
         return;
       }
+      if (batchProductionMode === 'text') {
+        const started = await startBatchAutomation(batch.id, {
+          presetId:presetID, bookIds:runnableBookIds, productionMode:'text', runMode:automationRunMode,
+          autoPublish:automationRunMode === 'full_submit', forceRegenerate:automationForceRegenerate,
+          scheduleMode:'execute', concurrency:normalizeAutomationConcurrency(automationConcurrency), queueIfActive:automationActive
+        });
+        setAutomationStatus(current => mergeAutomationLogSnapshot(current, resultData(started, 'automation')));
+        message.success(`已提交 ${runnableBookIds.length} 本选中的文本作品`);
+        await loadRuntimeStatus({quiet:true});
+        return;
+      }
       const clientRequestId = globalThis.crypto?.randomUUID
         ? crypto.randomUUID()
         : requestID('batch-execution');
@@ -5359,10 +5381,10 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   async function handleAutomationMenu({ key }) {
     if (automationBusy || actionBusy) return;
     if (key === 'start') return openAutomationStart();
-    if (key === 'retry-stages') {
+    if (key === 'retry-stages' || (key === 'retry' && batchProductionMode === 'text')) {
       setAutomationBusy('retry-stages');
       try {
-        for (const book of manualRetryBooks(books, stageSummaries, automationStatus)) await retryLastFailedStage(book);
+        for (const book of stageRetryTargets) await retryLastFailedStage(book);
       } finally { setAutomationBusy(''); }
       return;
     }
@@ -5699,7 +5721,10 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     { key: 'selected', label: `优化选择（${selectedBookIds.length}）`, disabled: selectedBookIds.length !== 1, title: '先在小说列表中勾选一本小说' }
   ];
   const automationStartBlocked = !books.length;
-  const stageRetryTargets = manualRetryBooks(books, stageSummaries, automationStatus);
+  const stageRetryTargets = batchProductionMode === 'text'
+    ? books.filter(book => automationBookNeedsRetry(automationStatus, book.id) ||
+        batchFactoryBookState(book, {productionMode:'text',stageSummary:stageSummaries[book.id]}).status === 'failed')
+    : manualRetryBooks(books, stageSummaries, automationStatus);
   const automationMenuItems = [
     ...batchFactoryAutomationMenu(automationStatus, books.length > 0, stageRetryTargets.length),
     { type: 'divider' },

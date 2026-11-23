@@ -106,6 +106,35 @@ test('same collection republish uses run identity before reused request and coll
   assert.equal(state().terminal,false);
 });
 
+test('manual receipt leads current status even when a previous automation run failed', () => {
+  const summary={textPublishSource:'manual',runs:[
+    {stage:'text_publish',id:'old',requestId:'old-key',attempt:1,collectionId:'old',status:'failed',errorMessage:'旧错误'}
+  ]};
+  for (const [status,label] of [['pending','正在上传'],['failed','上传失败'],['published','已上传']]) {
+    summary.textPublishRecord={...verifiedTextPublish,kind:'text',bookId:'b',collectionId:'new',status};
+    const state=batchFactoryBookState({id:'b'},{productionMode:'text',stageSummary:summary,automationBook:{stage:'text_publish',status:'failed',error:'旧错误'}});
+    assert.equal(state.label,label);
+    assert.notEqual(state.detail,'旧错误');
+  }
+});
+
+test('run ID cannot override conflicting attempt or request key', () => {
+  const summary={runs:[{stage:'text_publish',id:'current',attempt:2,requestId:'new-key',collectionId:'c',status:'running'}]};
+  for (const [attempt,requestKey,terminal] of [[1,'new-key',false],[2,'old-key',false],[2,'new-key',true]]) {
+    summary.textPublishRecord={...verifiedTextPublish,runId:'current',attempt,requestKey,collectionId:'c'};
+    assert.equal(batchFactoryBookState({id:'b'},{productionMode:'text',stageSummary:summary}).terminal,terminal);
+  }
+});
+
+test('collection-only progress respects each book upload setting', () => {
+  const runtime={productionMode:'text',runMode:'video_no_submit',textAutoUpload:true,
+    stageSummary:{runs:[{stage:'text_collection',status:'succeeded'}]}};
+  const progress=batchFactoryBatchProgress([{id:'a',settingsState:{patch:{textAutoUpload:false}}},{id:'b'}],runtime);
+  assert.equal(progress.collectionReady,1);
+  assert.equal(progress.awaitingUpload,1);
+  assert.equal(progress.completionPercent,50);
+});
+
 test('previous confirmed upload stays available for republish while current receipt is pending or failed', () => {
   const summary={runs:[],textLastPublishedRecord:{...verifiedTextPublish,bookId:'b',kind:'text'}};
   for (const [status,label] of [['pending','正在上传'],['failed','上传失败'],['upload_incomplete','上传失败']]) {

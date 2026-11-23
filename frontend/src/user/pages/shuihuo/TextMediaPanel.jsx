@@ -286,7 +286,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
         {(error || actionError) && <div role="alert">{error || actionError} <button type="button" onClick={() => {setActionError('');reload();}}>刷新</button></div>}
         {selectedReceipt?.error && <div role="alert">{selectedReceipt.error} <button type="button" onClick={reload}>刷新上传状态</button></div>}
         {selectedReceipt?.status?.publish && <div role="status">{selectedReceipt.status.published ? '已上传' : ({
-          pending:'已提交，等待上传确认', failed:'上传失败', upload_incomplete:'图片上传未完成'
+          pending:selectedReceipt.status.publish.message || '已提交，等待上传确认', failed:'上传失败', upload_incomplete:'图片上传未完成'
         })[selectedReceipt.status.publish.status]} {selectedReceipt.status.publish.errorMessage || selectedReceipt.status.publish.error}</div>}
         {tab === 'collections' ? <>
           <CollectionChoices collections={collections} current={collection} choose={id=>{chooseCollection(id);setCollectionImage('');}} />

@@ -2,6 +2,7 @@ import { getBookAssetImageBlob, getBookAssetImageGenerationTask, getBatch, listB
 import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
 import { audioPlanningRequired, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
+import { textReceiptMatchesRun } from './batchFactoryBookState.js';
 import { BOOK_CONFIG_REGIONS, normalizeSensitiveMode } from './batchFactoryBookConfigRegions';
 import { buildBatchFactoryH3Constraints } from './batchFactoryH3Constraints';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, batchFactorySourceText, comicAnalysisCharactersForBook } from './batchFactoryContentRange';
@@ -530,12 +531,24 @@ export function textUploadControl(collection, status) {
   };
 }
 
-// 只使用失败任务指出的合集。列表中新建的合集可能属于另一次手动编辑。
+export async function retryTextUpload(api, batchId, bookId, summary, confirmRepublish) {
+  const record = summary?.textPublishRecord;
+  const run = summary?.runs?.findLast(item => item.stage === 'text_publish');
+  const manual = summary?.textPublishSource === 'manual' || (!run && record && !record.runId && !record.attempt);
+  const collectionId = record?.collectionId || (!manual && run?.collectionId);
+  if (!collectionId || (record?.bookId && record.bookId !== bookId) || (record?.kind && record.kind !== 'text')) return 'select';
+  const status = await api.getTextPublishStatus(batchId, bookId, collectionId);
+  const current = manual || (status?.publish && run && textReceiptMatchesRun(status.publish, run, summary.runs));
+  if (status?.published && current) return 'published';
+  if (status?.publish?.status === 'pending') return 'pending';
+  const force = Boolean(status?.published || status?.lastPublished || summary?.textLastPublishedRecord?.collectionId === collectionId);
+  if (force && !confirmRepublish()) return 'cancelled';
+  if (manual) await api.publishTextCollection(batchId, bookId, collectionId, {force});
+  else await api.retryBatchAutomation(batchId, [bookId]);
+  return 'retried';
+}
+
 export async function retryTextStage(api, batchId, bookId, failed) {
-  if (failed.stage === 'text_publish') {
-    if (!failed.collectionId) throw Error('这条失败记录缺少合集编号，请在文本媒体库选择要上传的合集。');
-    return api.publishTextCollection(batchId, bookId, failed.collectionId, {force:false});
-  }
   if (!['text_render','text_collection'].includes(failed.stage)) return;
   const {document, pages = []} = await api.listTextPages(batchId, bookId);
   if (!document) throw Error('当前书还没有文字页，请先准备文字页。');

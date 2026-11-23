@@ -34,27 +34,24 @@ test('文本日志保留六个阶段、已成功步骤和后端失败原因', ()
   assert.ok(list.includes('stageSummary: stageSummaries?.[record.id]'),'日志应使用当前书的服务端阶段记录');
 });
 
-test('重试只渲染失败文字页，并按当前版本重建合集或提交原合集', async () => {
+test('重试只渲染失败文字页，并按当前版本重建合集', async () => {
   const calls=[];
   const api={
     listTextPages:async()=>({document:{revision:7,activeVersionId:'v',paginationVersion:2},pages:[
       {id:'one',ordinal:1,revision:3,status:'ready'}, {id:'two',ordinal:2,revision:5,status:'failed'},
       {id:'three',ordinal:3,revision:4,status:'ready',locked:true}]}),
     renderTextPage:async(...args)=>calls.push(['render',...args]),
-    createTextCollection:async(...args)=>calls.push(['collection',...args]),
-    publishTextCollection:async(...args)=>calls.push(['publish',...args])
+    createTextCollection:async(...args)=>calls.push(['collection',...args])
   };
   assert.equal(typeof helpers.retryTextStage,'function');
   await helpers.retryTextStage(api,'batch','book',{stage:'text_render',pageId:'two'});
   await helpers.retryTextStage(api,'batch','book',{stage:'text_collection'});
-  await helpers.retryTextStage(api,'batch','book',{stage:'text_publish',collectionId:'c'});
   assert.deepEqual(calls,[
     ['render','batch','book','two',{expectedRevision:5}],
-    ['collection','batch','book',{expectedRevision:7,versionId:'v',paginationVersion:2,pageIds:['one','two','three']}],
-    ['publish','batch','book','c',{force:false}]
+    ['collection','batch','book',{expectedRevision:7,versionId:'v',paginationVersion:2,pageIds:['one','two','three']}]
   ]);
   await assert.rejects(()=>helpers.retryTextStage(api,'batch','book',{stage:'text_render',pageId:'three'}));
-  assert.equal(calls.length,3);
+  assert.equal(calls.length,2);
 });
 
 test('渲染失败信息里的页码可定位尚未落图的页和封面', async () => {
@@ -67,6 +64,47 @@ test('渲染失败信息里的页码可定位尚未落图的页和封面', async
     renderTextCover:async(...args)=>calls.push(args)
   },'batch','book',{stage:'text_render',errorMessage:'第 2 页：失败\n封面：失败'});
   assert.deepEqual(calls,[['batch','book','p2',{expectedRevision:5}],['batch','book',{expectedRevision:7}]]);
+});
+
+test('上传重试按当前回执选合集，自动任务仅交回调度器，重传之前必须确认', async () => {
+  const calls=[];
+  let approved=false;
+  const api={
+    getTextPublishStatus:async(...args)=>{calls.push(['get',...args]);return {published:false,publish:{status:'failed'},lastPublished:{status:'published'}}},
+    retryBatchAutomation:async(...args)=>calls.push(['retry',...args]),
+    publishTextCollection:async(...args)=>calls.push(['publish',...args])
+  };
+  const summary={runs:[{stage:'text_publish',id:'old',collectionId:'auto-c'}],textPublishRecord:{collectionId:'manual-c',status:'failed'},textPublishSource:'manual'};
+  const retry=()=>helpers.retryTextUpload(api,'batch','book',summary,()=>approved);
+  assert.equal(await retry(),'cancelled');
+  assert.deepEqual(calls,[['get','batch','book','manual-c']]);
+  approved=true;assert.equal(await retry(),'retried');
+  assert.deepEqual(calls.at(-1),['publish','batch','book','manual-c',{force:true}]);
+  delete summary.textPublishRecord;delete summary.textPublishSource;
+  approved=false;calls.length=0;assert.equal(await retry(),'cancelled');
+  assert.deepEqual(calls,[['get','batch','book','auto-c']]);
+  approved=true;assert.equal(await retry(),'retried');
+  assert.deepEqual(calls.at(-1),['retry','batch',['book']]);
+  summary.runs=[];assert.equal(await retry(),'select');
+});
+
+test('失败的自动重传仍带有旧成功回执时，确认后才继续原任务', async () => {
+  const old={kind:'text',bookId:'book',collectionId:'c',status:'published',runId:'old',attempt:1,requestKey:'old-key'};
+  const run={stage:'text_publish',id:'new',collectionId:'c',attempt:2,requestId:'new-key',status:'failed'};
+  const calls=[];
+  const api={getTextPublishStatus:async()=>({published:true,publish:old,lastPublished:old}),
+    retryBatchAutomation:async(...args)=>calls.push(args)};
+  const summary={runs:[run],textLastPublishedRecord:old};
+  assert.equal(await helpers.retryTextUpload(api,'batch','book',summary,()=>false),'cancelled');
+  assert.equal(calls.length,0);
+  assert.equal(await helpers.retryTextUpload(api,'batch','book',summary,()=>true),'retried');
+  assert.deepEqual(calls,[['batch',['book']]]);
+});
+
+test('已选文本进入自动生产接口，日志收录手动上传回执',()=>{
+  assert.ok(list.includes("if (batchProductionMode === 'text') {\n        const started = await startBatchAutomation("));
+  assert.ok(list.includes("summary?.textPublishRecord"));
+  assert.ok(list.includes('runMode: automationStatus?.runMode, textAutoUpload: batch?.settingsState?.patch?.textAutoUpload'));
 });
 
 test('当前上传以回执状态为准，首次上传、等待回读和再次上传分别显示', () => {
@@ -90,10 +128,22 @@ test('混选漫画与文本会在提交前提示分开选择', () => {
 
 const browser = [process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(path => path && existsSync(path));
-test('Chrome 点击上传、取消和确认再次上传，等待回读期间不会重复提交', {skip:!browser}, async () => {
+async function runChrome(contents) {
   const dir = mkdtempSync(join(tmpdir(),'text-publish-'));
   try {
-    const result = await build({stdin:{resolveDir:here,loader:'jsx',contents:`
+    const result = await build({stdin:{resolveDir:here,loader:'jsx',contents},jsx:'automatic',bundle:true,write:false,format:'iife',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"production"'},minify:true});
+    writeFileSync(join(dir,'app.js'),result.outputFiles[0].contents);
+    const html=join(dir,'index.html');
+    writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="app.js"></script>');
+    const dom=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking',
+      '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget=16000',
+      '--dump-dom',pathToFileURL(html).href],{timeout:45000,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']});
+    assert.ok(dom.includes('data-result="passed"'),dom.match(/data-error="([^"]*)"/)?.[1] || '浏览器未完成验证');
+  } finally { rmSync(dir,{recursive:true,force:true,maxRetries:4,retryDelay:150}); }
+}
+
+test('Chrome 点击上传、取消和确认再次上传，等待回读期间不会重复提交', {skip:!browser}, async () => {
+  await runChrome(`
       import React from 'react';
       import {createRoot} from 'react-dom/client';
       import TextMediaPanel from './TextMediaPanel.jsx';
@@ -113,7 +163,7 @@ test('Chrome 点击上传、取消和确认再次上传，等待回读期间不�
         else if(path.endsWith('text-collections/c/publish')){
           if(opts.method==='POST'){
             posts.push(JSON.parse(opts.body));
-            status={published:false,publish:{status:'pending'}};
+            status={published:false,publish:{status:'pending',message:'等待平台返回合集回执；如长时间未更新，请到发布后台核对。'}};
           }
           data=status;
         }else throw Error('意外请求 '+path);
@@ -126,6 +176,7 @@ test('Chrome 点击上传、取消和确认再次上传，等待回读期间不�
         collection={id:'c',status:'ready'};mount(2);
         await until(()=>button('上传网络')&&!button('上传网络').disabled);
         button('上传网络').click();await until(()=>button('等待上传确认'));
+        if(!document.body.innerText.includes('等待平台返回合集回执；如长时间未更新，请到发布后台核对。'))throw Error('缺少平台回读提示');
         if(posts.length!==1||posts[0].force!==false||confirms||!button('等待上传确认').disabled)throw Error('首次提交或待回读状态错误');
         status={published:true,publish:{status:'published',carouselId:11,imageIds:[12]}};
         await until(()=>button('再次上传')&&!button('再次上传').disabled);
@@ -136,13 +187,60 @@ test('Chrome 点击上传、取消和确认再次上传，等待回读期间不�
         document.body.dataset.result='passed';
       }
       run().catch(e=>document.body.dataset.error=e.message);
-    `},bundle:true,write:false,format:'iife',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"production"'},minify:true});
-    writeFileSync(join(dir,'app.js'),result.outputFiles[0].contents);
-    const html=join(dir,'index.html');
-    writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="app.js"></script>');
-    const dom=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking',
-      '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget=16000',
-      '--dump-dom',pathToFileURL(html).href],{timeout:45000,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']});
-    assert.ok(dom.includes('data-result="passed"'),dom.match(/data-error="([^"]*)"/)?.[1] || '浏览器未完成上传回读验证');
-  } finally { rmSync(dir,{recursive:true,force:true,maxRetries:4,retryDelay:150}); }
+    `);
+});
+
+test('Chrome 在生产表重试手动上传、打开日志并立即执行所选文本书', {skip:!browser}, async () => {
+  await runChrome(`
+    import React from 'react';
+    import {createRoot} from 'react-dom/client';
+    import {BatchFactoryNovelList} from './BatchFactoryNovelList.jsx';
+    const sleep=n=>new Promise(done=>setTimeout(done,n));
+    const buttons=()=>Array.from(document.querySelectorAll('button'));
+    const button=text=>buttons().find(node=>node.textContent.trim()===text);
+    const posts=[];
+    let step='初始化',approved=false,confirms=0;
+    window.confirm=()=>{confirms++;return approved};
+    window.onerror=(message,_url,_line,_col,error)=>{document.body.dataset.crash=String(error?.message || message)};
+    class Boundary extends React.Component {
+      state={error:''};
+      static getDerivedStateFromError(error){return {error:error.message}}
+      render(){return this.state.error ? <div>{this.state.error}</div> : this.props.children}
+    }
+    async function until(test){for(let i=0;i<130;i++){if(test())return;await sleep(25)}throw Error(step+' '+(document.body.dataset.crash || document.body.innerText.slice(-750)))}
+    const book={id:'b',title:'手动上传的书',bookId:'101',sourceText:'正文。',txtText:'正文。',settingsState:{patch:{}},videos:[]};
+    const batch={id:'batch',revision:1,title:'文本批次',settingsState:{patch:{productionMode:'text'}},books:[book]};
+    const history={kind:'text',bookId:'b',collectionId:'c',status:'published',carouselId:1,imageIds:[2]};
+    const runtime={stageSummaries:{b:{textPublishSource:'manual',textPublishRecord:{kind:'text',bookId:'b',collectionId:'c',status:'failed'},textLastPublishedRecord:history}},automation:{state:'idle',books:[]},production:{jobs:[]},merge:{jobs:[]}};
+    window.fetch=async(url,opts={})=>{
+      const path=String(url).split('?')[0],method=opts.method||'GET';
+      const payload=opts.body?JSON.parse(opts.body):null;
+      if(method==='POST')posts.push({path,payload});
+      let data={};
+      if(path.endsWith('runtime-summary'))data=runtime;
+      else if(path.endsWith('text-collections/c/publish'))data={published:false,publish:{status:'failed'},lastPublished:history};
+      else if(path.endsWith('automation-presets'))data={presets:[{id:'preset',name:'文本预设',config:{productionMode:'text'}}]};
+      else if(path.endsWith('automation/preflight'))data={readOnly:true,books:[{bookId:'b',passed:true}]};
+      else if(path.endsWith('automation/start'))data={automation:{state:'running',books:[{bookId:'b',stage:'text_process',status:'running'}]}};
+      else if(path.endsWith('config-versions'))data={configVersions:[]};
+      return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+    };
+    async function run(){
+      const root=createRoot(document.querySelector('#root'));
+      root.render(<Boundary><BatchFactoryNovelList batch={batch} onBatchChanged={async()=>batch}/></Boundary>);
+      step='重试取消';await until(()=>button('重试失败步骤'));button('重试失败步骤').click();await until(()=>confirms===1);
+      if(posts.some(x=>x.path.endsWith('/publish')))throw Error('取消后仍提交上传');
+      step='确认重传';approved=true;await until(()=>!button('重试失败步骤').disabled);button('重试失败步骤').click();await until(()=>posts.some(x=>x.path.endsWith('/text-collections/c/publish')&&x.payload.force));
+      step='手动日志';button('任务/日志').click();const logs=()=>Array.from(document.querySelectorAll('.ant-modal')).find(n=>n.textContent.includes('文本任务 / 日志'));
+      await until(()=>logs()?.textContent.includes('手动上传 · 手动上传的书'));if(!logs().textContent.includes('上传失败'))throw Error('缺少手动上传失败状态');
+      logs().querySelector('.ant-modal-close').click();await sleep(350);
+      step='选择书';document.querySelector('.batch-factory-book-row input[type=checkbox]').click();await sleep(60);
+      step='批量操作';button('批量操作').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await until(()=>Array.from(document.querySelectorAll('[role=menuitem]')).some(n=>n.textContent.includes('立即执行已选')));
+      Array.from(document.querySelectorAll('[role=menuitem]')).find(n=>n.textContent.includes('立即执行已选')).click();
+      step='已选启动';await until(()=>posts.some(x=>x.path.endsWith('/automation/start')));
+      if(posts.some(x=>x.path.includes('/executions')) || posts.find(x=>x.path.endsWith('/automation/start')).payload.bookIds.join(',')!=='b')throw Error('提交到错误模式或书目');
+      document.body.dataset.result='passed';root.unmount();
+    }
+    run().catch(e=>document.body.dataset.error=e.message);
+  `);
 });

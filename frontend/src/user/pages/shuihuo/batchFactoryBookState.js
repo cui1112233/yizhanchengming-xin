@@ -212,9 +212,12 @@ function textAttemptRequestKey(run) {
   return key && key !== run.collectionId ? key : '';
 }
 
-function textReceiptMatchesRun(record, run, runs = []) {
+export function textReceiptMatchesRun(record, run, runs = []) {
   if (!run) return true;
   if (record.collectionId && run.collectionId && record.collectionId !== run.collectionId) return false;
+  const recordKey = record.requestKey || record.requestId;
+  if (record.attempt && run.attempt && Number(record.attempt) !== Number(run.attempt)) return false;
+  if (recordKey && textAttemptRequestKey(run) && recordKey !== textAttemptRequestKey(run)) return false;
   if (record.runId) return record.runId === run.id;
   const previous = runs.filter(other => other !== run && other.stage === 'text_publish');
   // 旧版把合集编号也写入 requestId；同一合集可上传多次，只有唯一的请求或尝试编号能确认本轮。
@@ -251,16 +254,19 @@ function textBookTimeline(book, summary) {
   const published = confirmed || confirmedTextReceipt(summary?.textLastPublishedRecord, book);
   const awaitingReceipt = matchesBook && ['pending', 'accepted', 'submitted', 'upload_pending_confirm'].includes(record.status);
   return Object.entries(textStageCopy).map(([key, copy]) => {
-    const run = latestStageRun(summary, key);
+    const manualUpload = key === 'text_publish' && matchesBook && summary.textPublishSource === 'manual';
+    const run = manualUpload ? null : latestStageRun(summary, key);
     let status = statusFromRun(run);
+    let receiptMessage = '';
     if (key === 'text_publish') {
       const current = matchesBook && textReceiptMatchesRun(record, run, summary.runs);
+      if (current) receiptMessage = record.message || record.errorMessage || '';
       if (current && confirmed) status = 'completed';
       else if (current && ['failed','upload_incomplete'].includes(record.status)) status = 'failed';
       else if (status === 'completed' || (status === 'pending' && current && awaitingReceipt)) status = 'running';
     }
     const label = copy[status] || stageLabel('runtime', key);
-    const detail = status === 'failed' ? (run?.errorMessage || label) : label;
+    const detail = receiptMessage || (status === 'failed' ? (run?.errorMessage || label) : label);
     return key === 'text_publish' ? { key, label, status, detail, published } : { key, label, status, detail };
   });
 }
@@ -272,7 +278,8 @@ function textBookState(book, summary, runMode, textAutoUpload, automationBook, m
   if (upload.status === 'completed') {
     return { ...base, ...upload, tone: 'green', published: true, terminal: true };
   }
-  const failed = timeline.find(step => step.status === 'failed');
+  if (summary?.textPublishSource === 'manual' && upload.status === 'running') return { ...base, ...upload, tone:'blue' };
+  const failed = summary?.textPublishSource === 'manual' && upload.status === 'failed' ? upload : timeline.find(step => step.status === 'failed');
   if (failed) return { ...base, ...failed, tone: 'red', failedStep: failed };
   if (taskState(automationBook) === 'failed' && !automationBook.stale) {
     const stage = automationBook.stage;
@@ -454,6 +461,7 @@ export function batchFactoryBatchProgress(books, runtime = {}) {
   for (const book of values) {
     const state = batchFactoryBookState(book, {
       ...runtime,
+      textAutoUpload: book?.settingsState?.patch?.textAutoUpload ?? runtime.textAutoUpload,
       stageSummary: runtime.stageSummaries?.[book?.id] || runtime.stageSummary
     });
     if (runtime.productionMode === 'text') {
