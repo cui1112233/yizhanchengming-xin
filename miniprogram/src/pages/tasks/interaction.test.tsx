@@ -1,4 +1,6 @@
 import {beforeEach,expect,test,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
 const h=vi.hoisted(()=>({slots:[] as any[],cursor:0,show:undefined as any,load:vi.fn(),navigate:vi.fn()}));
 vi.mock('react',()=>({useState:(initial:any)=>{const i=h.cursor++;if(!(i in h.slots))h.slots[i]=typeof initial==='function'?initial():initial;return [h.slots[i],(next:any)=>{h.slots[i]=typeof next==='function'?next(h.slots[i]):next;}];},useRef:(initial:any)=>{const i=h.cursor++;if(!(i in h.slots))h.slots[i]={current:initial};return h.slots[i];},useEffect:vi.fn()}));
 vi.mock('@tarojs/taro',()=>({default:{navigateTo:h.navigate},useDidShow:(fn:any)=>{h.show=fn;}}));
@@ -24,7 +26,9 @@ beforeEach(()=>{h.slots=[];h.navigate.mockReset();h.load.mockReset().mockResolve
 ]});});
 test('task center renders real counters, approved filters, and one shared list surface',async()=>{
  const tree=await ready();
+ expect(tree.filter(n=>n.props?.className==='task-studio-hero-mascot')).toHaveLength(1);
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-item'))).toHaveLength(3);
+ expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-icon'))).toHaveLength(3);
  expect(tree.filter(n=>n.props?.className==='task-studio-count-value').map(content)).toEqual(['1','1','1']);
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-item')).map(content)).toEqual(['1进行中','1待确认','1已完成']);
  expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-filter')).map(content)).toEqual(['全部','进行中','待确认','已完成']);
@@ -44,4 +48,15 @@ test('flat record opens the existing encoded module destination',async()=>{
 test('a record without an ID cannot open an empty or unrelated destination',async()=>{
  h.load.mockResolvedValue({sources:[{source:'fetch',state:'ready'}],entries:[{source:'fetch',sourceLabel:'Fetch',title:'Missing ID',status:'unknown'}]});
  const tree=await ready();const action=tree.find(n=>n.props?.className?.split(' ').includes('task-studio-row'));expect(action.props.className).toContain('is-disabled');action.props.onClick();expect(h.navigate).not.toHaveBeenCalled();
+});
+test('task content stays above the dynamic glass canvas in WeChat',()=>{
+ const style=readFileSync(resolve(__dirname,'tasks-studio.scss'),'utf8');
+ expect(style).toMatch(/\.task-studio-hero,.task-studio-body\s*\{[^}]*position:relative[^}]*z-index:1/);
+});
+test('task center keeps the compact phone scale from the approved reference',()=>{
+ const style=readFileSync(resolve(__dirname,'tasks-studio.scss'),'utf8');
+ expect(style).toMatch(/\.task-studio-counts\s*\{[^}]*min-height:72PX/);
+ expect(style).toMatch(/\.task-studio-segments\s*\{[^}]*height:42PX/);
+ expect(style).toMatch(/\.task-studio-row\s*\{[^}]*min-height:76PX/);
+ expect(style).toMatch(/\.task-studio-row-title\s*\{[^}]*font-size:14PX/);
 });

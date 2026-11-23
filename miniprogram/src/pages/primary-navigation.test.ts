@@ -8,7 +8,7 @@ describe("一级页面工作台界面", () => {
   test("工作区、任务页提供统一的移动工作台结构", () => {
     const expectations = [
       ["workspace/index.tsx", "workbench-current-card", "workbench-project-card", "workbench-detail-card"],
-      ["tasks/index.tsx", "mp-task-heading", "mp-task-filters", "mp-task-source-error"],
+      ["tasks/index.tsx", "task-studio-hero", "task-studio-segments", "task-studio-source-error"],
     ];
 
     for (const [page, ...classNames] of expectations) {

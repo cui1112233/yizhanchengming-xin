@@ -7,6 +7,7 @@ import { deriveTaskPageState } from "../../services/taskPageState";
 import { filterTaskEntries, loadTaskSummary, taskCounts, taskDestination, type AggregatedTask, type TaskFilter, type TaskSummary } from "../../services/taskSummary";
 import BrandHeader from "../../components/BrandHeader";
 import AppIcon from "../../components/AppIcon";
+import dragonPair from "../../assets/functions/dragon-pair-mobile.webp";
 import { FUNCTION_VISUALS } from "../functions/functionVisuals";
 import { ThemedPage } from "../../theme";
 import "./tasks-studio.scss";
@@ -67,6 +68,7 @@ export default function TasksPage() {
     <BrandHeader title="任务" primary />
     <View className="task-studio-hero">
       <View><Text className="task-studio-kicker">一战晟铭 · AI 创意套件</Text><Text className="task-studio-title">任务中心</Text><Text className="task-studio-subtitle">追踪全部创作与生产记录</Text></View>
+      <View className="task-studio-mascot-shell"><Image className="task-studio-hero-mascot" src={dragonPair} mode="scaleToFill" /></View>
       <Button className="task-studio-refresh" aria-label="刷新任务" loading={refreshing} disabled={loading} onClick={load}><AppIcon name="refresh-ccw" size={18} /></Button>
     </View>
 
@@ -76,19 +78,19 @@ export default function TasksPage() {
 
     {summary && pageState.kind !== "configuration-error" && pageState.kind !== "all-error" ? <View className="task-studio-body">
       <View className="task-studio-counts liquid-glass--secondary" data-glass-role="secondary">
-        <View className="task-studio-count-item is-running"><AppIcon name="clapperboard" size={24} /><View><Text className="task-studio-count-value">{counts.running}</Text><Text>进行中</Text></View></View><View className="task-studio-count-divider" />
-        <View className="task-studio-count-item is-attention"><AppIcon name="timer" size={24} /><View><Text className="task-studio-count-value">{counts.attention}</Text><Text>待确认</Text></View></View><View className="task-studio-count-divider" />
-        <View className="task-studio-count-item is-completed"><AppIcon name="shield-check" size={24} /><View><Text className="task-studio-count-value">{counts.completed}</Text><Text>已完成</Text></View></View>
+        <View className="task-studio-count-item is-running"><View className="task-studio-count-icon"><AppIcon name="clapperboard" size={22} /></View><View><Text className="task-studio-count-value">{counts.running}</Text><Text>进行中</Text></View></View><View className="task-studio-count-divider" />
+        <View className="task-studio-count-item is-attention"><View className="task-studio-count-icon"><AppIcon name="timer" size={22} /></View><View><Text className="task-studio-count-value">{counts.attention}</Text><Text>待确认</Text></View></View><View className="task-studio-count-divider" />
+        <View className="task-studio-count-item is-completed"><View className="task-studio-count-icon"><AppIcon name="shield-check" size={22} /></View><View><Text className="task-studio-count-value">{counts.completed}</Text><Text>已完成</Text></View></View>
       </View>
       <View className="task-studio-segments liquid-glass--list" data-glass-role="list">{FILTERS.map((item) => <Text key={item} className={filter === item ? "task-studio-filter is-active" : "task-studio-filter"} onClick={() => setFilter(item)}>{item}</Text>)}</View>
       {failedSources.map((source) => <View className="task-studio-source-error" key={source.source}><View><Text className="task-studio-state-title">{source.sourceLabel} 暂未同步</Text><Text>{source.error}</Text></View><Button className="task-studio-retry" onClick={load}>重试</Button></View>)}
       <View className="task-studio-list liquid-glass--list" data-glass-role="list">
         {filtered.map((entry, index) => {
           const progress = validProgress(entry); const visual = SOURCE_VISUAL[entry.source]; const disabled = !entry.id;
-          return <View className={`task-studio-row is-${entry.status}${disabled ? " is-disabled" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
+          return <View className={`task-studio-row studio-task-record is-${entry.status}${disabled ? " is-disabled" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
             <Image className="task-studio-row-art" src={visual.asset} mode="aspectFit" />
             <View className="task-studio-row-copy"><Text className="task-studio-row-title">{entry.title || "服务端未返回标题"}</Text><Text className="task-studio-row-source">{entry.sourceLabel} · {formatTimestamp(entry.createdAt)}</Text></View>
-            <View className="task-studio-row-state">{progress ? <><Text className="task-studio-progress-value">{progress.percent}%</Text><View className="task-studio-progress-track"><View style={{ width: `${progress.percent}%` }} /></View></> : null}<Text className={`task-studio-status is-${entry.status}`}>{disabled ? "记录 ID 未返回" : statusLabel(entry)}</Text></View>
+            <View className="task-studio-row-state studio-task-action">{progress ? <><Text className="task-studio-progress-value">{progress.percent}%</Text><View className="task-studio-progress-track"><View style={{ width: `${progress.percent}%` }} /></View></> : null}<Text className={`task-studio-status mp-status-pill is-${entry.status}`}>{disabled ? "记录 ID 未返回" : statusLabel(entry)}</Text></View>
             {!disabled ? <AppIcon className="task-studio-row-arrow" name="chevron-right" size={17} /> : null}
           </View>;
         })}
