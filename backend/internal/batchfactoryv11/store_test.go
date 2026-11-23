@@ -72,6 +72,77 @@ func TestCaptureBookSourceReplacesOnlyGeneratedTitle(t *testing.T) {
 	}
 }
 
+func TestCaptureWithoutRawPreservesPreviousOriginal(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "批次", Books: []CreateBookInput{{Title: "甲", SourceText: "旧截取", TxtText: "完整原文"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	updated, err := store.CaptureBookSource(ctx, "alice", batch.ID, book.ID, CaptureBookSourceInput{SourceText: "新截取", ReplaceSource: true, ExpectedRevision: book.Revision})
+	if err != nil || updated.TxtText != "完整原文" || updated.SourceText != "新截取" {
+		t.Fatalf("updated=%+v err=%v", updated, err)
+	}
+}
+
+func TestMetadataEditProtectsOriginalProvenanceAndInvalidatesChangedBookID(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "owner", CreateBatchInput{Title: "批次", Books: []CreateBookInput{{Title: "甲", BookID: "123456"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	book, err = store.CaptureBookSource(ctx, "owner", batch.ID, book.ID, CaptureBookSourceInput{RawSourceText: "全文", RawSourceOrigin: "uploaded_file", SourceText: "生产稿", ExpectedRevision: book.Revision})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book, err = store.UpdateBookMetadata(ctx, "owner", batch.ID, book.ID, UpdateBookMetadataInput{Title: "新书名", Metadata: map[string]any{"rawSourceOrigin": "伪造"}, ExpectedRevision: book.Revision})
+	if err != nil || book.SourceMetadata["rawSourceStatus"] != "verified" || book.SourceMetadata["rawSourceOrigin"] != "uploaded_file" {
+		t.Fatalf("rename: %+v %v", book, err)
+	}
+	book, err = store.UpdateBookMetadata(ctx, "owner", batch.ID, book.ID, UpdateBookMetadataInput{SourceBookID: "654321", Metadata: map[string]any{"rawSourceStatus": "verified"}, ExpectedRevision: book.Revision})
+	if err != nil || book.SourceMetadata["rawSourceStatus"] != "unverified" || book.SourceMetadata["rawSourceOrigin"] != nil || book.TxtText != "全文" {
+		t.Fatalf("changed source ID: %+v %v", book, err)
+	}
+}
+
+func TestSaveBookProductionTextPreservesOriginalAndRejectsStaleWrite(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	writer, ok := any(store).(ProductionTextStore)
+	if !ok {
+		t.Fatal("missing production text writer")
+	}
+	batch, err := store.CreateBatch(ctx, "owner", CreateBatchInput{Title: "批次", Books: []CreateBookInput{{Title: "甲"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	book, err = store.CaptureBookSource(ctx, "owner", batch.ID, book.ID, CaptureBookSourceInput{RawSourceText: " 完整原文\n", SourceText: "旧稿", SourceMetadata: map[string]any{"keep": "资料"}, ExpectedRevision: book.Revision})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := SaveBookProductionTextInput{SourceText: "新稿", SourceMetadata: map[string]any{"stage": "done", "rawSourceOrigin": "forged"}, ExpectedRevision: book.Revision}
+	updated, err := writer.SaveBookProductionText(ctx, "owner", batch.ID, book.ID, input)
+	if err != nil || updated.TxtText != " 完整原文\n" || updated.SourceText != "新稿" || updated.SourceMetadata["rawSourceStatus"] != "verified" || updated.SourceMetadata["rawSourceOrigin"] == "forged" || updated.SourceMetadata["stage"] != "done" || updated.SourceMetadata["keep"] != "资料" || updated.Revision != book.Revision+1 {
+		t.Fatalf("updated=%+v err=%v", updated, err)
+	}
+	if _, err := writer.SaveBookProductionText(ctx, "owner", batch.ID, book.ID, input); err != ErrConflict {
+		t.Fatalf("stale write: %v", err)
+	}
+	if _, err := writer.SaveBookProductionText(ctx, "other", batch.ID, book.ID, input); err != ErrNotFound {
+		t.Fatalf("wrong owner: %v", err)
+	}
+	reassigned, err := store.CaptureBookSource(ctx, "owner", batch.ID, book.ID, CaptureBookSourceInput{
+		SourceText: "其他书的生产稿", SourceBookID: "765432", ReplaceSource: true, ExpectedRevision: updated.Revision,
+	})
+	if err != nil || reassigned.TxtText != " 完整原文\n" || reassigned.SourceMetadata["rawSourceStatus"] != "unverified" {
+		t.Fatalf("reassigned without original: %+v %v", reassigned, err)
+	}
+}
+
 // 书城导入的占位书名「小说 <来源ID>」与内部 bookID 不同，抓正文拿到真实书名后
 // 也必须能回填，否则发布阶段永远匹配不到漫画作品。
 func TestCaptureBookSourceReplacesPlaceholderTitleWithSourceBookID(t *testing.T) {

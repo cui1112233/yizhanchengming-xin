@@ -101,7 +101,7 @@ test('grouped submit surfaces failed book cities and counts only fetched pending
   assert.match(source, /\} else if \(fetchedCount < totalCount\) \{/);
   // #6：fetchedCount 只对本组 pending id 中真正拿到非空正文的计数
   assert.match(source, /let fetchedCount = 0/);
-  assert.match(source, /for \(const bookId of pending\) \{\s*if \(String\(groupSources\[bookId\] \|\| ''\)\.trim\(\)\) fetchedCount \+= 1;/);
+  assert.match(source, /for \(const bookId of pending\) \{\s*if \(manualFetchedSourceText\(groupSources\[bookId\]\)\) fetchedCount \+= 1;/);
 });
 
 test('offers giant material intake through the resident executor', () => {

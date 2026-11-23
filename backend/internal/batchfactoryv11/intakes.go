@@ -20,9 +20,6 @@ func normalizeNovelFetchBook(book CreateBookInput) CreateBookInput {
 	book.SourceTaskID = strings.TrimSpace(book.SourceTaskID)
 	book.Platform = strings.TrimSpace(book.Platform)
 	book.TxtFileName = strings.TrimSpace(book.TxtFileName)
-	if book.TxtText == "" {
-		book.TxtText = book.SourceText
-	}
 	if book.TxtFileName == "" && book.BookID != "" {
 		book.TxtFileName = book.BookID + ".txt"
 	}

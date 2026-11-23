@@ -1,9 +1,42 @@
 package batchfactoryv11
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 )
+
+func TestGroupedRawSourceSurvivesIntakeWithoutCrossingPlatforms(t *testing.T) {
+	var input ManualIntakeInput
+	if err := json.Unmarshal([]byte(`{"rawSourceTextByBookId":{"737092":"顶层原文"},"groups":[{"platformId":"3","inputText":"737092 甲","sourceTextByBookId":{"737092":"甲截取"},"rawSourceTextByBookId":{"737092":"甲完整原文"}},{"platformId":"15","inputText":"737092 乙","sourceTextByBookId":{"737092":"乙旧版截取"}}]}`), &input); err != nil {
+		t.Fatal(err)
+	}
+	books, err := ParseGroupedManualBookLists(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	store := NewMemoryStore()
+	intake, err := store.CreateIntake(ctx, "owner", NovelFetchIntakeInput{Books: books})
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch, err := store.CreateBatchFromIntake(ctx, "owner", intake.ID, CreateBatchInput{Title: "原文"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(batch.Books) != 2 {
+		t.Fatalf("books: %+v", batch.Books)
+	}
+	a, b := batch.Books[0], batch.Books[1]
+	if a.TxtText != "甲完整原文" || a.SourceText != "甲截取" || a.SourceMetadata["rawSourceStatus"] != "verified" {
+		t.Fatalf("platform 3: %+v", a)
+	}
+	if b.TxtText != "" || b.SourceText != "乙旧版截取" || b.SourceMetadata["rawSourceStatus"] != "unverified" {
+		t.Fatalf("platform 15: %+v", b)
+	}
+}
 
 func TestParseGroupedManualBookLists(t *testing.T) {
 	input := ManualIntakeInput{
@@ -59,6 +92,17 @@ func TestParseGroupedManualBookListsInvalidGroup(t *testing.T) {
 func TestParseGroupedManualBookListsEmpty(t *testing.T) {
 	if _, err := ParseGroupedManualBookLists(ManualIntakeInput{}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("empty input must fail with ErrInvalid, got %v", err)
+	}
+}
+
+func TestRawOnlyGroupNeverInheritsAnotherProductionText(t *testing.T) {
+	var input ManualIntakeInput
+	if err := json.Unmarshal([]byte(`{"sourceTextByBookId":{"737092":"其他书城的生产文"},"groups":[{"platformId":"3","inputText":"737092 甲","sourceTextByBookId":{},"rawSourceTextByBookId":{"737092":"原文甲"},"sourceMetadataByBookId":{"737092":{"processingStatus":"failed","processError":"处理失败"}}}]}`), &input); err != nil {
+		t.Fatal(err)
+	}
+	books, err := ParseGroupedManualBookLists(input)
+	if err != nil || len(books) != 1 || books[0].SourceText != "" || books[0].TxtText != "原文甲" || books[0].SourceMetadata["processError"] != "处理失败" {
+		t.Fatalf("books=%+v err=%v", books, err)
 	}
 }
 

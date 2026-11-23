@@ -57,6 +57,17 @@ test('manual batch submission extracts fetched text instead of persisting object
   });
 });
 
+test('submission keeps each platform’s complete source even when processing failed', () => {
+  const result = buildManualBatchSubmission({ groups: [
+    { platformId: '3', sourceTextByBookId: { '737092': { data: '甲截取', rawData: '甲原文全文' }, '700000': '旧截取' } },
+    { platformId: '15', sourceTextByBookId: { '737092': { data: null, rawData: '乙原文全文' } } }
+  ] });
+  assert.deepEqual(result.groups[0].rawSourceTextByBookId, { '737092': '甲原文全文' });
+  assert.deepEqual(result.groups[0].sourceTextByBookId, { '737092': '甲截取', '700000': '旧截取' });
+  assert.deepEqual(result.groups[1].rawSourceTextByBookId, { '737092': '乙原文全文' });
+  assert.deepEqual(result.groups[1].sourceTextByBookId, {});
+});
+
 test('manual intake treats the leading 6-25 digit number of each row as a book ID', () => {
   assert.deepEqual(
     manualBookIDsFromInput('700000 六位数 ID\n748725 事不过三，过三遭殃\n2086529323515883958 长 ID'),

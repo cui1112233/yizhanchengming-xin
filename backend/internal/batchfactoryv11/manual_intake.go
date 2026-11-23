@@ -24,6 +24,7 @@ type ManualIntakeInput struct {
 	ContentCaptureCharacters int               `json:"contentCaptureCharacters,omitempty"`
 	ScheduledAt              string            `json:"scheduledAt,omitempty"`
 	SourceTextByBookID       map[string]string `json:"sourceTextByBookId,omitempty"`
+	RawSourceTextByBookID    map[string]string `json:"rawSourceTextByBookId,omitempty"`
 	// SourceMetadataByBookID carries authoritative fetch facts (for example 121
 	// category/genre). Manual columns keep precedence when the book is created.
 	SourceMetadataByBookID map[string]map[string]any `json:"sourceMetadataByBookId,omitempty"`
@@ -43,6 +44,7 @@ type ManualIntakeGroup struct {
 	// SourceTextByBookID 可选：该组已抓到的正文，键为书 ID。非空时分组解析
 	// 用它替代顶层同名 map，使跨书城撞 ID 的两本书各取各的正文。
 	SourceTextByBookID     map[string]string         `json:"sourceTextByBookId,omitempty"`
+	RawSourceTextByBookID  map[string]string         `json:"rawSourceTextByBookId,omitempty"`
 	SourceMetadataByBookID map[string]map[string]any `json:"sourceMetadataByBookId,omitempty"`
 }
 type manualRow struct {
@@ -512,8 +514,24 @@ func ParseManualBookList(input ManualIntakeInput) ([]CreateBookInput, error) {
 				meta["genderSource"] = strings.TrimSpace(source)
 			}
 		}
-		sourceText := strings.TrimSpace(input.SourceTextByBookID[id])
-		out = append(out, CreateBookInput{ID: id, BookID: id, Title: title, Platform: input.PlatformID, SourceText: sourceText, TxtText: sourceText, SourceMetadata: meta})
+		sourceText, _ := normalizeCapturedSourceText(input.SourceTextByBookID[id])
+		raw := input.RawSourceTextByBookID[id]
+		origin := "bookstore_raw"
+		if recordID, ok := meta["customCopyRecordId"].(string); ok && strings.TrimSpace(recordID) != "" {
+			raw, origin = input.SourceTextByBookID[id], "custom_copy"
+		}
+		if _, valid := normalizeCapturedSourceText(raw); !valid {
+			raw = ""
+		}
+		meta = sourceWriteMetadata(meta, nil, raw, origin)
+		if fetchedMeta["processingStatus"] == "failed" && sourceText == "" {
+			for _, key := range []string{"processingStatus", "processError", "processRetryable", "originalStatus", "queueStage"} {
+				if value, ok := fetchedMeta[key]; ok {
+					meta[key] = value
+				}
+			}
+		}
+		out = append(out, CreateBookInput{ID: id, BookID: id, Title: title, Platform: input.PlatformID, SourceText: sourceText, TxtText: raw, SourceMetadata: meta})
 	}
 	return out, nil
 }
@@ -531,10 +549,16 @@ func ParseGroupedManualBookLists(base ManualIntakeInput) ([]CreateBookInput, err
 		groupInput.PlatformID = strings.TrimSpace(group.PlatformID)
 		groupInput.PlatformName = strings.TrimSpace(group.PlatformName)
 		groupInput.InputText = group.InputText
-		if len(group.SourceTextByBookID) > 0 {
+		if group.SourceTextByBookID != nil || group.RawSourceTextByBookID != nil {
 			groupInput.SourceTextByBookID = group.SourceTextByBookID
 		}
-		if len(group.SourceMetadataByBookID) > 0 {
+		// The top-level raw copy belongs to the top-level source map. A group
+		// with its own texts may contain the same ID from another bookstore.
+		inheritSource := group.SourceTextByBookID == nil && (base.PlatformID == group.PlatformID || (base.PlatformID == "" && len(base.Groups) == 1))
+		if !inheritSource || group.RawSourceTextByBookID != nil {
+			groupInput.RawSourceTextByBookID = group.RawSourceTextByBookID
+		}
+		if !inheritSource || group.SourceMetadataByBookID != nil {
 			groupInput.SourceMetadataByBookID = group.SourceMetadataByBookID
 		}
 		books, err := ParseManualBookList(groupInput)

@@ -1283,7 +1283,11 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "project has no editable source book"})
 			return
 		}
-		book, err := store.CaptureBookSource(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CaptureBookSourceInput{SourceText: string(raw), ReplaceSource: true, SourceTitle: input.Filename, ExpectedRevision: batch.Books[0].Revision})
+		original := string(raw)
+		book, err := store.CaptureBookSource(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CaptureBookSourceInput{
+			SourceText: original, RawSourceText: original, RawSourceOrigin: "uploaded_file",
+			ReplaceSource: true, SourceTitle: input.Filename, ExpectedRevision: batch.Books[0].Revision,
+		})
 		if err != nil {
 			_ = store.DeleteBatch(r.Context(), owner, batch.ID)
 			writeStoreError(w, err)

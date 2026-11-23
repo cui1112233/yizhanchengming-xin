@@ -331,17 +331,17 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 	if sourceBookID != "" && !validSourceBookID(sourceBookID) {
 		return Book{}, fmt.Errorf("%w：%s", ErrInvalid, SourceBookIDValidationMessage)
 	}
-	metadata, err := json.Marshal(input.Metadata)
-	if err != nil {
-		return Book{}, ErrInvalid
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Book{}, err
 	}
 	defer tx.Rollback()
 	var current int64
-	err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&current)
+	var currentTitle, currentID string
+	var rawMetadata []byte
+	err = tx.QueryRowContext(ctx, `SELECT b.revision,COALESCE(r.title,''),COALESCE(r.source_book_id,''),r.source_metadata_json
+		FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id
+		WHERE b.id=? AND b.batch_id=? AND b.owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&current, &currentTitle, &currentID, &rawMetadata)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Book{}, ErrNotFound
 	}
@@ -352,26 +352,17 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 		return Book{}, ErrConflict
 	}
 	title := strings.TrimSpace(input.Title)
+	metadataValues := replaceBookMetadata(decodeSourceMetadata(rawMetadata), input.Metadata, currentID, sourceBookID)
 	if sourceBookID != "" {
 		// sourceLine 需要“书号\t书名”，用户只改书号时书名取记录里的当前值。
 		if title == "" {
-			if err = tx.QueryRowContext(ctx, `SELECT COALESCE(title,'') FROM batch_factory_v12_book_records WHERE book_id=? FOR UPDATE`, bookID).Scan(&title); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return Book{}, ErrNotFound
-				}
-				return Book{}, err
-			}
-		}
-		metadataValues := map[string]any{}
-		if string(metadata) != "null" {
-			if err = json.Unmarshal(metadata, &metadataValues); err != nil {
-				return Book{}, ErrInvalid
-			}
+			title = currentTitle
 		}
 		applySourceBookIDMetadata(metadataValues, sourceBookID, title)
-		if metadata, err = json.Marshal(metadataValues); err != nil {
-			return Book{}, ErrInvalid
-		}
+	}
+	metadata, err := json.Marshal(metadataValues)
+	if err != nil {
+		return Book{}, ErrInvalid
 	}
 	// MySQL JSON rejects driver-bound []byte as _binary. Bind JSON as UTF-8 text
 	// so metadata updates (including direct-read and OCR state) are durable.
@@ -411,9 +402,13 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 	return Book{}, ErrNotFound
 }
 
+func (s *MySQLStore) SaveBookProductionText(ctx context.Context, owner, batchID, bookID string, input SaveBookProductionTextInput) (Book, error) {
+	return s.CaptureBookSource(ctx, owner, batchID, bookID, input.captureInput())
+}
+
 func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, bookID string, input CaptureBookSourceInput) (Book, error) {
 	sourceText, validSourceText := normalizeCapturedSourceText(input.SourceText)
-	rawSourceText, validRawSourceText := normalizeCapturedSourceText(input.RawSourceText)
+	_, validRawSourceText := normalizeCapturedSourceText(input.RawSourceText)
 	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText) {
 		return Book{}, ErrInvalid
 	}
@@ -445,13 +440,11 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 	if strings.TrimSpace(source.String) != "" && !input.ReplaceSource {
 		return Book{}, ErrConflict
 	}
-	metadata := decodeSourceMetadata(rawMetadata)
-	if metadata == nil {
-		metadata = map[string]any{}
+	raw := ""
+	if validRawSourceText {
+		raw = input.RawSourceText
 	}
-	for key, value := range input.SourceMetadata {
-		metadata[key] = value
-	}
+	metadata := input.updatedMetadata(decodeSourceMetadata(rawMetadata), sourceBookID.String, raw)
 	encodedMetadata, err := json.Marshal(metadata)
 	if err != nil {
 		return Book{}, ErrInvalid
@@ -468,11 +461,13 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 	if validSourceText || input.ReplaceSource {
 		nextSourceText = sourceText
 	}
-	if !validRawSourceText && validSourceText {
-		rawSourceText = nextSourceText
-	}
 	// See UpdateBookMetadata: this column is JSON, not a binary blob.
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET title=?,source_book_id=?,source_text=?,txt_text=?,source_metadata_json=? WHERE book_id=?`, nextTitle, nullableString(nextSourceBookID), nextSourceText, rawSourceText, string(encodedMetadata), bookID); err != nil {
+	if !validRawSourceText && input.SourceTitle == "" && input.SourceBookID == "" {
+		_, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_text=?,source_metadata_json=? WHERE book_id=?`, nextSourceText, string(encodedMetadata), bookID)
+	} else {
+		_, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET title=?,source_book_id=?,source_text=?,txt_text=COALESCE(?,txt_text),source_metadata_json=? WHERE book_id=?`, nextTitle, nullableString(nextSourceBookID), nextSourceText, nullableString(raw), string(encodedMetadata), bookID)
+	}
+	if err != nil {
 		return Book{}, err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, time.Now().UTC(), bookID, batchID, owner); err != nil {
@@ -1268,7 +1263,7 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 				rows.Close()
 				return Batch{}, err
 			}
-			book.SourceMetadata = decodeSourceMetadata(metadata)
+			book.SourceMetadata = sourceReadMetadata(decodeSourceMetadata(metadata))
 			if book.BookID == "" {
 				book.BookID = book.ID
 			}

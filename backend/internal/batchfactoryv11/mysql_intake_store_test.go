@@ -207,13 +207,13 @@ func TestMySQLUpdateBookMetadataBindsJSONAsText(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT revision FROM batch_factory_v12_books").
+	mock.ExpectQuery("SELECT b.revision,COALESCE").
 		WithArgs("book-1", "batch-1", "alice").
-		WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(int64(1)))
+		WillReturnRows(sqlmock.NewRows([]string{"revision", "title", "source_book_id", "source_metadata_json"}).AddRow(int64(1), "书", "123456", []byte(`{"rawSourceStatus":"verified","rawSourceOrigin":"uploaded_file"}`)))
 	// The deliberately returned error stops before hydration. It proves the
 	// JSON-column argument matched as text rather than driver-bound _binary.
 	mock.ExpectExec("UPDATE batch_factory_v12_book_records").
-		WithArgs(jsonTextArg{}, "book-1").
+		WithArgs(`{"executorJobId":"giant-job-1","rawSourceOrigin":"uploaded_file","rawSourceStatus":"verified"}`, "book-1").
 		WillReturnError(errors.New("stop after metadata write"))
 	mock.ExpectRollback()
 
@@ -383,7 +383,7 @@ func TestMySQLCaptureBookSourceBindsJSONAsText(t *testing.T) {
 		WithArgs("book-1").
 		WillReturnRows(sqlmock.NewRows([]string{"source_text", "title", "source_book_id", "source_metadata_json"}).AddRow("", "小说 1", "1", []byte(`{}`)))
 	mock.ExpectExec("UPDATE batch_factory_v12_book_records").
-		WithArgs("小说 1", "2", "正文", "正文", jsonTextArg{}, "book-1").
+		WithArgs("小说 1", "2", "正文", nil, jsonTextArg{}, "book-1").
 		WillReturnError(errors.New("stop after source write"))
 	mock.ExpectRollback()
 
@@ -417,6 +417,33 @@ func TestMySQLCaptureBookSourceRejectsObjectPlaceholderBeforeDatabaseWrite(t *te
 	})
 	if !errors.Is(err, ErrInvalid) {
 		t.Fatalf("CaptureBookSource error = %v, want ErrInvalid", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMySQLProductionTextNeverWritesOriginalColumn(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	writer, ok := any(NewMySQLStore(db)).(ProductionTextStore)
+	if !ok {
+		t.Fatal("missing production text writer")
+	}
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT revision FROM batch_factory_v12_books").WithArgs("book", "batch", "owner").
+		WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(3))
+	mock.ExpectQuery("SELECT source_text,title,source_book_id,source_metadata_json").WithArgs("book").
+		WillReturnRows(sqlmock.NewRows([]string{"source_text", "title", "source_book_id", "source_metadata_json"}).AddRow("旧稿", "甲", "123", []byte(`{"keep":"资料","rawSourceStatus":"verified"}`)))
+	stop := errors.New("stop after checked update")
+	mock.ExpectExec(`UPDATE batch_factory_v12_book_records SET source_text=\?,source_metadata_json=\? WHERE book_id=\?`).WithArgs("新稿", `{"keep":"资料","rawSourceStatus":"verified","stage":"done"}`, "book").WillReturnError(stop)
+	mock.ExpectRollback()
+	_, err = writer.SaveBookProductionText(context.Background(), "owner", "batch", "book", SaveBookProductionTextInput{SourceText: "新稿", SourceMetadata: map[string]any{"stage": "done"}, ExpectedRevision: 3})
+	if !errors.Is(err, stop) {
+		t.Fatalf("save: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

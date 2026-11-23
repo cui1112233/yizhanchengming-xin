@@ -28,19 +28,25 @@ export function manualFetchedSourceText(value, depth = 0) {
     return text === '[object Object]' ? '' : text;
   }
   if (!value || typeof value !== 'object' || Array.isArray(value) || depth >= 3) return '';
-  for (const key of ['processedText', 'sourceText', 'text', 'content', 'data', 'rawData']) {
+  for (const key of ['processedText', 'sourceText', 'text', 'content', 'data']) {
     const text = manualFetchedSourceText(value[key], depth + 1);
     if (text) return text;
   }
   return '';
 }
 
-function normalizeSourceTextMap(sourceTextByBookId) {
-  if (!sourceTextByBookId || typeof sourceTextByBookId !== 'object' || Array.isArray(sourceTextByBookId)) return {};
-  return Object.fromEntries(Object.entries(sourceTextByBookId).flatMap(([bookId, value]) => {
+function submissionSourceMaps(sourceTextByBookId = {}, rawSourceTextByBookId = {}) {
+  const production = {};
+  const originals = {};
+  for (const [id, value] of Object.entries(sourceTextByBookId || {})) {
     const text = manualFetchedSourceText(value);
-    return text ? [[bookId, text]] : [];
-  }));
+    if (text) production[id] = text;
+    if (typeof value?.rawData === 'string' && manualFetchedSourceText(value.rawData)) originals[id] = value.rawData;
+  }
+  for (const [id, raw] of Object.entries(rawSourceTextByBookId || {})) {
+    if (typeof raw === 'string' && manualFetchedSourceText(raw)) originals[id] = raw;
+  }
+  return { sourceTextByBookId: production, rawSourceTextByBookId: originals };
 }
 
 export function hasFetchedManualSources(bookIds, sourceTextByBookId) {
@@ -51,12 +57,12 @@ export function buildManualBatchSubmission({ title, scheduledAt = '', automation
   const enabled = automationEnabled === true;
   const normalizedRunMode = String(runMode || '').trim();
   const groups = Array.isArray(input.groups)
-    ? input.groups.map(group => ({ ...group, sourceTextByBookId: normalizeSourceTextMap(group?.sourceTextByBookId) }))
+    ? input.groups.map(group => ({ ...group, ...submissionSourceMaps(group?.sourceTextByBookId, group?.rawSourceTextByBookId) }))
     : input.groups;
   return {
     ...input,
     ...(groups ? { groups } : {}),
-    ...(input.sourceTextByBookId ? { sourceTextByBookId: normalizeSourceTextMap(input.sourceTextByBookId) } : {}),
+    ...(input.sourceTextByBookId || input.rawSourceTextByBookId ? submissionSourceMaps(input.sourceTextByBookId, input.rawSourceTextByBookId) : {}),
     title: String(title || '').trim(),
     scheduledAt: String(scheduledAt || ''),
     runMode: normalizedRunMode,

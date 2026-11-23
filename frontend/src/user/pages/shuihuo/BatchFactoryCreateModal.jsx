@@ -624,8 +624,8 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
         const have = sourcesByGroup[groupKey] || group.sourceTextByBookId || {};
         sourcesByGroup[groupKey] = have;
         sourceMetadataByGroup[groupKey] = group.sourceMetadataByBookId || {};
-        fetchedCount += ids.filter(bookId => String(have[bookId] || '').trim()).length;
-        const pending = ids.filter(bookId => !String(have[bookId] || '').trim());
+        fetchedCount += ids.filter(bookId => manualFetchedSourceText(have[bookId])).length;
+        const pending = ids.filter(bookId => !manualFetchedSourceText(have[bookId]));
         if (!pending.length) continue;
         try {
           const result = await fetchDirectOriginals({
@@ -636,10 +636,9 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           const groupSources = {};
           const groupMetadata = {};
           for (const item of Array.isArray(result?.results) ? result.results : []) {
-            const text = manualFetchedSourceText(item?.data);
-            if (item?.status === 'ok' && text) {
+            if (item?.status === 'ok' || item?.status === 'processing_error') {
               const bookId = String(item.bookId);
-              groupSources[bookId] = text;
+              groupSources[bookId] = { data: item.data, rawData: item.rawData };
               if (item?.sourceMetadata && typeof item.sourceMetadata === 'object' && !Array.isArray(item.sourceMetadata)) {
                 groupMetadata[bookId] = item.sourceMetadata;
               }
@@ -649,7 +648,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           sourceMetadataByGroup[groupKey] = { ...groupMetadata, ...(sourceMetadataByGroup[groupKey] || {}) };
           // 只按本组请求的 pending id 计数，防止接口回传意外 ID 高估成功数
           for (const bookId of pending) {
-            if (String(groupSources[bookId] || '').trim()) fetchedCount += 1;
+            if (manualFetchedSourceText(groupSources[bookId])) fetchedCount += 1;
           }
         } catch (error) {
           // 单组抓取失败不阻断：该组正文留空，书照样创建，列表中标红后可单独重试
@@ -672,6 +671,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           platformName: group.platformName,
           inputText: group.inputText,
           sourceTextByBookId: sourcesByGroup[String(group.platformId)] || {},
+          rawSourceTextByBookId: group.rawSourceTextByBookId,
           sourceMetadataByBookId: sourceMetadataByGroup[String(group.platformId)] || {}
         })),
         parseMode,

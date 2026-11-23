@@ -431,6 +431,7 @@ func hydrateMemoryBatchSettingsState(b Batch, patches map[string]SettingsPatch, 
 	books := make([]Book, len(b.Books))
 	for i := range b.Books {
 		book := b.Books[i]
+		book.SourceMetadata = sourceReadMetadata(book.SourceMetadata)
 		book.SettingsState = SettingsState{
 			Patch:    clonePatch(patches[scopeKey(ScopeRef{Kind: ScopeBook, BatchID: b.ID, BookID: book.ID})]),
 			Revision: book.Revision,
@@ -694,10 +695,7 @@ func (s *MemoryStore) UpdateBookMetadata(_ context.Context, owner, batchID, book
 		if title := strings.TrimSpace(input.Title); title != "" {
 			book.Title = title
 		}
-		book.SourceMetadata = map[string]any{}
-		for key, value := range input.Metadata {
-			book.SourceMetadata[key] = value
-		}
+		book.SourceMetadata = replaceBookMetadata(book.SourceMetadata, input.Metadata, book.BookID, sourceBookID)
 		if sourceBookID != "" {
 			book.BookID = sourceBookID
 			applySourceBookIDMetadata(book.SourceMetadata, sourceBookID, book.Title)
@@ -710,10 +708,14 @@ func (s *MemoryStore) UpdateBookMetadata(_ context.Context, owner, batchID, book
 	return Book{}, ErrNotFound
 }
 
+func (s *MemoryStore) SaveBookProductionText(ctx context.Context, owner, batchID, bookID string, input SaveBookProductionTextInput) (Book, error) {
+	return s.CaptureBookSource(ctx, owner, batchID, bookID, input.captureInput())
+}
+
 func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookID string, input CaptureBookSourceInput) (Book, error) {
 	sourceText, validSourceText := normalizeCapturedSourceText(input.SourceText)
-	rawSourceText, validRawSourceText := normalizeCapturedSourceText(input.RawSourceText)
-	if input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText) {
+	_, validRawSourceText := normalizeCapturedSourceText(input.RawSourceText)
+	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText) {
 		return Book{}, ErrInvalid
 	}
 	s.mu.Lock()
@@ -734,23 +736,17 @@ func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookI
 		if validSourceText || input.ReplaceSource {
 			book.SourceText = sourceText
 		}
-		if !validRawSourceText && validSourceText {
-			rawSourceText = book.SourceText
-		}
-		if validRawSourceText || validSourceText {
-			book.TxtText = rawSourceText
+		raw := ""
+		if validRawSourceText {
+			raw = input.RawSourceText
+			book.TxtText = raw
 		}
 		if title := strings.TrimSpace(input.SourceTitle); title != "" && (input.ReplaceTitle || shouldReplaceGeneratedBookTitle(book.Title, book.BookID, title)) {
 			book.Title = title
 		}
+		book.SourceMetadata = input.updatedMetadata(book.SourceMetadata, book.BookID, raw)
 		if sourceBookID := strings.TrimSpace(input.SourceBookID); sourceBookID != "" {
 			book.BookID = sourceBookID
-		}
-		if book.SourceMetadata == nil {
-			book.SourceMetadata = map[string]any{}
-		}
-		for key, value := range input.SourceMetadata {
-			book.SourceMetadata[key] = value
 		}
 		book.Revision++
 		batch.UpdatedAt = time.Now().UTC()

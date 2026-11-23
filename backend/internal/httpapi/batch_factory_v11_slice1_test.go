@@ -284,7 +284,8 @@ func TestManualIntakeCreatesOneBatchAndKeepsManualSourceMetadata(t *testing.T) {
 	rec := signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/batch-factory/v11/intakes/manual", map[string]any{
 		"title": "晚间批量", "platformId": "15", "platformName": "番茄小说", "parseMode": "smart", "columnPresetId": "sample_input",
 		"inputText":               "100000000001\t书A\t精彩理由\t女频\t都市爽文\tS\n100000000002\t书B\t精彩理由\t男频\t都市爽文\tA",
-		"sourceTextByBookId":      map[string]string{"100000000001": "第一本完整原文", "100000000002": "第二本完整原文"},
+		"sourceTextByBookId":      map[string]string{"100000000001": "第一本截取", "100000000002": "第二本旧版截取"},
+		"rawSourceTextByBookId":   map[string]string{"100000000001": "第一本完整原文"},
 		"initialBatchSettings":    map[string]any{"textModelId": "text-default", "openingEnabled": false},
 		"comicAnalysisCharacters": 2000, "contentCaptureCharacters": 4000,
 		"contentRangeLines": 5, "scheduledAt": "2026-09-14T02:00:00Z",
@@ -302,7 +303,7 @@ func TestManualIntakeCreatesOneBatchAndKeepsManualSourceMetadata(t *testing.T) {
 	if got.Books[0].SourceMetadata["sourceMode"] != "manual_original" || got.Books[0].SourceMetadata["queueStatus"] != "scheduled_waiting" || got.Books[0].SourceMetadata["platformName"] != "番茄小说" || got.Books[0].SourceMetadata["gender"] != "女频" || got.Books[0].SourceMetadata["tags"] != "都市爽文" || got.Books[0].SourceMetadata["reason"] != "精彩理由" || got.Books[0].SourceMetadata["rating"] != "S" {
 		t.Fatalf("metadata=%#v", got.Books[0].SourceMetadata)
 	}
-	if got.Books[0].SourceText != "第一本完整原文" || got.Books[0].TxtText != "第一本完整原文" || got.Books[1].SourceText != "第二本完整原文" {
+	if got.Books[0].SourceText != "第一本截取" || got.Books[0].TxtText != "第一本完整原文" || got.Books[1].SourceText != "第二本旧版截取" || got.Books[1].TxtText != "" {
 		t.Fatalf("fetched source was not persisted: %#v", got.Books)
 	}
 	if got.Books[0].SourceMetadata["contentCaptureCharacters"] != float64(4000) {
@@ -323,7 +324,7 @@ func TestCaptureMissingBookSourceWritesOnceAndRejectsOverwrite(t *testing.T) {
 	book := batch.Books[0]
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
 	path := "/api/batch-factory/v11/batches/" + batch.ID + "/books/" + book.ID + "/source"
-	input := map[string]any{"sourceText": "抓回来的完整正文", "expectedRevision": book.Revision, "sourceMetadata": map[string]any{"sourceMode": "manual_refetched", "captureAttempts": 1}}
+	input := map[string]any{"sourceText": "抓回来的完整正文", "rawSourceText": "抓回来的完整正文", "expectedRevision": book.Revision, "sourceMetadata": map[string]any{"sourceMode": "manual_refetched", "captureAttempts": 1}}
 	first := signedJSONRequest(t, api, now, "alice", http.MethodPut, path, input)
 	if first.Code != http.StatusOK {
 		t.Fatalf("capture=%d body=%s", first.Code, first.Body.String())
@@ -350,7 +351,7 @@ func TestCaptureBookSourceRejectsObjectPlaceholderWithoutOverwritingExistingSour
 	path := "/api/batch-factory/v11/batches/" + batch.ID + "/books/" + book.ID + "/source"
 
 	first := signedJSONRequest(t, api, now, "alice", http.MethodPut, path, map[string]any{
-		"sourceText": "用户保存的完整正文", "replaceSource": true, "expectedRevision": book.Revision,
+		"sourceText": "用户保存的完整正文", "rawSourceText": "明确提交的完整原文", "replaceSource": true, "expectedRevision": book.Revision,
 	})
 	if first.Code != http.StatusOK {
 		t.Fatalf("initial save=%d body=%s", first.Code, first.Body.String())
@@ -367,7 +368,7 @@ func TestCaptureBookSourceRejectsObjectPlaceholderWithoutOverwritingExistingSour
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Books[0].SourceText != "用户保存的完整正文" || got.Books[0].TxtText != "用户保存的完整正文" {
+	if got.Books[0].SourceText != "用户保存的完整正文" || got.Books[0].TxtText != "明确提交的完整原文" {
 		t.Fatalf("existing source was overwritten: source=%q txt=%q", got.Books[0].SourceText, got.Books[0].TxtText)
 	}
 }

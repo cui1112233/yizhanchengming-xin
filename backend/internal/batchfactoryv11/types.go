@@ -625,17 +625,29 @@ const SourceBookIDValidationMessage = "书号只能填写 3-20 位数字，请�
 // intake records that retained a book ID and platform but never persisted the
 // fetched original; it must never replace an existing source text.
 type CaptureBookSourceInput struct {
-	SourceText    string `json:"sourceText"`
-	RawSourceText string `json:"rawSourceText,omitempty"`
-	ReplaceSource bool   `json:"replaceSource,omitempty"`
-	SourceBookID  string `json:"sourceBookId,omitempty"`
-	SourceTitle   string `json:"sourceTitle,omitempty"`
+	SourceText      string `json:"sourceText"`
+	RawSourceText   string `json:"rawSourceText,omitempty"`
+	RawSourceOrigin string `json:"-"`
+	ReplaceSource   bool   `json:"replaceSource,omitempty"`
+	SourceBookID    string `json:"sourceBookId,omitempty"`
+	SourceTitle     string `json:"sourceTitle,omitempty"`
 	// ReplaceTitle 让抓正文成功后的上游书名覆盖当前书名，包括用户粘贴或
 	// 手工改过的书名。只有真实抓取路径会置 true；上传 TXT 等路径保持占位名
 	// 才替换的旧规则。
 	ReplaceTitle     bool           `json:"replaceTitle,omitempty"`
 	SourceMetadata   map[string]any `json:"sourceMetadata,omitempty"`
 	ExpectedRevision int64          `json:"expectedRevision"`
+}
+
+// ProductionTextStore updates a production copy with optimistic locking.
+type ProductionTextStore interface {
+	SaveBookProductionText(context.Context, string, string, string, SaveBookProductionTextInput) (Book, error)
+}
+
+type SaveBookProductionTextInput struct {
+	SourceText       string
+	SourceMetadata   map[string]any
+	ExpectedRevision int64
 }
 
 // generatedBookTitlePattern 匹配书城导入时的占位书名，例如「小说 793433」。
