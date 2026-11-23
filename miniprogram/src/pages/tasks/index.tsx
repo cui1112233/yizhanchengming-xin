@@ -66,7 +66,7 @@ export default function TasksPage() {
   const failedSources = summary?.sources.filter((source) => source.state === "error") || [];
   const openTask = (entry: AggregatedTask) => { if (entry.id) void Taro.navigateTo({ url: taskDestination(entry) }); };
 
-  return <ThemedPage className="mp-page mp-primary-page mp-tasks-page task-studio-page">
+  return <ThemedPage className="mp-page mp-primary-page mp-tasks-page task-studio-page" dynamicGlass={false}>
     <View className="task-studio-header-scene">
       <BrandHeader title="任务" primary />
       <View className="task-studio-hero">

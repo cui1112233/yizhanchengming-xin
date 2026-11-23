@@ -54,6 +54,10 @@ test('task content stays above the dynamic glass canvas in WeChat',()=>{
  const style=readFileSync(resolve(__dirname,'tasks-studio.scss'),'utf8');
  expect(style).toMatch(/\.task-studio-header-scene,.task-studio-body,.task-studio-state\s*\{[^}]*position:relative[^}]*z-index:1/);
 });
+test('task center disables the native dynamic canvas that can cover the page in WeChat',async()=>{
+ const tree=await ready();
+ expect(tree.find(n=>n.type==='ThemedPage')?.props.dynamicGlass).toBe(false);
+});
 test('task center keeps the compact phone scale from the approved reference',()=>{
  const style=readFileSync(resolve(__dirname,'tasks-studio.scss'),'utf8');
  expect(style).toMatch(/\.task-studio-counts\s*\{[^}]*min-height:72PX/);
