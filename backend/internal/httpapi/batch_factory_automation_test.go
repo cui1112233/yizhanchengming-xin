@@ -138,6 +138,12 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 	t.Logf("book=%s pages=%d collection=%s stageAttempts=%v", scope.BookID, len(result.Collection.Items), collection, counts)
 }
 
+func workflowReceiptJSON(v any) map[string]any {
+	data, _ := json.Marshal(v)
+	var out map[string]any
+	_ = json.Unmarshal(data, &out)
+	return out
+}
 func TestAutomationTextPublishPendingResumesSameAttemptAndSeparatesHistory(t *testing.T) {
 	ctx := context.Background()
 	s := batchfactoryv11.NewMemoryStore()
@@ -195,12 +201,12 @@ func TestAutomationTextPublishPendingResumesSameAttemptAndSeparatesHistory(t *te
 	}
 	save(prev)
 	snapshot := read()
-	if snapshot["textPublishRecord"] != nil || mapOrEmpty(snapshot["textLastPublishedRecord"])["runId"] != first.ID {
+	if snapshot["textPublishRecord"] != nil || workflowReceiptJSON(snapshot["textLastPublishedRecord"])["runId"] != first.ID {
 		t.Fatalf("old receipt relabeled %+v", snapshot)
 	}
 	save(present)
 	snapshot = read()
-	if mapOrEmpty(snapshot["textPublishRecord"])["status"] != "upload_pending_confirm" || mapOrEmpty(snapshot["textLastPublishedRecord"])["runId"] != first.ID {
+	if workflowReceiptJSON(snapshot["textPublishRecord"])["status"] != "upload_pending_confirm" || workflowReceiptJSON(snapshot["textLastPublishedRecord"])["runId"] != first.ID {
 		t.Fatalf("pending receipt lost %+v", snapshot)
 	}
 }
@@ -220,13 +226,74 @@ func TestAutomationTextManualPublishSummaryUsesBookCollection(t *testing.T) {
 		if err := addWorkflowPublishSummary(ctx, s, "alice", b.ID, id, "manual-collection", nil, out); err != nil {
 			t.Fatal(err)
 		}
-		rec := mapOrEmpty(out["textPublishRecord"])
+		rec := workflowReceiptJSON(out["textPublishRecord"])
 		if rec["collectionId"] != "manual-collection" || out["runs"] != nil || rec["runId"] != nil {
 			t.Fatalf("manual receipt %+v", out)
 		}
 		if (out["textLastPublishedRecord"] != nil) != (status == "published") {
 			t.Fatal(out)
 		}
+	}
+}
+
+func TestAutomationTextNewerManualReceiptSupersedesFinishedRun(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch := preflightComicBatch(t, store, 1, 0)
+	bookID := batch.Books[0].ID
+	ended := time.Now().Add(-time.Hour)
+	old := batchfactoryv11.BookStageRun{ID: "run-1", Stage: "text_publish", Attempt: 1, RequestID: "key-1", CollectionID: "auto", Status: batchfactoryv11.ProductionSucceeded, UpdatedAt: ended}
+	saved := func(id string, receipt map[string]any) {
+		receipt["kind"], receipt["bookId"], receipt["collectionId"] = "text", bookID, id
+		raw, err := json.Marshal(receipt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = store.SaveDraft(ctx, "alice", batchfactoryv11.Draft{Key: id, Kind: "n8-text-publish", Scope: batch.ID, Content: string(raw)})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	saved("auto", map[string]any{"runId": "run-1", "attempt": 1, "requestKey": "key-1", "carouselId": 1, "imageIds": []int{9}, "status": "published"})
+	read := func(runs ...batchfactoryv11.BookStageRun) map[string]any {
+		out := map[string]any{}
+		if err := addWorkflowPublishSummary(ctx, store, "alice", batch.ID, bookID, "manual", runs, out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	for _, status := range []string{"pending", "failed", "published"} {
+		saved("manual", map[string]any{"intentId": "manual-intent", "requestKey": "manual-key", "carouselId": 2, "imageIds": []int{7}, "status": status})
+		out := read(old)
+		rec := workflowReceiptJSON(out["textPublishRecord"])
+		want := status
+		if status == "pending" {
+			want = "upload_pending_confirm"
+		}
+		history := "auto"
+		if status == "published" {
+			history = "manual"
+		}
+		if out["textPublishSource"] != "manual" || rec["status"] != want || rec["collectionId"] != "manual" || rec["runId"] != nil || workflowReceiptJSON(out["textLastPublishedRecord"])["collectionId"] != history {
+			t.Fatalf("%s: %+v", status, out)
+		}
+	}
+	for _, state := range []batchfactoryv11.ProductionState{batchfactoryv11.ProductionRunning, batchfactoryv11.ProductionSucceeded, batchfactoryv11.ProductionFailed} {
+		newest := old
+		newest.ID = "run-2"
+		newest.RequestID = "key-2"
+		newest.Attempt = 2
+		newest.Status = state
+		newest.UpdatedAt = time.Now().Add(time.Hour)
+		if out := read(old, newest); out["textPublishSource"] == "manual" || out["textPublishRecord"] != nil {
+			t.Fatalf("manual receipt hid newer automatic %s: %+v", state, out)
+		}
+	}
+	// Even with a more recent write timestamp, a receipt that identifies an old
+	// automatic attempt cannot become the manual result by changing the pointer.
+	saved("manual", map[string]any{"runId": "old-auto-id", "attempt": 7, "status": "pending", "requestKey": "previous-key"})
+	if out := read(old); out["textPublishSource"] == "manual" {
+		t.Fatalf("claimed historic automatic receipt as manual: %+v", out)
 	}
 }
 

@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"qiantie/backend/internal/batchfactorysensitive"
 	txt "qiantie/backend/internal/batchfactorytext"
 	"qiantie/backend/internal/batchfactoryv11"
+	cp "qiantie/backend/internal/collectionpublish"
 	"qiantie/backend/internal/localartifact"
 )
 
@@ -24,70 +26,85 @@ func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store,
 		}
 	}
 	slices.SortFunc(uploads, func(a, b batchfactoryv11.BookStageRun) int { return cmp.Compare(b.Attempt, a.Attempt) })
-	manual := len(uploads) == 0 && manualCollectionID != ""
-	if manual {
-		uploads = append(uploads, batchfactoryv11.BookStageRun{CollectionID: manualCollectionID})
+	var latest batchfactoryv11.BookStageRun
+	if len(uploads) > 0 {
+		latest = uploads[0]
+	}
+	ids := []string{manualCollectionID}
+	for _, r := range uploads {
+		ids = append(ids, r.CollectionID)
 	}
 	seen := map[string]bool{}
-	scoped := func(rec map[string]any, id string) bool {
-		return rec["kind"] == "text" && rec["bookId"] == bookID && rec["collectionId"] == id
-	}
-	confirmed := func(rec map[string]any) bool {
-		images, _ := rec["imageIds"].([]any)
-		if rec["status"] != "published" || intValue(rec["carouselId"]) <= 0 || len(images) == 0 {
-			return false
-		}
-		if n := intValue(rec["pageCount"]); n > 0 && n != len(images) {
-			return false
-		}
-		for _, id := range images {
-			if intValue(id) <= 0 {
-				return false
-			}
-		}
-		return true
-	}
-	for i, run := range uploads {
-		if seen[run.CollectionID] {
+	manualCurrent := false
+	var historyTime time.Time
+	for _, id := range ids {
+		if id == "" || seen[id] {
 			continue
 		}
-		seen[run.CollectionID] = true
-		d, err := store.GetDraft(ctx, owner, run.CollectionID, "n8-text-publish", batchID)
+		seen[id] = true
+		draft, err := store.GetDraft(ctx, owner, id, textPublishDraftKind, batchID)
 		if errors.Is(err, batchfactoryv11.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
-		var rec map[string]any
-		if err = json.Unmarshal([]byte(d.Content), &rec); err != nil {
+		var rec cp.Record
+		if err = json.Unmarshal([]byte(draft.Content), &rec); err != nil {
 			return err
 		}
-		if !scoped(rec, run.CollectionID) {
+		scoped := func(record *cp.Record) bool {
+			return record != nil && record.Kind == cp.CollectionKindText && record.BookID == bookID && record.CollectionID == id
+		}
+		if !scoped(&rec) {
 			continue
 		}
-		if i == 0 {
-			runID := stringValue(rec["runId"])
-			attempt := intValue(rec["attempt"])
-			key := stringValue(rec["requestKey"])
-			matches := (runID != "" && runID == run.ID) || (runID == "" && attempt > 0 && attempt == run.Attempt) || (runID == "" && attempt == 0 && key != "" && key == run.RequestID)
-			if manual || matches && (attempt == 0 || attempt == run.Attempt) {
-				if rec["status"] == "pending" {
-					rec["status"] = "upload_pending_confirm"
-				}
-				summary["textPublishRecord"] = rec
+		if id == manualCollectionID && rec.RunID == "" && rec.Attempt == 0 {
+			finished := latest.Status == batchfactoryv11.ProductionSucceeded || latest.Status == batchfactoryv11.ProductionFailed
+			knownKey := rec.RequestKey != "" && slices.ContainsFunc(uploads, func(r batchfactoryv11.BookStageRun) bool { return rec.RequestKey == r.RequestID })
+			manualCurrent = !knownKey && (latest.ID == "" || finished && draft.UpdatedAt.After(latest.UpdatedAt))
+		}
+		if id == manualCollectionID && manualCurrent || !manualCurrent && matchingWorkflowPublishAttempt(rec, latest) {
+			if rec.Status == "pending" {
+				rec.Status = "upload_pending_confirm"
+			}
+			summary["textPublishRecord"] = rec
+			if manualCurrent {
+				summary["textPublishSource"] = "manual"
 			}
 		}
-		history := rec
-		if !confirmed(rec) {
-			history, _ = rec["lastPublished"].(map[string]any)
+		history := &rec
+		if !rec.Confirmed() {
+			history = rec.LastPublished
 		}
-		if scoped(history, run.CollectionID) && confirmed(history) {
-			summary["textLastPublishedRecord"] = history
-			return nil
+		if scoped(history) && history.Confirmed() {
+			published := history.PublishedAt
+			if published.IsZero() {
+				published = draft.UpdatedAt
+			}
+			if summary["textLastPublishedRecord"] == nil || published.After(historyTime) {
+				summary["textLastPublishedRecord"] = *history
+				historyTime = published
+			}
 		}
 	}
 	return nil
+}
+
+func matchingWorkflowPublishAttempt(rec cp.Record, run batchfactoryv11.BookStageRun) bool {
+	if rec.CollectionID != run.CollectionID || run.ID == "" {
+		return false
+	}
+	if rec.Attempt > 0 && rec.Attempt != run.Attempt {
+		return false
+	}
+	if rec.RunID != "" {
+		return rec.RunID == run.ID
+	}
+	if rec.Attempt > 0 {
+		return true
+	}
+	return rec.RequestKey != "" && rec.RequestKey == run.RequestID
 }
 
 func freezeAutomationTextSettings(entry map[string]any, batch batchfactoryv11.SettingsPatch, book batchfactoryv11.Book) error {
