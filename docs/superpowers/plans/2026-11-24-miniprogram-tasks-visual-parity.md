@@ -141,3 +141,39 @@ Keep only P3 polish in `design-qa.md`; if the capture is blocked, mark the resul
 git add -- miniprogram/design-qa.md miniprogram/qa-tasks-implementation.png miniprogram/qa-tasks-reference.png miniprogram/qa-tasks-comparison.png
 git commit -m "test: verify miniprogram task center parity"
 ```
+
+### Task 4: 任务图标与真实类型对应
+
+**Files:**
+- Create: `miniprogram/src/pages/tasks/taskVisuals.ts`
+- Create: `miniprogram/src/pages/tasks/taskVisuals.test.ts`
+- Modify: `miniprogram/src/services/taskSummary.ts`
+- Modify: `miniprogram/src/services/taskSummary.test.ts`
+- Modify: `miniprogram/src/pages/tasks/index.tsx`
+- Modify: `miniprogram/src/pages/tasks/interaction.test.tsx`
+
+**Interfaces:**
+- Produces: `AggregatedTask.visualHint?: string`
+- Produces: `taskVisualAsset(entry: AggregatedTask): string`
+
+- [ ] **Step 1: Write failing tests**
+
+Assert that server `kind/type/stage/taskType` is preserved as `visualHint`, that explicit title keywords select the matching image, and that each source has a different fallback asset.
+
+- [ ] **Step 2: Run focused tests and confirm failure**
+
+Run: `npm test -- --run src/pages/tasks/taskVisuals.test.ts src/services/taskSummary.test.ts src/pages/tasks/interaction.test.tsx`
+
+Expected: FAIL because `visualHint` and `taskVisualAsset` do not exist and the page still reads one source image map.
+
+- [ ] **Step 3: Implement real visual mapping**
+
+Preserve the server visual hint without changing status normalization. Map image, writing, novel, batch, comic/storyboard, video/export and agent categories to the existing transparent 3D assets; fall back by source only when no explicit category exists.
+
+- [ ] **Step 4: Replace status and hero art**
+
+Use one task hero asset plus separate running, attention and completed status assets. Keep all task numbers and labels as live UI text.
+
+- [ ] **Step 5: Verify and commit**
+
+Run focused tests and `npm run build:weapp:sandbox`, then commit only the task-page files and new assets.
