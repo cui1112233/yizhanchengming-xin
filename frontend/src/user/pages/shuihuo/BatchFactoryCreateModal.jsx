@@ -14,6 +14,8 @@ import { duplicateGiantMaterialBookIndexes, parseGiantMaterialIds } from './batc
 import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
 import { comicEstimatedPageRange } from './batchFactoryContentRange.js';
+import TextProductionSettingsForm from './TextProductionSettingsForm';
+import { applyTextProductionChanges, normalizeTextProductionConfig } from './textProductionConfig';
 import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryComicPublishSettingsForm, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm, PRODUCTION_MODE_OPTIONS } from './BatchFactoryUnifiedSettingsModal.jsx';
 import { batchCreationSettings, batchFactoryProductionMode } from './batchFactoryProductionMode';
 import {
@@ -862,11 +864,11 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     destroyOnClose={false}
   >
     <Alert type="info" showIcon message="首次批量统一配置" description="配置会在创建批量时一次性保存为该批量默认值；后续仍可在工作台的“统一配置”继续修改，单书覆盖不会被清空。" />
-    <Tabs items={[
+    {batchMode === 'text' ? <TextProductionSettingsForm open={initialSettingsOpen} value={normalizeTextProductionConfig(initialBatchSettings)} profiles={initialBatchSettings.publishSettings?.websiteProfiles} onChange={changes=>setInitialBatchSettings(current=>applyTextProductionChanges(current,changes))}/> : <Tabs items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} sections={['models', 'audio']} active={initialSettingsOpen} /> },
       { key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm productionMode={initialBatchSettings.productionMode} value={initialBatchSettings.aiPromptConfig} onChange={aiPromptConfig => setInitialBatchSettings(current => ({ ...current, aiPromptConfig }))} /> },
       { key: 'publish', label: '发布统一', children: isComicProduction ? <BatchFactoryComicPublishSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} /> : <BatchFactoryPublishSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} active={initialSettingsOpen} /> }
-    ]} />
+    ]} />}
   </Modal>
   <Modal
     title={automationDialogMode === 'scheduled' ? '开始定时' : '立即执行自动生产'}

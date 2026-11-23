@@ -31,6 +31,9 @@ type textRequest struct {
 }
 
 func (x textRequest) base() string {
+	if x.scope.BookID == "" {
+		return "/api/batch-factory/v12/text-"
+	}
 	return "/api/batch-factory/v12/batches/" + url.PathEscape(x.scope.BatchID) + "/books/" + url.PathEscape(x.scope.BookID) + "/text-"
 }
 
@@ -62,12 +65,7 @@ func (a textAPI) scoped(fn textHandler) http.HandlerFunc {
 			writeJSON(w, 503, map[string]string{"error": "文本生产存储尚未配置"})
 			return
 		}
-		settings := batchfactoryv11.SettingsPatch{}
-		for _, p := range []batchfactoryv11.SettingsPatch{b.SettingsState.Patch, book.SettingsState.Patch} {
-			for k, v := range p {
-				settings[k] = v
-			}
-		}
+		settings := effectiveTextSettings(b.SettingsState.Patch, book.SettingsState.Patch)
 		if err = fn(w, r, textRequest{r.Context(), s, b, book, settings}); err != nil {
 			writeTextError(w, err)
 		}
@@ -96,6 +94,26 @@ func writeTextError(w http.ResponseWriter, err error) {
 }
 func registerBatchTextRoutes(m *http.ServeMux, opt RouterOptions, c *BatchAutomationCoordinator) {
 	a := textAPI{opt.Store, opt.TextRepository, opt.LocalArtifacts, c}
+	for pattern, fn := range map[string]textHandler{
+		"GET /api/batch-factory/v12/text-backgrounds":                        a.backgrounds,
+		"POST /api/batch-factory/v12/text-backgrounds":                       a.upload,
+		"GET /api/batch-factory/v12/text-backgrounds/{backgroundId}/content": a.content,
+	} {
+		m.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+			owner, ok := bridgeOwner(r)
+			if !ok {
+				writeJSON(w, 401, map[string]string{"error": "请登录"})
+				return
+			}
+			if a.repo == nil || a.files == nil {
+				writeJSON(w, 503, map[string]string{"error": "文本生产存储尚未配置"})
+				return
+			}
+			if err := fn(w, r, textRequest{Context: r.Context(), scope: txt.Scope{Owner: owner}}); err != nil {
+				writeTextError(w, err)
+			}
+		})
+	}
 	const base = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/text-"
 	for _, route := range []struct {
 		method, path string
@@ -165,6 +183,26 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 	if v := x.settings["textCover"]; len(v) > 0 {
 		if err := json.Unmarshal(v, &s.Cover); err != nil {
 			return s, txt.ErrInvalid
+		}
+		if s.Cover.Layout != nil {
+			var cover struct {
+				Layout map[string]json.RawMessage `json:"layout"`
+			}
+			if err := json.Unmarshal(v, &cover); err != nil {
+				return s, txt.ErrInvalid
+			}
+			for k, val := range cover.Layout {
+				raw[k] = val
+			}
+			encoded, err := json.Marshal(raw)
+			if err != nil {
+				return s, txt.ErrInvalid
+			}
+			var merged txt.LayoutConfig
+			if err = json.Unmarshal(encoded, &merged); err != nil {
+				return s, txt.ErrInvalid
+			}
+			s.Cover.Layout = &merged
 		}
 	}
 	if v := x.settings["highlightReuseEnabled"]; len(v) > 0 {

@@ -14,6 +14,8 @@ import { BatchFactoryComicPublishSettingsForm } from './BatchFactoryUnifiedSetti
 import { batchFactoryProductionModeVisibility } from './batchFactoryProductionMode';
 import { bookSensitiveModeUpdate, normalizeSensitiveMode, SENSITIVE_MODE_OPTIONS, sensitiveModeLabel } from './batchFactoryBookConfigRegions';
 import { IMAGE_ASPECT_RATIO_OPTIONS } from '../../../shared/imageAspectRatios';
+import TextProductionSettingsForm from './TextProductionSettingsForm';
+import { applyTextProductionChanges, textProductionBookOverride, updateTextProductionSettings } from './textProductionConfig';
 
 const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'assetImagesEnabled', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts', 'sensitiveMode', 'sensitiveAIModels', 'sensitiveAIOnFailure'];
 const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings', 'comicPublishSettings'];
@@ -338,7 +340,40 @@ function ConstraintLayers({ value, records, personalPrompts, loading, saving, ed
   </div>;
 }
 
-export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion = 'engine', onClose, onSaved, onOpenBookAssets }) {
+function TextBookSettingsModal({batch,book,onClose,onSaved}) {
+  const [changes,setChanges]=useState({});
+  const [saving,setSaving]=useState(false);
+  const [error,setError]=useState('');
+  // Pin both the initial book revision and its sparse settings for the edit.
+  const [initial]=useState(()=>({patch:book.settingsState?.patch || {},revision:book.revision}));
+  const inherited=batch.settingsState?.patch || {};
+  const draft=applyTextProductionChanges(initial.patch,changes);
+  const {value,explicitKeys}=textProductionBookOverride(inherited,draft);
+  const change=next=>setChanges(current=>({...current,...next}));
+  async function save(){
+    const update=updateTextProductionSettings(initial.patch,changes);
+    if (!Object.keys(update.patch).length && !update.restoreKeys.length) return onClose();
+    setSaving(true);
+    try{
+      await saveBookOverride(batch.id,book.id,{...update,expectedRevision:initial.revision});
+      await onSaved?.();
+      onClose();
+    }catch(e){setError(Number(e.status)===409?'本书配置已更新，请重新打开后核对。':e.message || '保存失败');}
+    finally{setSaving(false);}
+  }
+  return <Modal open title={`单书配置 · ${book.title || '文本'}`} width={980} onCancel={onClose} onOk={save} confirmLoading={saving} okText="保存单书配置" cancelText="取消" className="batch-factory-unified-settings-modal">
+    {error && <Alert type="error" showIcon message={error}/>}
+    <TextProductionSettingsForm scope="book" value={value} explicitKeys={explicitKeys} profiles={inherited.publishSettings?.websiteProfiles} onChange={change} onRestore={key=>change({[key]:undefined})}/>
+  </Modal>;
+}
+
+export function BatchFactoryBookSettingsModal(props) {
+  const mode=props.batch?.settingsState?.patch?.productionMode ?? props.book?.settingsState?.patch?.productionMode;
+  if (mode === 'text') return props.open && props.book ? <TextBookSettingsModal key={props.book.id} {...props}/> : null;
+  return <MediaBookSettingsModal {...props}/>;
+}
+
+function MediaBookSettingsModal({ open, batch, book, activeRegion = 'engine', onClose, onSaved, onOpenBookAssets }) {
   const batchPatch = batch?.settingsState?.patch || {};
   const bookPatch = book?.settingsState?.patch || {};
 	const frozenAutomationPreset = batchPatch?.automationPresetSnapshot && typeof batchPatch.automationPresetSnapshot === 'object'

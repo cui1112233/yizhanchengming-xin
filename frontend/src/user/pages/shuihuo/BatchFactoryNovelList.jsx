@@ -5507,7 +5507,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     } catch (error) { message.error(error?.message || '保存小说元数据失败'); } finally { setMetadataSaving(false); }
   }
   async function saveSettings(patch) {
-    const normalized = normalizeAudioSourceSettings({ ...patch, audioDurationSeconds: 0 });
+    const normalized = patch.productionMode === 'text' ? patch : normalizeAudioSourceSettings({ ...patch, audioDurationSeconds: 0 });
     try {
       await saveBatchSettings(batch.id, { patch: normalized, expectedRevision: Number(batch?.settingsState?.revision || 0) }, { suppressGlobalError: true });
     } catch (error) {
@@ -5533,6 +5533,11 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       }
     }
     try {
+      if (normalized.productionMode === 'text') {
+        await refreshBatch();
+        message.success('文本统一配置已保存，继承这些设置的书已更新。');
+        return true;
+      }
       try { await refreshBatch(); } catch (_) { /* 刷新失败不影响已落库的写透结果 */ }
       const savedResult = await getBatch(batch.id);
       const savedBatch = resultData(savedResult, 'batch');

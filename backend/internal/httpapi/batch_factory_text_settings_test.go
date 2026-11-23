@@ -1,0 +1,81 @@
+package httpapi
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"image"
+	"image/png"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	txt "qiantie/backend/internal/batchfactorytext"
+	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localartifact"
+)
+
+type settingLibrary struct {
+	txt.Repository
+	owners map[string]txt.LibraryBackground
+}
+
+func (lib settingLibrary) ListBackgrounds(_ context.Context, owner string) ([]txt.LibraryBackground, error) {
+	if bg, ok := lib.owners[owner]; ok {
+		return []txt.LibraryBackground{bg}, nil
+	}
+	return nil, nil
+}
+func (lib settingLibrary) GetBackground(_ context.Context, owner, id string) (txt.LibraryBackground, error) {
+	if bg, ok := lib.owners[owner]; ok && bg.ID == id {
+		return bg, nil
+	}
+	return txt.LibraryBackground{}, txt.ErrNotFound
+}
+func (lib settingLibrary) SaveBackground(_ context.Context, owner, name string, file txt.ArtifactFile) (txt.LibraryBackground, error) {
+	bg := txt.LibraryBackground{ID: owner + "-bg", Name: name, ArtifactFile: file}
+	lib.owners[owner] = bg
+	return bg, nil
+}
+
+func TestBatchFactoryTextPersonalSettingsLibrary(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	lib := settingLibrary{owners: make(map[string]txt.LibraryBackground)}
+	api := NewRouter(RouterOptions{Slice: 1, Store: batchfactoryv11.NewMemoryStore(), TextRepository: lib, LocalArtifacts: localartifact.NewStore(t.TempDir(), 32<<20), BridgeSecret: "secret", Now: func() time.Time { return now }})
+	path := "/api/batch-factory/v12/text-backgrounds"
+	var data bytes.Buffer
+	if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("POST", path+"?name=paper", bytes.NewReader(data.Bytes()))
+	SignBridgeRequest(req, "alice", false, now, "secret")
+	uploaded := httptest.NewRecorder()
+	api.ServeHTTP(uploaded, req)
+	if uploaded.Code != 201 {
+		t.Fatalf("upload %d %s", uploaded.Code, uploaded.Body.String())
+	}
+	for owner, expected := range map[string]int{"alice": 1, "bob": 0} {
+		rr := signedJSONRequest(t, api, now, owner, "GET", path, nil)
+		result := decodeBody[struct{ Items []textMediaView }](t, rr)
+		if rr.Code != 200 || len(result.Items) != expected {
+			t.Fatalf("owner %s response %d %s", owner, rr.Code, rr.Body.String())
+		}
+	}
+	owned := signedJSONRequest(t, api, now, "alice", "GET", path+"/alice-bg/content", nil)
+	if owned.Code != 200 || !bytes.Equal(data.Bytes(), owned.Body.Bytes()) {
+		t.Fatalf("owner could not read uploaded image: status %d", owned.Code)
+	}
+	rr := signedJSONRequest(t, api, now, "bob", "GET", path+"/alice-bg/content", nil)
+	if rr.Code != 404 {
+		t.Fatalf("foreign library response %d", rr.Code)
+	}
+}
+
+func TestBatchFactoryTextCoverSparseSettings(t *testing.T) {
+	batch := batchfactoryv11.SettingsPatch{"textFontSize": json.RawMessage("56"), "textPadding": json.RawMessage("0"), "textCover": json.RawMessage(`{"layout":{"fontId":"ma-shan-zheng"},"background":{"kind":"color","color":"#123456"}}`)}
+	book := batchfactoryv11.SettingsPatch{"textCover": json.RawMessage(`{"layout":{"align":"right"}}`)}
+	snap, err := bookTextSnapshot(textRequest{settings: effectiveTextSettings(batch, book)})
+	if err != nil || snap.Cover.Layout.FontID != "ma-shan-zheng" || snap.Cover.Layout.FontSize != 56 || snap.Cover.Layout.Align != "right" || snap.Cover.Layout.Padding != 0 || snap.Cover.Background.Color != "#123456" {
+		t.Fatalf("cover resolved to %+v, error %v", snap, err)
+	}
+}

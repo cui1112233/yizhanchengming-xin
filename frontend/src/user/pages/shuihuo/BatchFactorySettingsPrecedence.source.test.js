@@ -14,6 +14,14 @@ const engineDrawer = read('BatchFactoryEngineSettingsDrawer.jsx');
 const helpers = read('batchFactoryNovelListHelpers.js');
 const regions = read('batchFactoryBookConfigRegions.js');
 
+test('创建、统一、单书文本配置共用表单，统一保存不会写入显式的单书配置', () => {
+  for (const source of [read('BatchFactoryCreateModal.jsx'),unifiedModal,bookModal])
+    assert.match(source, /<TextProductionSettingsForm\b/);
+  assert.match(bookModal, /updateTextProductionSettings\(initial\.patch,changes\)/);
+  const save=novelList.match(/async function saveSettings\(patch\) \{[\s\S]*?\n  \}/)[0];
+  assert.match(save,/if \(normalized\.productionMode === 'text'\) \{[\s\S]*?return true;[\s\S]*?syncUnifiedSettingsToBooks/);
+});
+
 test('runtime merge chain keeps the book patch above the batch unified configuration', () => {
   const fn = helpers.match(/export function effectiveBookSettings\(batch, book\) \{[\s\S]*?\n\}/)?.[0] || '';
   assert.match(fn, /\.\.\.batchPatch,\s*\.\.\.bookPatch/);
