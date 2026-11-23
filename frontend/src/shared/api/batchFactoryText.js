@@ -7,7 +7,7 @@ const page = (batch,book,pageId) => base(batch,book)+'pages/'+id(pageId);
 const upload = (path,file) => apiRequest(path,{method:'POST',body:file,headers:{'Content-Type': file.type || 'application/octet-stream'}});
 const revision = value => '?expectedRevision='+id(value);
 export const prepareTextBook = (b,k,p) => post(base(b,k)+'prepare',p);
-export const listTextPages = (b,k) => apiRequest(base(b,k)+'pages');
+export const listTextPages = (b,k,options) => apiRequest(base(b,k)+'pages',options);
 export const patchTextPage = (b,k,i,p) => apiRequest(page(b,k,i),{method:'PATCH',body:JSON.stringify(p)});
 export const splitTextPage = (b,k,i,p) => post(page(b,k,i)+'/split',p);
 export const mergeTextPage = (b,k,i,p) => post(page(b,k,i)+'/merge',p);
@@ -25,7 +25,7 @@ export const listPersonalTextBackgrounds = () => apiRequest(personalBackgrounds)
 export const uploadPersonalTextBackground = file => upload(personalBackgrounds+'?name='+id(file.name || '自定义背景'),file);
 export const uploadTextBackground = (b,k,file,name) => upload(base(b,k)+'backgrounds?name='+id(name || file.name || '自定义背景'),file);
 export const createTextCollection = (b,k,p) => post(base(b,k)+'collections',p);
-export const listTextCollections = (b,k) => apiRequest(base(b,k)+'collections');
-export const getTextCollection = (b,k,i) => apiRequest(base(b,k)+'collections/'+id(i));
+export const listTextCollections = (b,k,options) => apiRequest(base(b,k)+'collections',options);
+export const getTextCollection = (b,k,i,options) => apiRequest(base(b,k)+'collections/'+id(i),options);
 export const getTextArtifactBlob = (b,k,i) => apiRequest(base(b,k)+'artifacts/'+id(i)+'/content',{responseType:'blob'});
 export const getTextBackgroundBlob = (b,k,i) => apiRequest(base(b,k)+'backgrounds/'+id(i)+'/content',{responseType:'blob'});

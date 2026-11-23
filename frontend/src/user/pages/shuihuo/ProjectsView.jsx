@@ -9,6 +9,7 @@ import { BatchFactoryCreateModal } from './BatchFactoryCreateModal';
 import { batchFactoryFallbackCoverFromProductionStatus, createCoverHydrationScheduler, isBatchFactoryV11Project } from './batchFactoryProjects';
 import { getProjectRetention, indexRetention } from '../../../shared/api/projectRetention.js';
 import { WorkspaceArchivePanel } from '../../components/WorkspaceArchivePanel';
+import AuthenticatedTextPageImage from './AuthenticatedTextPageImage.jsx';
 
 const scheduleLegacyProjectCoverFallback = createCoverHydrationScheduler();
 
@@ -98,6 +99,7 @@ function AuthenticatedProjectCover({ src, alt, batchId }) {
 export function ProjectsView({ projects, loadError, health, onCreate, onImported, onCreateBatch, onOpen, onDelete, onRefresh, openCreateOnLoad = false }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [modeFilter, setModeFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('desc');
   const [viewMode, setViewMode] = useState('grid');
   const [name, setName] = useState('');
@@ -182,12 +184,13 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
     return [...(projects || [])]
       .filter(project => !retention[retentionKey(project)]?.archivedAt)
       .filter(project => !keyword || project.name.toLocaleLowerCase().includes(keyword))
+      .filter(project => modeFilter === 'all' || (isBatchFactoryV11Project(project) && project.factoryMode === modeFilter))
       .sort((left, right) => {
         const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime();
         const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime();
         return sortOrder === 'desc' ? rightTime - leftTime : leftTime - rightTime;
       });
-  }, [projects, search, sortOrder, retention]);
+  }, [projects, search, modeFilter, sortOrder, retention]);
 
   function projectCount(project) {
     if (Number.isFinite(project.segmentCount)) return `${project.segmentCount} 个分镜`;
@@ -195,12 +198,13 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
   }
 
   function batchKindLabel(project) {
-    return project?.factoryMode === 'comic' ? '漫画' : '视频';
+    return {comic:'漫画',text:'文本',video:'视频'}[project?.factoryMode] || '视频';
   }
 
   function projectCover(project) {
     const media = project?.coverMedia;
     if (!media?.url) return null;
+    if (project.factoryMode === 'text') return <AuthenticatedTextPageImage passive contentUrl={media.url} alt={`${project.name} 文本封面`} className="shuihuo-project-card-cover-media"/>;
     return media.kind === 'video'
       ? <ProductionMediaBoundary showDownload={false}><video className="shuihuo-project-card-cover-media" src={media.url} muted playsInline preload="auto" onLoadedMetadata={event => { event.currentTarget.currentTime = 0.001; }} aria-label={`${project.name} 封面视频`} /></ProductionMediaBoundary>
       : <AuthenticatedProjectCover src={media.url} alt={`${project.name} 封面`} batchId={project.batchId} />;
@@ -215,7 +219,9 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
     {loadError ? <Alert className="shuihuo-project-load-error" type="warning" showIcon message="作品读取暂时失败" description={loadError} action={<Button size="small" onClick={() => onRefresh?.()}>重试</Button>} /> : null}
     <div className="shuihuo-project-library-toolbar">
       <Input className="shuihuo-project-search" prefix={<SearchOutlined />} value={search} onChange={event => setSearch(event.target.value)} placeholder="搜索作品..." allowClear />
-      <span className="shuihuo-project-filter-label">全部作品</span>
+      <Select aria-label="按生产模式筛选" value={modeFilter} onChange={setModeFilter} options={[
+        {value:'all',label:'全部作品'},{value:'video',label:'视频'},{value:'comic',label:'漫画'},{value:'text',label:'文本'}
+      ]}/>
       <button className="shuihuo-project-filter" type="button" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}><ClockCircleOutlined /><span>{sortOrder === 'desc' ? '按时间降序' : '按时间升序'}</span></button>
       <Button className="shuihuo-project-view-toggle" type="text" icon={viewMode === 'grid' ? <UnorderedListOutlined /> : <AppstoreOutlined />} onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} aria-label={viewMode === 'grid' ? '切换为列表视图' : '切换为网格视图'} title={viewMode === 'grid' ? '切换为列表视图' : '切换为网格视图'} />
       <Button className="shuihuo-project-archive-entry" icon={<InboxOutlined />} onClick={() => setArchiveOpen(true)}>归档库</Button>

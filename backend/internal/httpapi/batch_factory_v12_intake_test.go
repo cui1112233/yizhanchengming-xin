@@ -180,6 +180,17 @@ func TestV12BatchSummaryFallsBackToComicImageCoverAndMode(t *testing.T) {
 	}
 }
 
+func TestBatchLibraryShowsTextModeWithLegacyComicBook(t *testing.T) {
+	batch := batchfactoryv11.Batch{Books: []batchfactoryv11.Book{{Mode: "comic"}}}
+	batch.SettingsState.Patch = batchfactoryv11.SettingsPatch{"productionMode": json.RawMessage(`"text"`)}
+	if got := batchProductionMode(batch); got != "text" {
+		t.Fatalf("batch mode = %s", got)
+	}
+	if got := batchProductionMode(batchfactoryv11.Batch{ProductionMode: "text"}); got != "text" {
+		t.Fatalf("index mode = %s", got)
+	}
+}
+
 func TestV12BatchSummaryUsesLightweightCoverIndex(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := &v12SummaryIndexStore{MemoryStore: batchfactoryv11.NewMemoryStore()}

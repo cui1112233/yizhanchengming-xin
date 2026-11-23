@@ -16,7 +16,7 @@ function isTextMediaURL(url) {
   }
 }
 
-function ImageRequest({ contentUrl, alt, className }) {
+function ImageRequest({ contentUrl, alt, className, passive }) {
   const [image, setImage] = useState('');
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -40,6 +40,7 @@ function ImageRequest({ contentUrl, alt, className }) {
       if (ownedUrl) URL.revokeObjectURL(ownedUrl);
     };
   }, [contentUrl, attempt]);
+  if (failed && passive) return <span>图片读取失败</span>;
   if (failed) return <button type="button" onClick={() => {
     setImage('');
     setFailed(false);
@@ -51,8 +52,8 @@ function ImageRequest({ contentUrl, alt, className }) {
 }
 
 // Only send the session token to the authenticated text-media content routes.
-export default function AuthenticatedTextPageImage({ contentUrl, alt = '文字页', className }) {
+export default function AuthenticatedTextPageImage({ contentUrl, alt = '文字页', className, passive = false }) {
   if (!contentUrl) return <span>暂无图片</span>;
   if (!isTextMediaURL(contentUrl)) return <span>图片地址无效</span>;
-  return <ImageRequest key={contentUrl} contentUrl={contentUrl} alt={alt} className={className} />;
+  return <ImageRequest key={contentUrl} contentUrl={contentUrl} alt={alt} className={className} passive={passive} />;
 }

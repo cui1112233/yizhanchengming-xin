@@ -1,3 +1,5 @@
+import { batchFactoryProductionMode } from './batchFactoryProductionMode.js';
+
 const BATCH_FACTORY_V11_SOURCE = 'batch_factory_v11';
 
 function text(value) {
@@ -29,7 +31,7 @@ export function batchFactoryProjectsFrom(batches) {
       batchId,
       name: text(batch.title) || '未命名批量',
       productionMode: 'batch_factory',
-      factoryMode: text(batch.productionMode) === 'comic' ? 'comic' : 'video',
+      factoryMode: batchFactoryProductionMode(batch.productionMode || batch.settingsState?.patch?.productionMode),
       source: BATCH_FACTORY_V11_SOURCE,
       createdAt: batch.createdAt,
       updatedAt: batch.updatedAt,

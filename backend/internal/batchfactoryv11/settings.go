@@ -194,6 +194,25 @@ func EffectiveProductionMode(batchPatch, bookPatch SettingsPatch) string {
 	return normalizeProductionMode(ResolveSettings(batchPatch, bookPatch))
 }
 
+// SummaryProductionMode returns the same mode for a library card as the batch workbench.
+func SummaryProductionMode(batch Batch) string {
+	switch batch.ProductionMode {
+	case "video", "comic", "text":
+		return batch.ProductionMode
+	}
+	for _, book := range batch.Books {
+		patch := book.SettingsState.Patch
+		if rawString(patch, "productionMode", "") == "" && (book.Mode == "comic" || book.Mode == "text") {
+			value, _ := json.Marshal(book.Mode)
+			patch = SettingsPatch{"productionMode": value}
+		}
+		if mode := EffectiveProductionMode(batch.SettingsState.Patch, patch); mode != "video" {
+			return mode
+		}
+	}
+	return EffectiveProductionMode(batch.SettingsState.Patch, nil)
+}
+
 // AssetImagesEnabled reports whether automation should generate asset
 // reference images. Defaults to false: batches and books that never wrote the
 // key keep the assets stage off without blocking the storyboard, video or comic

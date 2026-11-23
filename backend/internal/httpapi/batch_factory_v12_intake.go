@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -145,28 +144,6 @@ func filterShuihuoProjectBatches(ctx context.Context, store batchfactoryv11.Stor
 	return filtered
 }
 
-// batchProductionMode 让项目卡片显示“漫画/视频”。摘要索引会带上推断结果；
-// 走内存库或详情列表时退回读取批次与书籍设置里的 productionMode。
 func batchProductionMode(batch batchfactoryv11.Batch) string {
-	if mode := strings.ToLower(strings.TrimSpace(batch.ProductionMode)); mode == "comic" || mode == "video" {
-		return mode
-	}
-	patches := []batchfactoryv11.SettingsPatch{batch.SettingsState.Patch}
-	for _, book := range batch.Books {
-		patches = append(patches, book.SettingsState.Patch)
-		if strings.EqualFold(strings.TrimSpace(book.Mode), "comic") {
-			return "comic"
-		}
-	}
-	for _, patch := range patches {
-		raw, ok := patch["productionMode"]
-		if !ok {
-			continue
-		}
-		var mode string
-		if json.Unmarshal(raw, &mode) == nil && strings.EqualFold(strings.TrimSpace(mode), "comic") {
-			return "comic"
-		}
-	}
-	return "video"
+	return batchfactoryv11.SummaryProductionMode(batch)
 }

@@ -22,11 +22,11 @@ func TestListBatchSummaryIndexReadsOnlyProjectCardFields(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "revision", "created_at", "updated_at"}).
 			AddRow("batch-2", "第二批", int64(8), now, now).
 			AddRow("batch-1", "第一批", int64(3), now, now))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.batch_id,b.ordinal,b.id`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,''),COALESCE(d.cover_artifact_id,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id LEFT JOIN batch_factory_v12_text_documents d ON d.owner_username=b.owner_username AND d.batch_id=b.batch_id AND d.book_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.batch_id,b.ordinal,b.id`)).
 		WithArgs("alice").
-		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "id", "book_id", "title", "platform"}).
-			AddRow("batch-1", "book-1", "558154", "后来情深情亦浅", "七猫").
-			AddRow("batch-2", "book-2", "1201790", "第二通电话", "七猫"))
+		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "id", "book_id", "title", "platform", "cover_artifact_id"}).
+			AddRow("batch-1", "book-1", "558154", "后来情深情亦浅", "七猫", "").
+			AddRow("batch-2", "book-2", "1201790", "第二通电话", "七猫", "text-cover"))
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT j.batch_id,j.output_url FROM batch_factory_v12_merge_jobs j LEFT JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' AND (b.id IS NULL OR b.hidden_at IS NULL) ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`)).
 		WithArgs("alice").
 		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "output_url"}).
@@ -45,9 +45,11 @@ func TestListBatchSummaryIndexReadsOnlyProjectCardFields(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT a.batch_id,a.book_id,a.id,i.id FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id AND a.owner_username=i.owner_username LEFT JOIN batch_factory_v12_books b ON b.id=a.book_id AND b.owner_username=a.owner_username WHERE i.owner_username=? AND i.is_primary=TRUE ORDER BY a.batch_id,COALESCE(b.ordinal,2147483647),i.created_at DESC,i.id DESC`)).
 		WithArgs("alice").
 		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "book_id", "asset_id", "image_id"}))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT batch_id,patch_json FROM batch_factory_v12_settings_patches WHERE owner_username=? AND scope_type IN ('batch','book')`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT batch_id,scope_type,scope_id,patch_json FROM batch_factory_v12_settings_patches WHERE owner_username=? AND scope_type IN ('batch','book')`)).
 		WithArgs("alice").
-		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "patch_json"}))
+		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "scope_type", "scope_id", "patch_json"}).
+			AddRow("batch-2", "book", "book-2", `{"productionMode":"comic"}`).
+			AddRow("batch-2", "batch", "batch-2", `{"productionMode":"text"}`))
 
 	got, err := NewMySQLStore(db).ListBatchSummaryIndex(context.Background(), "alice")
 	if err != nil {
@@ -62,7 +64,10 @@ func TestListBatchSummaryIndexReadsOnlyProjectCardFields(t *testing.T) {
 	if got[1].ProjectCoverArtifactID != "merge_new" || got[0].ProjectCoverArtifactID != "" {
 		t.Fatalf("unexpected project cover artifacts: %#v", got)
 	}
-	if got[1].ProjectCoverMediaURL != "https://media.example/merge-fallback.mp4" || got[0].ProjectCoverMediaURL != "https://media.example/first-shot.mp4" {
+	if got[0].ProductionMode != "text" || got[0].ProjectCoverImageURL != "/api/batch-factory/v12/batches/batch-2/books/book-2/text-artifacts/text-cover/content" {
+		t.Fatalf("unexpected text project %#v", got[0])
+	}
+	if got[1].ProjectCoverMediaURL != "https://media.example/merge-fallback.mp4" || got[0].ProjectCoverMediaURL != "" {
 		t.Fatalf("unexpected project cover media: %#v", got)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

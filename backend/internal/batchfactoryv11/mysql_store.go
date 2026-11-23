@@ -596,18 +596,23 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	}
 	rows.Close()
 
-	bookRows, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.batch_id,b.ordinal,b.id`, owner)
+	textCovers := map[string]string{}
+	bookRows, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,''),COALESCE(d.cover_artifact_id,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id LEFT JOIN batch_factory_v12_text_documents d ON d.owner_username=b.owner_username AND d.batch_id=b.batch_id AND d.book_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.batch_id,b.ordinal,b.id`, owner)
 	if err != nil {
 		return nil, err
 	}
 	defer bookRows.Close()
 	for bookRows.Next() {
 		var book Book
-		if err := bookRows.Scan(&book.BatchID, &book.ID, &book.BookID, &book.Title, &book.Platform); err != nil {
+		var coverID string
+		if err := bookRows.Scan(&book.BatchID, &book.ID, &book.BookID, &book.Title, &book.Platform, &coverID); err != nil {
 			return nil, err
 		}
 		if index, ok := batchIndexByID[book.BatchID]; ok {
 			batches[index].Books = append(batches[index].Books, book)
+			if coverID != "" && textCovers[book.BatchID] == "" {
+				textCovers[book.BatchID] = "/api/batch-factory/v12/batches/" + url.PathEscape(book.BatchID) + "/books/" + url.PathEscape(book.ID) + "/text-artifacts/" + url.PathEscape(coverID) + "/content"
+			}
 		}
 	}
 	if err := bookRows.Err(); err != nil {
@@ -724,23 +729,27 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	}
 	assetRows.Close()
 
-	// 项目卡片上的“漫画/视频”标记由批次或书籍设置里的 productionMode 决定。
-	modeRows, err := s.db.QueryContext(ctx, `SELECT batch_id,patch_json FROM batch_factory_v12_settings_patches WHERE owner_username=? AND scope_type IN ('batch','book')`, owner)
+	// 项目卡片和书籍工作台都按同一条设置继承规则判断生产模式。
+	modeRows, err := s.db.QueryContext(ctx, `SELECT batch_id,scope_type,scope_id,patch_json FROM batch_factory_v12_settings_patches WHERE owner_username=? AND scope_type IN ('batch','book')`, owner)
 	if err != nil {
 		return nil, err
 	}
-	seenComicMode := map[string]bool{}
+	batchModes := map[string]SettingsPatch{}
+	bookModes := map[string]SettingsPatch{}
 	for modeRows.Next() {
-		var batchID, patchJSON string
-		if err := modeRows.Scan(&batchID, &patchJSON); err != nil {
+		var batchID, scope, scopeID, patchJSON string
+		if err := modeRows.Scan(&batchID, &scope, &scopeID, &patchJSON); err != nil {
 			modeRows.Close()
 			return nil, err
 		}
-		var patch struct {
-			ProductionMode string `json:"productionMode"`
+		var patch SettingsPatch
+		if json.Unmarshal([]byte(patchJSON), &patch) != nil {
+			continue
 		}
-		if json.Unmarshal([]byte(patchJSON), &patch) == nil && strings.EqualFold(patch.ProductionMode, "comic") {
-			seenComicMode[batchID] = true
+		if scope == "batch" {
+			batchModes[batchID] = patch
+		} else {
+			bookModes[scopeID] = patch
 		}
 	}
 	if err := modeRows.Err(); err != nil {
@@ -748,14 +757,17 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 		return nil, err
 	}
 	modeRows.Close()
-	for batchID := range seenComicMode {
-		if index, ok := batchIndexByID[batchID]; ok {
-			batches[index].ProductionMode = "comic"
+	for i := range batches {
+		batch := &batches[i]
+		view := Batch{SettingsState: SettingsState{Patch: batchModes[batch.ID]}, Books: make([]Book, len(batch.Books))}
+		for j, book := range batch.Books {
+			view.Books[j].SettingsState.Patch = bookModes[book.ID]
 		}
-	}
-	for index := range batches {
-		if batches[index].ProductionMode == "" {
-			batches[index].ProductionMode = "video"
+		batch.ProductionMode = SummaryProductionMode(view)
+		if batch.ProductionMode == "text" {
+			batch.ProjectCoverImageURL = textCovers[batch.ID]
+			batch.ProjectCoverMediaURL = ""
+			batch.ProjectCoverArtifactID = ""
 		}
 	}
 	return batches, nil
