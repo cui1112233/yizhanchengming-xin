@@ -52,11 +52,45 @@ func TestV12H3KernelSchemaPersistsTimelineCompilationAndProductionTrace(t *testi
 
 func TestV12MigrationsRegisterH3KernelAfterUpgradeAudit(t *testing.T) {
 	migrations := V12Migrations()
-	if len(migrations) != 12 {
-		t.Fatalf("V12 migration count=%d, want 12: %+v", len(migrations), migrations)
+	if len(migrations) != 13 {
+		t.Fatalf("V12 migration count=%d, want 13: %+v", len(migrations), migrations)
 	}
 	if migrations[0].Version != 1200101 || migrations[1].Version != 1200102 || migrations[2].Version != 1200103 || migrations[3].Version != 1200104 || migrations[4].Version != 1200105 || migrations[5].Version != 1200106 || migrations[6].Version != 1200107 || migrations[7].Version != 1200108 || migrations[8].Version != 1200109 || migrations[9].Version != 1200110 || migrations[10].Version != 1200111 || migrations[11].Version != 1200112 {
 		t.Fatalf("V12 migration order=%+v", migrations)
+	}
+}
+
+func TestV12TextProductionMigrationCreatesDurablePageAndCollectionTables(t *testing.T) {
+	migrations := V12Migrations()
+	m := migrations[len(migrations)-1]
+	if m.Version != 1200113 || m.CallbackChecksum != "batch-factory-v12-text-production-v1" {
+		t.Fatalf("missing V12 text production migration: last version %d, marker %q", m.Version, m.CallbackChecksum)
+	}
+	tables := map[string][]string{
+		"documents":        {"original_text mediumtext", "active_version_id", "pagination_version", "config_snapshot_json", "cover_artifact_id", "cover_locked", "(owner_username, book_id)"},
+		"versions":         {"production_text mediumtext", "sensitive_mode", "change_trace_json", "content_digest"},
+		"pages":            {"version_id", "ordinal_no", "start_offset", "end_offset", "page_text", "content_digest", "layout_json", "background_json", "source_kind", "locked", "render_version", "status", "last_error", "revision", "created_at", "updated_at", "unique key uq_bfv12_text_page_order (owner_username, book_id, pagination_version, ordinal_no)", "(owner_username, book_id, status)"},
+		"page_artifacts":   {"page_id", "render_version", "storage_ref", "media_type", "sha256"},
+		"backgrounds":      {"owner_username", "storage_ref", "media_type"},
+		"collections":      {"book_id", "pagination_version", "cover_artifact_id", "status"},
+		"collection_items": {"primary key (collection_id, ordinal_no)", "artifact_id", "storage_ref"},
+	}
+	for _, statement := range m.SQL {
+		sql := strings.ToLower(strings.Join(strings.Fields(statement), " "))
+		name, _, ok := strings.Cut(strings.TrimPrefix(sql, "create table if not exists batch_factory_v12_text_"), " (")
+		required, exists := tables[name]
+		if !ok || !exists {
+			t.Fatalf("unexpected text migration statement: %s", sql)
+		}
+		for _, field := range required {
+			if !strings.Contains(sql, field) {
+				t.Errorf("table %s missing %q", name, field)
+			}
+		}
+		delete(tables, name)
+	}
+	if len(tables) != 0 {
+		t.Fatalf("missing text tables: %v", tables)
 	}
 }
 

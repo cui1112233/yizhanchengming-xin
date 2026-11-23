@@ -210,6 +210,126 @@ func V12ImageGenerationCacheStatements() []string {
 	}
 }
 
+// V12TextProductionStatements keeps frozen collections independent of the
+// mutable page list. Cover and body images share the same artifact metadata.
+func V12TextProductionStatements() []string {
+	return []string{
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_text_documents (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  batch_id VARCHAR(64) NOT NULL,
+  book_id VARCHAR(64) NOT NULL,
+  original_text MEDIUMTEXT NOT NULL,
+  active_version_id VARCHAR(64) NULL,
+  pagination_version BIGINT NOT NULL DEFAULT 0,
+  config_snapshot_json JSON NULL,
+  cover_artifact_id VARCHAR(64) NULL,
+  cover_locked BOOLEAN NOT NULL DEFAULT FALSE,
+  revision BIGINT NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_bfv12_text_document_book (owner_username, book_id),
+  KEY idx_bfv12_text_document_batch (owner_username, batch_id),
+  FOREIGN KEY (book_id) REFERENCES batch_factory_v12_books(id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_text_versions (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  book_id VARCHAR(64) NOT NULL,
+  document_id VARCHAR(64) NOT NULL,
+  production_text MEDIUMTEXT NOT NULL,
+  sensitive_mode VARCHAR(16) NOT NULL,
+  change_trace_json JSON NULL,
+  content_digest CHAR(64) NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  KEY idx_bfv12_text_version_book (owner_username, book_id, created_at),
+  FOREIGN KEY (document_id) REFERENCES batch_factory_v12_text_documents(id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_text_pages (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  book_id VARCHAR(64) NOT NULL,
+  version_id VARCHAR(64) NOT NULL,
+  pagination_version BIGINT NOT NULL,
+  ordinal_no INT NOT NULL,
+  start_offset INT UNSIGNED NOT NULL,
+  end_offset INT UNSIGNED NOT NULL,
+  page_text MEDIUMTEXT NOT NULL,
+  content_digest CHAR(64) NOT NULL,
+  layout_json JSON NULL,
+  background_json JSON NULL,
+  source_kind VARCHAR(24) NOT NULL DEFAULT 'system',
+  locked BOOLEAN NOT NULL DEFAULT FALSE,
+  render_version BIGINT NOT NULL DEFAULT 0,
+  active_artifact_id VARCHAR(64) NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'pending',
+  failed_stage VARCHAR(32) NULL,
+  error_type VARCHAR(64) NULL,
+  last_error TEXT NULL,
+  revision BIGINT NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_bfv12_text_page_order (owner_username, book_id, pagination_version, ordinal_no),
+  KEY idx_bfv12_text_page_status (owner_username, book_id, status),
+  FOREIGN KEY (version_id) REFERENCES batch_factory_v12_text_versions(id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_text_page_artifacts (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  book_id VARCHAR(64) NOT NULL,
+  page_id VARCHAR(64) NULL,
+  artifact_kind VARCHAR(24) NOT NULL,
+  source_kind VARCHAR(24) NOT NULL,
+  render_version BIGINT NOT NULL,
+  storage_ref VARCHAR(512) NOT NULL,
+  media_type VARCHAR(96) NOT NULL,
+  byte_size BIGINT UNSIGNED NOT NULL,
+  sha256 CHAR(64) NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  KEY idx_bfv12_text_artifact_page (owner_username, book_id, page_id, render_version),
+  FOREIGN KEY (book_id) REFERENCES batch_factory_v12_books(id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_text_backgrounds (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  name VARCHAR(191) NOT NULL,
+  storage_ref VARCHAR(512) NOT NULL,
+  media_type VARCHAR(96) NOT NULL,
+  byte_size BIGINT UNSIGNED NOT NULL,
+  sha256 CHAR(64) NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  KEY idx_bfv12_text_background_owner (owner_username, created_at)
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_text_collections (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  batch_id VARCHAR(64) NOT NULL,
+  book_id VARCHAR(64) NOT NULL,
+  version_id VARCHAR(64) NOT NULL,
+  pagination_version BIGINT NOT NULL,
+  cover_artifact_id VARCHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  storage_ref VARCHAR(512) NULL,
+  config_snapshot_json JSON NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  KEY idx_bfv12_text_collection_book (owner_username, book_id, created_at),
+  FOREIGN KEY (version_id) REFERENCES batch_factory_v12_text_versions(id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_text_collection_items (
+  collection_id VARCHAR(64) NOT NULL,
+  ordinal_no INT NOT NULL,
+  page_id VARCHAR(64) NOT NULL,
+  artifact_id VARCHAR(64) NOT NULL,
+  storage_ref VARCHAR(512) NOT NULL,
+  media_type VARCHAR(96) NOT NULL,
+  sha256 CHAR(64) NOT NULL,
+  PRIMARY KEY (collection_id, ordinal_no),
+  FOREIGN KEY (collection_id) REFERENCES batch_factory_v12_text_collections(id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+	}
+}
+
 func V12Migrations() []Migration {
 	// 1200001-1200003 belong to Novel Fetch Workshop in the shared migration
 	// ledger. V12 must have its own unused number or a Batch Factory startup
@@ -227,6 +347,7 @@ func V12Migrations() []Migration {
 		{Version: 1200110, SQL: V12ComicPageLastErrorStatements(), CallbackChecksum: "batch-factory-v12-comic-page-last-error-v1"},
 		{Version: 1200111, SQL: V12BookRetentionStatements(), CallbackChecksum: "batch-factory-v12-book-retention-v1"},
 		{Version: 1200112, SQL: V12BatchRetentionStatements(), CallbackChecksum: "batch-factory-v12-batch-retention-v1"},
+		{Version: 1200113, SQL: V12TextProductionStatements(), CallbackChecksum: "batch-factory-v12-text-production-v1"},
 	}
 }
 
