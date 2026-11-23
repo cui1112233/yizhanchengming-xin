@@ -140,3 +140,29 @@ final result: passed
 - P3：空状态比参考稿的真实运行态留白更多；这是数据状态差异，待用户产生任务后会自动替换为项目进度和本次执行卡，不用假数据补满。
 
 final result: passed
+
+---
+
+# 任务中心新版 Design QA（2026-11-24）
+
+- source visual truth: `C:/Users/Administrator/.codex/generated_images/01a1f9e5-bbb4-7691-9ec3-99b4847f95ea/exec-097c823d-b7b8-4a06-8d08-5363bcbaf0b1.png`
+- implementation: `src/pages/tasks/index.tsx` + `src/pages/tasks/tasks-studio.scss`
+- viewport target: 320px 至 430px 手机宽度
+
+## Source and build checks
+
+- 使用项目官方折线 Logo，并在任务页显示为青绿蓝色。
+- 双龙素材已移除，头部改为项目夕阳背景和任务相关 3D 素材。
+- 三个统计项、四个筛选项、任务列表和底部四栏导航保持真实数据与原有点击逻辑。
+- 标题 29px、任务标题 14px、辅助文字 10px 至 12px；任务行 76px、统计卡 72px、筛选条 42px。
+- 15 项任务页相关测试通过，小程序开发构建成功。
+
+## Visual check
+
+- 微信开发者工具窗口存在，工程名称为“一战晟铭”。
+- 桌面截图通道连续两次超时，未取得本轮构建后的模拟器截图，不能用旧截图代替本轮视觉证明。
+
+final result: blocked
+
+阻塞项：重新取得微信开发者工具模拟器截图后，再与目标图按同一手机宽度比较 Logo、头图高度、首屏任务数量和底部安全区。
+

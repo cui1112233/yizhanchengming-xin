@@ -7,7 +7,9 @@ import { deriveTaskPageState } from "../../services/taskPageState";
 import { filterTaskEntries, loadTaskSummary, taskCounts, taskDestination, type AggregatedTask, type TaskFilter, type TaskSummary } from "../../services/taskSummary";
 import BrandHeader from "../../components/BrandHeader";
 import AppIcon from "../../components/AppIcon";
-import dragonPair from "../../assets/functions/dragon-pair-mobile.webp";
+import taskRunningArt from "../../assets/functions/shuihuo-production-3d.webp";
+import taskAttentionArt from "../../assets/functions/batch-review-3d.webp";
+import taskCompletedArt from "../../assets/functions/cm-canvas-3d.webp";
 import { FUNCTION_VISUALS } from "../functions/functionVisuals";
 import { ThemedPage } from "../../theme";
 import "./tasks-studio.scss";
@@ -65,11 +67,13 @@ export default function TasksPage() {
   const openTask = (entry: AggregatedTask) => { if (entry.id) void Taro.navigateTo({ url: taskDestination(entry) }); };
 
   return <ThemedPage className="mp-page mp-primary-page mp-tasks-page task-studio-page">
-    <BrandHeader title="任务" primary />
-    <View className="task-studio-hero">
-      <View><Text className="task-studio-kicker">一战晟铭 · AI 创意套件</Text><Text className="task-studio-title">任务中心</Text><Text className="task-studio-subtitle">追踪全部创作与生产记录</Text></View>
-      <View className="task-studio-mascot-shell"><Image className="task-studio-hero-mascot" src={dragonPair} mode="scaleToFill" /></View>
-      <Button className="task-studio-refresh" aria-label="刷新任务" loading={refreshing} disabled={loading} onClick={load}><AppIcon name="refresh-ccw" size={18} /></Button>
+    <View className="task-studio-header-scene">
+      <BrandHeader title="任务" primary />
+      <View className="task-studio-hero">
+        <View className="task-studio-hero-copy"><Text className="task-studio-title">任务中心</Text><Text className="task-studio-subtitle">追踪全部创作与生产记录</Text><Text className="task-studio-title-stroke" /></View>
+        <Image className="task-studio-hero-art" src={taskRunningArt} mode="aspectFit" />
+        <Button className="task-studio-refresh" aria-label="刷新任务" loading={refreshing} disabled={loading} onClick={load}><AppIcon name="refresh-ccw" size={16} /></Button>
+      </View>
     </View>
 
     {pageState.kind === "configuration-error" ? <View className="task-studio-state liquid-glass--secondary"><View><Text className="task-studio-state-title">服务端未配置</Text><Text>{pageState.message}</Text></View></View> : null}
@@ -78,9 +82,9 @@ export default function TasksPage() {
 
     {summary && pageState.kind !== "configuration-error" && pageState.kind !== "all-error" ? <View className="task-studio-body">
       <View className="task-studio-counts liquid-glass--secondary" data-glass-role="secondary">
-        <View className="task-studio-count-item is-running"><View className="task-studio-count-icon"><AppIcon name="clapperboard" size={22} /></View><View><Text className="task-studio-count-value">{counts.running}</Text><Text>进行中</Text></View></View><View className="task-studio-count-divider" />
-        <View className="task-studio-count-item is-attention"><View className="task-studio-count-icon"><AppIcon name="timer" size={22} /></View><View><Text className="task-studio-count-value">{counts.attention}</Text><Text>待确认</Text></View></View><View className="task-studio-count-divider" />
-        <View className="task-studio-count-item is-completed"><View className="task-studio-count-icon"><AppIcon name="shield-check" size={22} /></View><View><Text className="task-studio-count-value">{counts.completed}</Text><Text>已完成</Text></View></View>
+        <View className="task-studio-count-item is-running"><Image className="task-studio-count-art" src={taskRunningArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.running}</Text><Text>进行中</Text></View></View><View className="task-studio-count-divider" />
+        <View className="task-studio-count-item is-attention"><Image className="task-studio-count-art" src={taskAttentionArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.attention}</Text><Text>待确认</Text></View></View><View className="task-studio-count-divider" />
+        <View className="task-studio-count-item is-completed"><Image className="task-studio-count-art" src={taskCompletedArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.completed}</Text><Text>已完成</Text></View></View>
       </View>
       <View className="task-studio-segments liquid-glass--list" data-glass-role="list">{FILTERS.map((item) => <Text key={item} className={filter === item ? "task-studio-filter is-active" : "task-studio-filter"} onClick={() => setFilter(item)}>{item}</Text>)}</View>
       {failedSources.map((source) => <View className="task-studio-source-error" key={source.source}><View><Text className="task-studio-state-title">{source.sourceLabel} 暂未同步</Text><Text>{source.error}</Text></View><Button className="task-studio-retry" onClick={load}>重试</Button></View>)}

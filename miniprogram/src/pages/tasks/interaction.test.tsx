@@ -26,9 +26,10 @@ beforeEach(()=>{h.slots=[];h.navigate.mockReset();h.load.mockReset().mockResolve
 ]});});
 test('task center renders real counters, approved filters, and one shared list surface',async()=>{
  const tree=await ready();
- expect(tree.filter(n=>n.props?.className==='task-studio-hero-mascot')).toHaveLength(1);
+ expect(tree.filter(n=>n.props?.className==='task-studio-hero-art')).toHaveLength(1);
+ expect(tree.filter(n=>n.props?.className==='task-studio-mascot-shell')).toHaveLength(0);
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-item'))).toHaveLength(3);
- expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-icon'))).toHaveLength(3);
+ expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-art'))).toHaveLength(3);
  expect(tree.filter(n=>n.props?.className==='task-studio-count-value').map(content)).toEqual(['1','1','1']);
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-item')).map(content)).toEqual(['1进行中','1待确认','1已完成']);
  expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-filter')).map(content)).toEqual(['全部','进行中','待确认','已完成']);
@@ -51,7 +52,7 @@ test('a record without an ID cannot open an empty or unrelated destination',asyn
 });
 test('task content stays above the dynamic glass canvas in WeChat',()=>{
  const style=readFileSync(resolve(__dirname,'tasks-studio.scss'),'utf8');
- expect(style).toMatch(/\.task-studio-hero,.task-studio-body\s*\{[^}]*position:relative[^}]*z-index:1/);
+ expect(style).toMatch(/\.task-studio-header-scene,.task-studio-body,.task-studio-state\s*\{[^}]*position:relative[^}]*z-index:1/);
 });
 test('task center keeps the compact phone scale from the approved reference',()=>{
  const style=readFileSync(resolve(__dirname,'tasks-studio.scss'),'utf8');
