@@ -23,7 +23,7 @@ import { getConstraintPresetTexts } from '../../../shared/api/generation';
 import ImageCapacityControl from './ImageCapacityControl';
 import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
 import { batchFactoryProductionModeVisibility, batchFactoryShouldLoadPublishEnvironment } from './batchFactoryProductionMode';
-import { normalizePresetSensitiveMode, normalizeSensitiveMode, SENSITIVE_MODE_OPTIONS } from './batchFactoryBookConfigRegions';
+import { normalizeSensitiveMode, normalizeSensitiveSettings, SENSITIVE_MODE_OPTIONS } from './batchFactoryBookConfigRegions';
 import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts';
 import { loadBatchFactoryPresetCatalog } from './batchFactoryPresetCatalog';
 import { reconcileSyncedWebsiteProfiles, websiteProfileOrganization } from './batchFactoryWebsiteProfiles';
@@ -644,8 +644,8 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad, productionM
     try { await loadPresets(); setPresetOpen(true); }
     catch (error) { message.error(error?.message || '读取自动化预设失败'); }
   };
-  const clonePresetConfig = normalizePresetSensitiveMode(normalizeBatchAutoAudioConfig(selectedPreset?.config));
-  const presetDraftConfig = () => withAutomationPresetMode(normalizePresetSensitiveMode(normalizeBatchAutoAudioConfig(value)), productionMode);
+  const clonePresetConfig = normalizeSensitiveSettings(normalizeBatchAutoAudioConfig(selectedPreset?.config));
+  const presetDraftConfig = () => withAutomationPresetMode(normalizeSensitiveSettings(normalizeBatchAutoAudioConfig(value)), productionMode);
   const loadPreset = () => {
     if (!selectedPreset) return message.warning('请先选择自动化预设');
     Modal.confirm({ title: '确认载入此预设', content: '它只替换当前统一配置草稿；确认当前批量配置后才会应用。', okText: '载入草稿', onOk: () => onLoad(clonePresetConfig) });
@@ -717,9 +717,8 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
     setSaving(true);
     const aiPromptConfig = draftPatch.aiPromptConfig && typeof draftPatch.aiPromptConfig === 'object' ? draftPatch.aiPromptConfig : {};
     const video = requiredVideoPrompt(aiPromptConfig.video);
-    const { sensitiveAIEnabled, ...settingsPatch } = draftPatch;
     const preparedPatch = {
-      ...settingsPatch,
+      ...normalizeSensitiveSettings(draftPatch),
       aiPromptConfig: { ...aiPromptConfig, video },
       ...(video.presetId === 'batch-video-sd' && !draftPatch.storyTimelineVersion
         ? { storyTimelineVersion: 'sd.original-story.v1' }
@@ -773,7 +772,7 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
     } finally { setModeSaving(false); }
   };
   const productionMode = batchFactoryProductionModeVisibility(draftPatch.productionMode).mode;
-  return <Modal title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={draftPatch} productionMode={productionMode} onLoad={setDraftPatch} /><span>统一配置</span><BatchFactoryProductionModeControl value={draftPatch.productionMode} disabled={modeSaving} onChange={changeProductionMode} /></div>} open={open} onCancel={onClose} width={980} destroyOnClose={false} className="batch-factory-unified-settings-modal" footer={<Space><span className="batch-factory-unified-settings-scope">保存将覆盖本批次 {(Array.isArray(batch?.books) ? batch.books.length : 0) || 0} 本书的对应配置（包括单书已改过的值）</span><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存统一配置</Button></Space>}>
+  return <Modal title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={draftPatch} productionMode={productionMode} onLoad={setDraftPatch} /><span>统一配置</span><BatchFactoryProductionModeControl value={draftPatch.productionMode} disabled={modeSaving} onChange={changeProductionMode} /></div>} open={open} onCancel={onClose} width={980} destroyOnClose={false} className="batch-factory-unified-settings-modal" footer={<Space><span className="batch-factory-unified-settings-scope">保存将覆盖本批次 {(Array.isArray(batch?.books) ? batch.books.length : 0) || 0} 本书的模型等配置（含单书改动）。批次敏感模式仅用于继承的书。</span><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存统一配置</Button></Space>}>
     {modeNotice ? <Alert type="warning" showIcon closable message={modeNotice} style={{ marginBottom: 12 }} onClose={() => setModeNotice('')} /> : null}
     <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={draftPatch} onChange={setDraftPatch} sections={['models', 'audio', 'sensitive']} active={open && activeTab === 'models'} /> },

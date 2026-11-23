@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as settings from './batchFactoryBookConfigRegions.js';
 
-const { bookConfigRegionStatus, bookSensitiveModeUpdate, normalizeSensitiveMode, normalizePresetSensitiveMode, SENSITIVE_MODE_OPTIONS } = settings;
+const { bookConfigRegionStatus, bookSensitiveModeUpdate, normalizeSensitiveMode, normalizeSensitiveSettings, SENSITIVE_MODE_OPTIONS } = settings;
 
 test('sensitive settings use the three canonical modes and default to local processing', () => {
   assert.equal(typeof normalizeSensitiveMode, 'function');
@@ -26,12 +26,22 @@ test('legacy sensitive AI support recognizes only an explicit true flag', () => 
 });
 
 test('loading or saving a preset keeps the legacy choice without forwarding its old flag', () => {
-  assert.equal(typeof normalizePresetSensitiveMode, 'function');
+  assert.equal(typeof normalizeSensitiveSettings, 'function');
   const oldPreset = { sensitiveAIEnabled: true, textModelId: 'example' };
-  assert.deepEqual(normalizePresetSensitiveMode(oldPreset), { sensitiveMode: 'ai', textModelId: 'example' });
+  assert.deepEqual(normalizeSensitiveSettings(oldPreset), { sensitiveMode: 'ai', textModelId: 'example' });
   assert.deepEqual(oldPreset, { sensitiveAIEnabled: true, textModelId: 'example' });
-  assert.deepEqual(normalizePresetSensitiveMode({ sensitiveAIEnabled: true, sensitiveMode: 'off' }), { sensitiveMode: 'off' });
-  assert.deepEqual(normalizePresetSensitiveMode({ textModelId: 'example' }), { textModelId: 'example' });
+  assert.deepEqual(normalizeSensitiveSettings({ sensitiveAIEnabled: true, sensitiveMode: 'off' }), { sensitiveMode: 'off' });
+});
+
+test('saving a preset without sensitive settings explicitly writes the system default', () => {
+  assert.deepEqual(normalizeSensitiveSettings({ textModelId: 'example' }), {
+    textModelId: 'example', sensitiveMode: 'system'
+  });
+});
+
+test('saving a preset with an invalid sensitive mode writes the effective valid mode', () => {
+  assert.deepEqual(normalizeSensitiveSettings({ sensitiveMode: 'unknown' }), { sensitiveMode: 'system' });
+  assert.deepEqual(normalizeSensitiveSettings({ sensitiveMode: 'unknown', sensitiveAIEnabled: true }), { sensitiveMode: 'ai' });
 });
 
 test('single-book sensitive settings save only the changed policy and restore inheritance sparsely', () => {

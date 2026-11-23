@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = name => readFileSync(join(here, name), 'utf8');
@@ -37,6 +38,28 @@ test('a saved unified configuration is pushed through to every book in the batch
   // 写透后按实际落库的批次重新取书，再用取回的书数提示覆盖范围。
   assert.match(novelList, /const syncedBooks = Array\.isArray\(syncedBatch\?\.books\) \? syncedBatch\.books : \[\]/);
   assert.match(novelList, /统一配置已覆盖本批次 \$\{syncedBooks\.length\}/);
+});
+
+test('saving another unified field preserves a book set to off and keeps inheriting books sparse', async () => {
+  const configurationKeys = novelList.match(/const UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
+  const generatedKeys = novelList.match(/const GENERATED_CONTENT_SETTINGS_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
+  const syncSource = novelList.match(/async function syncUnifiedSettingsToBooks\(currentBatch\) \{[\s\S]*?\n  \}/)?.[0] || '';
+  const books = [
+    { id: 'off', settingsState: { patch: { sensitiveMode: 'off' } } },
+    { id: 'inherited', settingsState: { patch: {} } }
+  ];
+  const sync = runInNewContext([configurationKeys, generatedKeys, syncSource, 'syncUnifiedSettingsToBooks'].join('\n'), {
+    async saveBookOverrideWithRetry(batchId, bookId, revision, { patch, restoreKeys = [] }) {
+      const current = books.find(book => book.id === bookId).settingsState.patch;
+      for (const key of restoreKeys) delete current[key];
+      Object.assign(current, patch);
+    }
+  });
+
+  await sync({ id: 'batch', settingsState: { patch: { sensitiveMode: 'system', textModelId: 'new-model' } }, books });
+
+  assert.deepEqual(books[0].settingsState.patch, { sensitiveMode: 'off', textModelId: 'new-model' });
+  assert.deepEqual(books[1].settingsState.patch, { textModelId: 'new-model' });
 });
 
 test('unified configuration covers engine, model, media, opening and publish fields', () => {
@@ -89,7 +112,7 @@ test('settings saves do not write back the legacy sensitive AI flag', () => {
     assert.match(keys, /'sensitiveMode'/);
     assert.doesNotMatch(keys, /'sensitiveAIEnabled'/);
   }
-  assert.match(unifiedModal, /const \{ sensitiveAIEnabled, \.\.\.settingsPatch \} = draftPatch;/);
+  assert.match(unifiedModal, /const preparedPatch = \{\s*\.\.\.normalizeSensitiveSettings\(draftPatch\)/);
 });
 
 test('unified configuration only writes configuration and never pushes generated content', () => {
@@ -118,7 +141,8 @@ test('aiPromptConfig is documented as configuration only, not per-book generated
 
 test('the unified settings footer states the batch-wide overwrite scope', () => {
   assert.ok(unifiedModal.includes('保存将覆盖本批次 '), 'missing batch-wide scope hint');
-  assert.ok(unifiedModal.includes('本书的对应配置（包括单书已改过的值）'), 'missing overwrite wording');
+  assert.ok(unifiedModal.includes('本书的模型等配置（含单书改动）'), 'missing overwrite wording');
+  assert.ok(unifiedModal.includes('批次敏感模式仅用于继承的书'), 'missing sensitive mode inheritance wording');
 });
 
 test('book settings only badge the fields that deviate from the batch configuration', () => {

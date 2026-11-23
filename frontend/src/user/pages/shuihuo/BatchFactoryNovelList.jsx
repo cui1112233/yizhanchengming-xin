@@ -4207,10 +4207,11 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     const unifiedPatch = currentBatch?.settingsState?.patch || {};
     // “保存统一配置”是批量改模型的唯一入口：把面板里实际有值的字段批量写进
     // 该批次每一本书（包括此前单书单独改过的），这样不会有书还跑在旧模型上。
+    // 敏感模式由单书直接继承批次值，保留每本书单独设置的模式。
     // 内容键一律不进推送集合：已生成的分镜/提示词/配音测量/图片视频产物只由
     // 生成流程写，统一配置保存不得触碰，否则会把已完成阶段变成“待重跑”。
     const pushKeys = UNIFIED_CONFIGURATION_KEYS
-      .filter(key => !GENERATED_CONTENT_SETTINGS_KEYS.includes(key))
+      .filter(key => !GENERATED_CONTENT_SETTINGS_KEYS.includes(key) && key !== 'sensitiveMode')
       .filter(key => Object.hasOwn(unifiedPatch, key));
     if (!pushKeys.length) return;
     const pushPatch = Object.fromEntries(pushKeys.map(key => [key, unifiedPatch[key]]));

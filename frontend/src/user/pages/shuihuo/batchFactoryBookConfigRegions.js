@@ -22,10 +22,9 @@ export function sensitiveModeLabel(mode) {
   return SENSITIVE_MODE_OPTIONS.find(option => option.value === mode)?.label;
 }
 
-export function normalizePresetSensitiveMode(settings = {}) {
+export function normalizeSensitiveSettings(settings = {}) {
   const { sensitiveAIEnabled, ...patch } = settings;
-  if (Object.hasOwn(settings, 'sensitiveAIEnabled')) patch.sensitiveMode = normalizeSensitiveMode(settings);
-  return patch;
+  return { ...patch, sensitiveMode: normalizeSensitiveMode(settings) };
 }
 
 export function bookSensitiveModeUpdate(inherited, bookPatch = {}, edited, restore = false) {
