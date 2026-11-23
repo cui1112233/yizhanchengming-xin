@@ -1,6 +1,11 @@
 package batchfactoryv11
 
-import "strings"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+)
 
 func normalizeCapturedSourceText(value string) (string, bool) {
 	text := strings.TrimSpace(value)
@@ -76,4 +81,53 @@ func (input CaptureBookSourceInput) updatedMetadata(current map[string]any, curr
 		metadata["rawSourceStatus"] = "unverified"
 	}
 	return metadata
+}
+
+type preparedProductionContextKey struct{}
+type preparedProductionVersion struct{ BookID, Key string }
+
+func ProductionVersion(book Book) string {
+	state, _ := book.SourceMetadata["batchSensitiveStage"].(map[string]any)
+	if state["status"] != "done" {
+		return ""
+	}
+	key, _ := state["key"].(string)
+	return key
+}
+
+// WithPreparedProduction binds the version approved for this call. It must be
+// carried to the service that actually contacts the model.
+func WithPreparedProduction(ctx context.Context, book Book) context.Context {
+	if _, pinned := ctx.Value(preparedProductionContextKey{}).(preparedProductionVersion); pinned {
+		return ctx
+	}
+	return context.WithValue(ctx, preparedProductionContextKey{}, preparedProductionVersion{book.ID, ProductionVersion(book)})
+}
+
+func checkedProductionSource(ctx context.Context, store Store, owner, batchID string, book Book) (string, bool, error) {
+	draft, err := store.GetDraft(ctx, owner, "working-front:"+book.ID, "working-front-content", batchID)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return "", false, err
+	}
+	hasDraft := strings.TrimSpace(draft.Content) != ""
+	version := ProductionVersion(book)
+	expected, pinned := ctx.Value(preparedProductionContextKey{}).(preparedProductionVersion)
+	state, _ := book.SourceMetadata["batchSensitiveStage"].(map[string]any)
+	stale := func() (string, bool, error) {
+		return "", false, fmt.Errorf("%w: 生产正文已更新，请重新执行", ErrConflict)
+	}
+	if pinned && (expected.BookID != book.ID || version == "" || expected.Key != version) {
+		return stale()
+	}
+	if len(state) > 0 {
+		base, _ := state["authoredBase"].(string)
+		if version == "" || state["raw"] != sourceDigest(book.TxtText) || state["output"] != sourceDigest(book.SourceText) || hasDraft && base != WorkingDraftVersion(draft.Content) || !hasDraft && strings.HasPrefix(base, "working:") {
+			return stale()
+		}
+		return book.SourceText, hasDraft, nil
+	}
+	if hasDraft {
+		return draft.Content, true, nil
+	}
+	return book.SourceText, false, nil
 }

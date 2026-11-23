@@ -38,7 +38,8 @@ func registerComicSourceSegmentRoutes(mux *http.ServeMux, production *BatchAutom
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		if _, err := production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true); err != nil {
+		prepared, err := production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true)
+		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
@@ -59,7 +60,7 @@ func registerComicSourceSegmentRoutes(mux *http.ServeMux, production *BatchAutom
 			return
 		}
 		if director != nil && director.Provider != nil {
-			result, err := director.RunComicSourceSegmentation(r.Context(), owner, batch.ID, book.ID)
+			result, err := director.RunComicSourceSegmentation(batchfactoryv11.WithPreparedProduction(r.Context(), prepared), owner, batch.ID, book.ID)
 			if err != nil {
 				writeStoreError(w, err)
 				return

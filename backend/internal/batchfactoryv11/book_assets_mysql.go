@@ -69,6 +69,9 @@ func (s *MySQLStore) CreateBookAsset(ctx context.Context, owner, batchID, bookID
 	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`, asset.ID, owner, asset.BatchID, asset.BookID, asset.Kind, asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, nullableString(asset.ImageModelID), nullableString(asset.ImageAspectRatio), asset.Source, now, now); err != nil {
 		return BookAsset{}, err
 	}
+	if err := saveAssetProofSQL(ctx, tx, owner, asset, input.ProductionVersion); err != nil {
+		return BookAsset{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return BookAsset{}, err
 	}
@@ -88,7 +91,7 @@ func (s *MySQLStore) PersistExtractedBookAssets(ctx context.Context, owner strin
 	if err := ensureBookOwnership(ctx, tx, owner, book.BatchID, book.ID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? AND source='director'`, owner, book.BatchID, book.ID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE a,d FROM batch_factory_v12_book_assets a LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=a.owner_username AND d.scope=a.batch_id AND d.draft_key=a.id AND d.kind='asset_prompt_version' WHERE a.owner_username=? AND a.batch_id=? AND a.book_id=? AND a.source='director'`, owner, book.BatchID, book.ID); err != nil {
 		return nil, err
 	}
 	output := DirectorResult{Characters: assets.Characters, Scenes: assets.Scenes, Props: assets.Props}
@@ -155,7 +158,7 @@ func (s *MySQLStore) PersistComicExtractedBookAssets(ctx context.Context, owner 
 		AND (a.source='comic' OR (a.source='manual' AND a.extraction_preset_id IN (?,?)))`, owner, book.BatchID, book.ID, "batch-comic-assets", "vip-smart-character-derive"); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? AND (source='comic' OR (source='manual' AND extraction_preset_id IN (?,?)))`, owner, book.BatchID, book.ID, "batch-comic-assets", "vip-smart-character-derive"); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE a,d FROM batch_factory_v12_book_assets a LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=a.owner_username AND d.scope=a.batch_id AND d.draft_key=a.id AND d.kind='asset_prompt_version' WHERE a.owner_username=? AND a.batch_id=? AND a.book_id=? AND (a.source='comic' OR (a.source='manual' AND a.extraction_preset_id IN (?,?)))`, owner, book.BatchID, book.ID, "batch-comic-assets", "vip-smart-character-derive"); err != nil {
 		return nil, err
 	}
 	now := time.Now().UTC()
@@ -166,6 +169,10 @@ func (s *MySQLStore) PersistComicExtractedBookAssets(ctx context.Context, owner 
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,extraction_preset_id,extraction_preset_version,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'comic',?,?,1,?,?)`,
 			id, owner, book.BatchID, book.ID, asset.Kind, asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, nil, nil, nullableString(asset.ExtractionPresetID), nullableInt64(asset.ExtractionPresetVersion), now, now); err != nil {
+			return nil, err
+		}
+		asset.ID = id
+		if err := saveAssetProofSQL(ctx, tx, owner, asset, ProductionVersion(book)); err != nil {
 			return nil, err
 		}
 	}
@@ -230,6 +237,9 @@ func (s *MySQLStore) UpdateBookAsset(ctx context.Context, owner, batchID, bookID
 	}
 	asset = normalizeLegacyComicBookAsset(asset)
 	asset.ID, asset.BatchID, asset.BookID = assetID, batchID, bookID
+	if err := saveAssetProofSQL(ctx, tx, owner, asset, input.ProductionVersion); err != nil {
+		return BookAsset{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return BookAsset{}, err
 	}
@@ -251,11 +261,11 @@ func (s *MySQLStore) DeleteBookAsset(ctx context.Context, owner, batchID, bookID
 	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_asset_images WHERE asset_id=? AND owner_username=?`, assetID, owner); err != nil {
 		return err
 	}
-	result, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_assets WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, assetID, owner, batchID, bookID)
+	result, err := tx.ExecContext(ctx, `DELETE a,d FROM batch_factory_v12_book_assets a LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=a.owner_username AND d.scope=a.batch_id AND d.draft_key=a.id AND d.kind='asset_prompt_version' WHERE a.id=? AND a.owner_username=? AND a.batch_id=? AND a.book_id=?`, assetID, owner, batchID, bookID)
 	if err != nil {
 		return err
 	}
-	if affected, _ := result.RowsAffected(); affected != 1 {
+	if affected, _ := result.RowsAffected(); affected == 0 {
 		return ErrNotFound
 	}
 	return tx.Commit()
@@ -312,7 +322,7 @@ func persistDirectorBookAssets(ctx context.Context, tx *sql.Tx, owner string, bo
 
 	// Delete stale rows first so later inserts never collide with freed names.
 	for _, id := range plan.Deletes {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_assets WHERE id=? AND owner_username=? AND source='director'`, id, owner); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE a,d FROM batch_factory_v12_book_assets a LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=a.owner_username AND d.scope=a.batch_id AND d.draft_key=a.id AND d.kind='asset_prompt_version' WHERE a.id=? AND a.owner_username=? AND a.source='director'`, id, owner); err != nil {
 			return err
 		}
 	}
@@ -326,6 +336,10 @@ func persistDirectorBookAssets(ctx context.Context, tx *sql.Tx, owner string, bo
 			id, owner, book.BatchID, book.ID, asset.Kind, asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, nil, nil, nullableString(asset.ExtractionPresetID), nullableInt64(asset.ExtractionPresetVersion), now, now); err != nil {
 			return err
 		}
+		asset.ID = id
+		if err := saveAssetProofSQL(ctx, tx, owner, asset, ProductionVersion(book)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -335,4 +349,13 @@ func nullableInt64(v int64) any {
 		return nil
 	}
 	return v
+}
+
+func saveAssetProofSQL(ctx context.Context, tx *sql.Tx, owner string, asset BookAsset, version string) error {
+	if version == "" {
+		return nil
+	}
+	d := assetPromptProof(asset, version)
+	_, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_drafts(owner_username,draft_key,kind,scope,content,revision,updated_at) VALUES(?,?,?,?,?,1,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE content=VALUES(content),revision=revision+1,updated_at=VALUES(updated_at)`, owner, d.Key, d.Kind, d.Scope, d.Content)
+	return err
 }

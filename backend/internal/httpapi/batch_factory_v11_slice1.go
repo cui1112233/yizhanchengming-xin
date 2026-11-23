@@ -594,7 +594,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		if !decodeJSON(w, r, &input) {
 			return
 		}
-		if strings.TrimSpace(input.Key) == "" {
+		if strings.TrimSpace(input.Key) == "" || strings.EqualFold(strings.TrimSpace(input.Kind), batchfactoryv11.AssetPromptProofKind) {
 			writeStoreError(w, batchfactoryv11.ErrInvalid)
 			return
 		}

@@ -265,6 +265,14 @@ func NewRouter(options RouterOptions) http.Handler {
 	stageService.PrepareProductionText = func(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.Book, error) {
 		return manualProduction.runBatchSensitiveStage(ctx, owner, batchID, bookID, true)
 	}
+	if options.Production != nil && options.Store != nil {
+		scoped := *options.Production
+		scoped.PreparedBook = func(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.Book, error) {
+			return manualProduction.batchSensitiveStage(ctx, owner, batchID, bookID, false, true)
+		}
+		options.Production = &scoped
+		stageService.Production = &scoped
+	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
 	publish121Available := options.VideoManagementConnector != nil || (options.External != nil && options.External.Enabled[external.Provider121])
@@ -282,7 +290,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		})
 		registerConfiguredImageGenerationRoute(v11, options.Store, runtimeCatalogStore)
 		registerConfiguredImageGenerationRoute(v12, options.Store, runtimeCatalogStore)
-		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
+		registerBookAssetRoutes(v11, manualProduction, options.Store, options.LocalArtifacts)
 		registerV12AssetGenerationRoute(v12, manualProduction, options.Store, options.LocalArtifacts, options.LocalExecutors, options.PresetCatalog, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner, func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
 			provider := providerForBatchClassification(ctx, owner, batchFetchClassification{RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver})
 			if provider == nil {

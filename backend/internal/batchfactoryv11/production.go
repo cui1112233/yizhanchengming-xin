@@ -174,6 +174,7 @@ type openingVariantPromptResolver interface {
 }
 
 type ProductionService struct {
+	PreparedBook     func(context.Context, string, string, string) (Book, error)
 	Store            Store
 	Compiler         PromptResolver
 	Adapter          ProductionAdapter
@@ -472,6 +473,20 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 	book, err := bookFromBatch(batch, bookID)
 	if err != nil {
 		return ProductionJob{}, err
+	}
+	// A replay of an already recorded job returned above and incurs no paid call.
+	if s.PreparedBook != nil {
+		prepared, err := s.PreparedBook(ctx, owner, batchID, bookID)
+		if err != nil {
+			return ProductionJob{}, err
+		}
+		if prepared.DirectorRevision == nil {
+			return ProductionJob{}, NewConfigRequiredError(DirectorRevisionRequiredMessage)
+		}
+		if prepared.DirectorRevision.Output.ProductionVersion == "" || prepared.DirectorRevision.Output.ProductionVersion != ProductionVersion(prepared) {
+			return ProductionJob{}, NewConfigRequiredError("当前分镜对应旧版生产正文，请先重新生成分镜")
+		}
+		book = prepared
 	}
 	// The effective per-book selection is authoritative at submission time:
 	// a caller may still pass the batch engine (or a preset default), but the

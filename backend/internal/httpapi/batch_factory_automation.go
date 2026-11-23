@@ -1630,6 +1630,7 @@ func (c *BatchAutomationCoordinator) applyResumePreflight(ctx context.Context, o
 		bookByID[book.ID] = book
 	}
 	runMode := automationStringValue(job["runMode"], "full_submit")
+	independent := hasFrozenComicUpload(job)
 	running, failed, ready := 0, 0, 0
 	for bookID, raw := range books {
 		entry, _ := raw.(map[string]any)
@@ -1647,7 +1648,7 @@ func (c *BatchAutomationCoordinator) applyResumePreflight(ctx context.Context, o
 		}
 		reason := ""
 		if !frozenComicUpload(runMode, entry) {
-			reason = c.automationBookPreflightReason(ctx, owner, batch, book, runMode)
+			reason = c.productionBookReadiness(ctx, owner, batch, book, runMode, independent)
 		}
 		if reason != "" {
 			// 预检失败只改终态和原因，stage 保持原值，避免把已完成阶段清掉。
@@ -2491,27 +2492,36 @@ func (c *BatchAutomationCoordinator) automationSubmitDeferred(job map[string]any
 		strings.TrimSpace(automationStringValue(job["scheduledAt"], "")) != "" && !automationJobDue(job, c.now())
 }
 
-func (c *BatchAutomationCoordinator) validateResumedAutomation(ctx context.Context, owner string, batch batchfactoryv11.Batch, job map[string]any) error {
+// A job with a frozen upload can dispatch even while another book lacks a
+// generator. Each production worker checks its own effective dependencies.
+func hasFrozenComicUpload(job map[string]any) bool {
 	runMode := automationStringValue(job["runMode"], "full_submit")
 	entries, _ := job["books"].(map[string]any)
-	onlyPublish := false
 	for _, item := range entries {
 		entry, _ := item.(map[string]any)
-		if entry["status"] == "completed" {
-			continue
+		if entry["status"] != "completed" && frozenComicUpload(runMode, entry) {
+			return true
 		}
-		if !frozenComicUpload(runMode, entry) {
-			return c.validateAutomationGlobalPreflight(ctx, owner, batch, runMode)
-		}
-		onlyPublish = true
 	}
-	if onlyPublish {
-		if c.comicPublish == nil {
-			return fmt.Errorf("N8 漫画发布服务未配置")
-		}
+	return false
+}
+func (c *BatchAutomationCoordinator) validateResumedAutomation(ctx context.Context, owner string, batch batchfactoryv11.Batch, job map[string]any) error {
+	if hasFrozenComicUpload(job) {
 		return nil
 	}
-	return c.validateAutomationGlobalPreflight(ctx, owner, batch, runMode)
+	return c.validateAutomationGlobalPreflight(ctx, owner, batch, automationStringValue(job["runMode"], "full_submit"))
+}
+
+func (c *BatchAutomationCoordinator) productionBookReadiness(ctx context.Context, owner string, batch batchfactoryv11.Batch, book batchfactoryv11.Book, runMode string, independent bool) string {
+	if independent {
+		scoped := batch
+		scoped.SettingsState.Patch = batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+		scoped.Books = []batchfactoryv11.Book{book}
+		if err := c.validateAutomationGlobalPreflight(ctx, owner, scoped, runMode); err != nil {
+			return err.Error()
+		}
+	}
+	return c.automationBookPreflightReason(ctx, owner, batch, book, runMode)
 }
 
 func frozenComicUpload(runMode string, entry map[string]any) bool {
@@ -3559,6 +3569,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	}
 	// job 是跨书共享的 map，worker 运行期间 persist() 会写 counts/updatedAt；
 	// worker 必须只读启动时快照，否则并发 map 读写会直接打崩进程。
+	independentReadiness := hasFrozenComicUpload(job)
 	jobRunMode := automationStringValue(job["runMode"], "full_submit")
 	jobForceRegenerate := automationBoolValue(job["forceRegenerate"])
 	jobAutoPublish := automationBoolValue(job["autoPublish"])
@@ -3996,7 +4007,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					persist()
 					continue
 				}
-				if reason := c.automationBookPreflightReason(ctx, owner, batch, book, jobRunMode); reason != "" {
+				if reason := c.productionBookReadiness(ctx, owner, batch, book, jobRunMode, independentReadiness); reason != "" {
 					entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "blocked", "preflight", "", reason, c.now()
 					appendAutomationBookLog(entry, c.now(), "preflight", reason)
 					persist()
@@ -4028,6 +4039,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					continue
 				}
 				book = processed
+				ctx := batchfactoryv11.WithPreparedProduction(ctx, book)
 				if book.SourceMetadata["classificationAfterSensitive"] == true {
 					book, sensitiveErr = c.classifyProductionBook(ctx, owner, batchID, book, batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch))
 					if sensitiveErr != nil {

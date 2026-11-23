@@ -16,7 +16,7 @@ import (
 	"qiantie/backend/internal/localexecutor"
 )
 
-func registerBookAssetRoutes(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store) {
+func registerBookAssetRoutes(mux *http.ServeMux, production *BatchAutomationCoordinator, store batchfactoryv11.Store, files *localartifact.Store) {
 	const collection = "/api/batch-factory/v11/batches/{batchId}/books/{bookId}/assets"
 	const imageCollection = collection + "/{assetId}/images"
 	const imageUpload = imageCollection + "/upload"
@@ -45,6 +45,12 @@ func registerBookAssetRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		if !decodeJSON(w, r, &input) {
 			return
 		}
+		// Editing is free. Only an already prepared current production version can
+		// certify the prompt for subsequent paid generation.
+		prepared, err := production.batchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), false, true)
+		if err == nil {
+			input.ProductionVersion = batchfactoryv11.ProductionVersion(prepared)
+		}
 		asset, err := store.CreateBookAsset(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input)
 		if err != nil {
 			writeStoreError(w, err)
@@ -61,6 +67,12 @@ func registerBookAssetRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		var input batchfactoryv11.UpdateBookAssetInput
 		if !decodeJSON(w, r, &input) {
 			return
+		}
+		// Editing is free. Only an already prepared current production version can
+		// certify the prompt for subsequent paid generation.
+		prepared, err := production.batchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), false, true)
+		if err == nil {
+			input.ProductionVersion = batchfactoryv11.ProductionVersion(prepared)
 		}
 		asset, err := store.UpdateBookAsset(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("assetId"), input)
 		if err != nil {

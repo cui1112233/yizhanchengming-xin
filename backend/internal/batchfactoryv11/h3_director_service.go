@@ -42,6 +42,11 @@ func (s *DirectorService) RunH3Director(ctx context.Context, owner, batchID, boo
 	if err != nil {
 		return DirectorRevision{}, err
 	}
+	if _, pinned := ctx.Value(preparedProductionContextKey{}).(preparedProductionVersion); pinned {
+		if _, _, err := checkedProductionSource(ctx, s.Store, owner, batchID, book); err != nil {
+			return DirectorRevision{}, err
+		}
+	}
 	source, err := normalizeH3VideoSource(request.VideoSource)
 	if err != nil {
 		return DirectorRevision{}, err

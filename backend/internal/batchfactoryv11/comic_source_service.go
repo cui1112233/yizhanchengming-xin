@@ -29,10 +29,9 @@ func (s *DirectorService) RunComicSourceSegmentation(ctx context.Context, owner,
 	if err != nil {
 		return ComicSourceSegmentation{}, err
 	}
-	if draft, draftErr := s.Store.GetDraft(ctx, owner, "working-front:"+book.ID, "working-front-content", batchID); draftErr == nil && strings.TrimSpace(draft.Content) != "" {
-		book.SourceText = EffectiveWorkingSource(book, draft.Content)
-	} else if draftErr != nil && draftErr != ErrNotFound {
-		return ComicSourceSegmentation{}, draftErr
+	book.SourceText, _, err = checkedProductionSource(ctx, s.Store, owner, batchID, book)
+	if err != nil {
+		return ComicSourceSegmentation{}, err
 	}
 	if book.SourceText == "" {
 		return ComicSourceSegmentation{}, fmt.Errorf("%w: 漫画正文为空", ErrInvalid)

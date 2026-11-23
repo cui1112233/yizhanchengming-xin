@@ -1174,7 +1174,7 @@ var deleteBookStmts = []deleteBookStmt{
 	{query: `DELETE FROM batch_factory_v12_director_revisions WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	{query: `DELETE FROM batch_factory_v12_hook_revisions WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	{query: `DELETE i FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id WHERE a.owner_username=? AND a.batch_id=? AND a.book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE a,d FROM batch_factory_v12_book_assets a LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=a.owner_username AND d.scope=a.batch_id AND d.draft_key=a.id AND d.kind='asset_prompt_version' WHERE a.owner_username=? AND a.batch_id=? AND a.book_id=?`, args: deleteBookDefaultArgs},
 	{
 		query: `DELETE FROM batch_factory_v12_drafts WHERE owner_username=? AND draft_key=? AND scope=?`,
 		args:  func(owner, batchID, bookID string) []any { return []any{owner, "working-front:" + bookID, batchID} },

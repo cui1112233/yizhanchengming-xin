@@ -288,7 +288,7 @@ func (s frozenCollectionStore) ListComicCollections(context.Context, string, str
 func TestSensitiveStageHistoricalComicUploadUsesFrozenCollection(t *testing.T) {
 	ctx := context.Background()
 	store := frozenCollectionStore{batchfactoryv11.NewMemoryStore(), batchfactoryv11.ComicCollection{ID: "fixed"}}
-	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "旧合集", InitialBatchSettings: batchfactoryv11.SettingsPatch{"productionMode": comicTestRaw(t, "comic"), "sensitiveMode": comicTestRaw(t, "ai"), "comicPublishSettings": json.RawMessage(`{"producerAdminName":"新设置"}`)}, Books: []batchfactoryv11.CreateBookInput{{Title: "旧书", SourceText: "历史片段"}}})
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "旧合集", InitialBatchSettings: batchfactoryv11.SettingsPatch{"productionMode": comicTestRaw(t, "comic"), "sensitiveMode": comicTestRaw(t, "ai"), "comicPublishSettings": json.RawMessage(`{"producerAdminName":"新设置"}`)}, Books: []batchfactoryv11.CreateBookInput{{Title: "旧书", SourceText: "历史片段"}, {Title: "仍需制作", TxtText: "新书正文。", SourceText: "新书正文。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,8 @@ func TestSensitiveStageHistoricalComicUploadUsesFrozenCollection(t *testing.T) {
 		return N8ComicPublishRecord{Status: "published", CarouselID: 17}, nil
 	})
 	entry := map[string]any{"status": "running", "stage": "comic_publish", "comicCollectionId": "fixed", "frozenComicPublishSettings": `{"producerAdminName":"原设置"}`}
-	job := map[string]any{"id": "old", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "full_submit", "books": map[string]any{book.ID: entry}}
+	pending := map[string]any{"status": "queued", "stage": "queued"}
+	job := map[string]any{"id": "old", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "full_submit", "books": map[string]any{book.ID: entry, batch.Books[1].ID: pending}}
 	if err := c.validateResumedAutomation(ctx, "alice", batch, job); err != nil {
 		t.Fatal(err)
 	}
@@ -315,6 +316,9 @@ func TestSensitiveStageHistoricalComicUploadUsesFrozenCollection(t *testing.T) {
 	c.run(ctx, 0, "alice", batch.ID, "old", job, batch)
 	if uploadCalls != 1 || modelCalls != 0 || entry["stage"] != "published" {
 		t.Fatalf("uploads=%d model=%d entry=%v", uploadCalls, modelCalls, entry)
+	}
+	if pending["status"] != "blocked" || !strings.Contains(automationStringValue(pending["message"], ""), "模型") {
+		t.Fatalf("second book missing readiness result: %v", pending)
 	}
 	if _, err := c.latestComicCollection(ctx, "alice", batch.ID, book.ID, "deleted"); err == nil {
 		t.Fatal("missing collection fell back to a different artifact")
@@ -335,5 +339,49 @@ func prepareComicPageSourceForGeneration(t *testing.T, store *batchfactoryv11.Me
 	}
 	if _, err = store.BindComicSourceSegments(ctx, "alice", batchID, bookID, comicSourceDigest(source), []string{videoID}, drafts); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestProductionRejectsDraftChangedAfterPreflight(t *testing.T) {
+	for _, action := range []string{"director", "segmentation"} {
+		t.Run(action, func(t *testing.T) {
+			ctx := context.Background()
+			store := batchfactoryv11.NewMemoryStore()
+			batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "竞争测试", Books: []batchfactoryv11.CreateBookInput{{Title: "书", TxtText: "完整原稿。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			id := batch.Books[0].ID
+			coordinator := &BatchAutomationCoordinator{store: store}
+			prepared, err := coordinator.runBatchSensitiveStage(ctx, "alice", batch.ID, id, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pinned := batchfactoryv11.WithPreparedProduction(ctx, prepared)
+			if _, err = store.SaveDraft(ctx, "alice", batchfactoryv11.Draft{Kind: "working-front-content", Key: "working-front:" + id, Scope: batch.ID, Content: "此刻刚保存的未处理稿。"}); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			director := &batchfactoryv11.DirectorService{Store: store, Provider: sensitiveTestProvider(func(context.Context, batchfactoryv11.TextCompletionRequest) (string, error) {
+				calls++
+				return "{}", nil
+			})}
+			verifyConflict := func(t *testing.T) {
+				t.Helper()
+				if action == "director" {
+					_, err = director.RunDirector(pinned, "alice", batch.ID, id)
+				} else {
+					_, err = director.RunComicSourceSegmentation(pinned, "alice", batch.ID, id)
+				}
+				if !errors.Is(err, batchfactoryv11.ErrConflict) || calls != 0 {
+					t.Fatalf("changed draft: err=%v providerCalls=%d", err, calls)
+				}
+			}
+			verifyConflict(t)
+			if _, err = coordinator.runBatchSensitiveStage(ctx, "alice", batch.ID, id, true); err != nil {
+				t.Fatal(err)
+			}
+			verifyConflict(t)
+		})
 	}
 }

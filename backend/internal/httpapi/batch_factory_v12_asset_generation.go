@@ -264,12 +264,17 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, production *BatchAutoma
 		if !decodeJSON(w, r, &input) {
 			return
 		}
-		if _, err := production.batchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), false, true); err != nil {
+		prepared, err := production.batchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), false, true)
+		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
 		selectedBatch := batch
-		selectedBatch.Books = []batchfactoryv11.Book{*selected}
+		if err := batchfactoryv11.CheckAssetPromptVersions(r.Context(), store, owner, prepared, input.AssetIDs); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		selectedBatch.Books = []batchfactoryv11.Book{prepared}
 		batchID := r.PathValue("batchId")
 		assetIDs := append([]string(nil), input.AssetIDs...)
 		modelID, aspectRatio, provider := input.ModelID, input.AspectRatio, input.Provider

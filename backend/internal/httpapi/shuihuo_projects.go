@@ -3360,6 +3360,11 @@ func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactor
 	if len(wanted) == 0 {
 		return nil, fmt.Errorf("%w: asset selection is required", batchfactoryv11.ErrInvalid)
 	}
+	if _, tracked := batch.Books[0].SourceMetadata["batchSensitiveStage"]; tracked {
+		if err := batchfactoryv11.CheckAssetPromptVersions(ctx, store, owner, batch.Books[0], assetIDs); err != nil {
+			return nil, err
+		}
+	}
 	config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStores...)
 	if err != nil {
 		return nil, err

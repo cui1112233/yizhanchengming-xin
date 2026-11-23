@@ -286,28 +286,30 @@ type BookAsset struct {
 }
 
 type CreateBookAssetInput struct {
-	Kind             string `json:"kind"`
-	Source           string `json:"source,omitempty"`
-	Name             string `json:"name"`
-	FormalName       string `json:"formalName,omitempty"`
-	Facts            string `json:"facts,omitempty"`
-	Appearance       string `json:"appearance,omitempty"`
-	Relationships    string `json:"relationships,omitempty"`
-	Prompt           string `json:"prompt"`
-	ImageModelID     string `json:"imageModelId,omitempty"`
-	ImageAspectRatio string `json:"imageAspectRatio,omitempty"`
+	ProductionVersion string `json:"-"`
+	Kind              string `json:"kind"`
+	Source            string `json:"source,omitempty"`
+	Name              string `json:"name"`
+	FormalName        string `json:"formalName,omitempty"`
+	Facts             string `json:"facts,omitempty"`
+	Appearance        string `json:"appearance,omitempty"`
+	Relationships     string `json:"relationships,omitempty"`
+	Prompt            string `json:"prompt"`
+	ImageModelID      string `json:"imageModelId,omitempty"`
+	ImageAspectRatio  string `json:"imageAspectRatio,omitempty"`
 }
 
 type UpdateBookAssetInput struct {
-	Name             string `json:"name"`
-	FormalName       string `json:"formalName,omitempty"`
-	Facts            string `json:"facts,omitempty"`
-	Appearance       string `json:"appearance,omitempty"`
-	Relationships    string `json:"relationships,omitempty"`
-	Prompt           string `json:"prompt"`
-	ImageModelID     string `json:"imageModelId,omitempty"`
-	ImageAspectRatio string `json:"imageAspectRatio,omitempty"`
-	ExpectedRevision int64  `json:"expectedRevision"`
+	ProductionVersion string `json:"-"`
+	Name              string `json:"name"`
+	FormalName        string `json:"formalName,omitempty"`
+	Facts             string `json:"facts,omitempty"`
+	Appearance        string `json:"appearance,omitempty"`
+	Relationships     string `json:"relationships,omitempty"`
+	Prompt            string `json:"prompt"`
+	ImageModelID      string `json:"imageModelId,omitempty"`
+	ImageAspectRatio  string `json:"imageAspectRatio,omitempty"`
+	ExpectedRevision  int64  `json:"expectedRevision"`
 }
 
 type BookAssetImage struct {

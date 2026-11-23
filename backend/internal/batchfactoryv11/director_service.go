@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -365,13 +364,14 @@ func comicSourceTextForBook(book Book) string {
 }
 
 func (s *DirectorService) productionBookWithSourceMode(ctx context.Context, owner, batchID string, book Book, completeSource bool) (Book, error) {
-	draft, err := s.Store.GetDraft(ctx, owner, "working-front:"+book.ID, "working-front-content", batchID)
-	if err == nil && strings.TrimSpace(draft.Content) != "" {
-		book.SourceText = strings.TrimSpace(EffectiveWorkingSource(book, draft.Content))
-		return book, nil
-	}
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	source, hasDraft, err := checkedProductionSource(ctx, s.Store, owner, batchID, book)
+	if err != nil {
 		return Book{}, err
+	}
+	book.SourceText = source
+	if hasDraft {
+		book.SourceText = strings.TrimSpace(source)
+		return book, nil
 	}
 	if completeSource {
 		book.SourceText = strings.TrimSpace(book.SourceText)
@@ -951,6 +951,11 @@ func (s *DirectorService) RunOpeningVariants(ctx context.Context, owner, batchID
 	book, err := bookFromBatch(batch, bookID)
 	if err != nil {
 		return nil, err
+	}
+	if _, pinned := ctx.Value(preparedProductionContextKey{}).(preparedProductionVersion); pinned {
+		if _, _, err := checkedProductionSource(ctx, s.Store, owner, batchID, book); err != nil {
+			return nil, err
+		}
 	}
 	effective := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 	if !rawBool(effective, "openingEnabled", false) {

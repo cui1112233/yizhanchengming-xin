@@ -399,6 +399,7 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 			_ = s.finish(ctx, owner, run, err)
 			return BookStageSummary{}, err
 		}
+		ctx = WithPreparedProduction(ctx, book)
 	}
 	switch stage {
 	case BookStageAssets:

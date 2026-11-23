@@ -42,8 +42,12 @@ func (a *mergeHTTPAdapter) Submit(_ context.Context, _ string, sources []batchfa
 func TestSliceFourProductionRoutesSubmitAndReadDurableStatus(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
-	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "林晚推门进入客厅。"}}})
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "林晚推门进入客厅。", TxtText: "林晚推门进入客厅。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}})
 	if err != nil {
+		t.Fatal(err)
+	}
+	coordinator := &BatchAutomationCoordinator{store: store}
+	if _, err := coordinator.runBatchSensitiveStage(context.Background(), "alice", batch.ID, batch.Books[0].ID, false); err != nil {
 		t.Fatal(err)
 	}
 	director := &batchfactoryv11.DirectorService{Store: store, Provider: &directorHTTPProvider{output: directorHTTPJSON}}
@@ -65,6 +69,24 @@ func TestSliceFourProductionRoutesSubmitAndReadDurableStatus(t *testing.T) {
 	batchRun := signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/batch-factory/v11/batches/"+batch.ID+"/production", map[string]any{"requestId": "submit-batch-1"})
 	if batchRun.Code != http.StatusCreated || !strings.Contains(batchRun.Body.String(), batch.ID) {
 		t.Fatalf("batch status=%d body=%s", batchRun.Code, batchRun.Body.String())
+	}
+	// Updating the working draft then preparing it leaves the old director result stale.
+	if _, err := store.SaveDraft(context.Background(), "alice", batchfactoryv11.Draft{Key: "working-front:" + batch.Books[0].ID, Kind: "working-front-content", Scope: batch.ID, Content: "新的已处理稿。"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := coordinator.runBatchSensitiveStage(context.Background(), "alice", batch.ID, batch.Books[0].ID, false); err != nil {
+		t.Fatal(err)
+	}
+	before := adapter.calls
+	for _, path := range []string{base + "/production", "/api/batch-factory/v12/batches/" + batch.ID + "/production"} {
+		stale := signedJSONRequest(t, api, now, "alice", "POST", path, map[string]any{"requestId": "stale"})
+		if stale.Code != 409 || !strings.Contains(stale.Body.String(), "旧版生产正文") || adapter.calls != before {
+			t.Fatalf("stale %s: %d %s calls=%d", path, stale.Code, stale.Body.String(), adapter.calls)
+		}
+	}
+	replay := signedJSONRequest(t, api, now, "alice", "POST", base+"/production", map[string]any{"requestId": "submit-http-1"})
+	if replay.Code != 201 || adapter.calls != before {
+		t.Fatalf("existing job replay status=%d calls=%d", replay.Code, adapter.calls)
 	}
 }
 

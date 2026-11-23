@@ -31,12 +31,12 @@ func registerV12H3Routes(mux *http.ServeMux, production *BatchAutomationCoordina
 			writeStoreError(w, batchfactoryv11.ErrUnavailable)
 			return
 		}
-		_, err = production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true)
+		prepared, err := production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		revision, err := runner.RunH3Director(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.H3DirectorRunRequest)
+		revision, err := runner.RunH3Director(batchfactoryv11.WithPreparedProduction(r.Context(), prepared), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.H3DirectorRunRequest)
 		if err != nil {
 			writeStoreError(w, err)
 			return

@@ -65,6 +65,7 @@ type SourceCoverage struct {
 }
 
 type DirectorResult struct {
+	ProductionVersion    string                `json:"productionVersion,omitempty"`
 	Characters           []NamedPrompt         `json:"characters"`
 	Scenes               []NamedPrompt         `json:"scenes"`
 	Props                []NamedPrompt         `json:"props"`

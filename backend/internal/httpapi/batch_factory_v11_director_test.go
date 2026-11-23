@@ -2,8 +2,11 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -176,5 +179,76 @@ func TestRegenerationChecksCurrentProductionEvidenceWithoutCallingAI(t *testing.
 		if rec.Code != 409 || !strings.Contains(rec.Body.String(), "生产文本版本") || calls != 1 {
 			t.Fatalf("%s status=%d body=%s calls=%d", suffix, rec.Code, rec.Body.String(), calls)
 		}
+	}
+}
+
+func TestPaidAssetImagesRequireCurrentPromptVersion(t *testing.T) {
+	ctx := context.Background()
+	var calls atomic.Int32
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="}]}`))
+	}))
+	defer mock.Close()
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(ctx, "alice", map[string]any{"modelCatalog": []any{map[string]any{"id": "test-image", "kind": "image", "enabled": true, "provider": "personal_api", "modelId": "test", "baseUrl": mock.URL, "credential": "test"}}}); err != nil {
+		t.Fatal(err)
+	}
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "资产", Books: []batchfactoryv11.CreateBookInput{{Title: "书", TxtText: "初稿。", SourceText: "初稿。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bookID := batch.Books[0].ID
+	c := &BatchAutomationCoordinator{store: store, ttsStore: catalog}
+	prepare := func() {
+		t.Helper()
+		if _, err := c.runBatchSensitiveStage(ctx, "alice", batch.ID, bookID, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prepare()
+	now := time.Unix(1700000000, 0)
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Slice: 2, Now: func() time.Time { return now }, Store: store, NovelFetchStore: catalog, LocalArtifacts: localartifact.NewStore(t.TempDir(), 1<<20)})
+	path := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + bookID + "/assets"
+	newAsset := func() batchfactoryv11.BookAsset {
+		t.Helper()
+		rec := signedJSONRequest(t, api, now, "alice", "POST", path, map[string]any{"kind": "prop", "name": "手表", "prompt": "正面的蓝色手表"})
+		var result struct {
+			Asset batchfactoryv11.BookAsset `json:"asset"`
+		}
+		if rec.Code != 201 || json.Unmarshal(rec.Body.Bytes(), &result) != nil {
+			t.Fatalf("asset: %d %s", rec.Code, rec.Body.String())
+		}
+		return result.Asset
+	}
+	render := func(id string) *httptest.ResponseRecorder {
+		return signedJSONRequest(t, api, now, "alice", "POST", path+"/images/generate", map[string]any{"assetIds": []string{id}, "modelId": "test-image", "provider": "personal_api", "imageAspectRatio": "1:1", "useThreeView": false})
+	}
+	legacy, err := store.CreateBookAsset(ctx, "alice", batch.ID, bookID, batchfactoryv11.CreateBookAssetInput{Kind: "prop", Name: "旧表", Prompt: "旧稿来源未知"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejected := render(legacy.ID)
+	if rejected.Code != 409 || calls.Load() != 0 {
+		t.Fatalf("legacy asset: %d %s calls=%d", rejected.Code, rejected.Body.String(), calls.Load())
+	}
+	asset := newAsset()
+	if _, err := store.SaveDraft(ctx, "alice", batchfactoryv11.Draft{Key: "working-front:" + bookID, Kind: "working-front-content", Scope: batch.ID, Content: "新稿。"}); err != nil {
+		t.Fatal(err)
+	}
+	prepare()
+	rejected = render(asset.ID)
+	if rejected.Code != 409 || !strings.Contains(rejected.Body.String(), "提示词") || calls.Load() != 0 {
+		t.Fatalf("stale asset: %d %s calls=%d", rejected.Code, rejected.Body.String(), calls.Load())
+	}
+	patch := signedJSONRequest(t, api, now, "alice", "PATCH", path+"/"+asset.ID, map[string]any{"expectedRevision": asset.Revision, "name": "手表", "prompt": "正面的银色手表"})
+	if patch.Code != 200 {
+		t.Fatalf("confirm asset: %d %s", patch.Code, patch.Body.String())
+	}
+	rec := render(asset.ID)
+	if rec.Code != 201 || calls.Load() != 1 {
+		t.Fatalf("fresh asset: %d %s calls=%d", rec.Code, rec.Body.String(), calls.Load())
 	}
 }

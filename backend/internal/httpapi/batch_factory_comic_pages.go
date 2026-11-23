@@ -2211,7 +2211,8 @@ func registerComicPageRoutes(mux *http.ServeMux, production *BatchAutomationCoor
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "漫画提示词服务未配置"})
 			return
 		}
-		if _, err := production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true); err != nil {
+		prepared, err := production.runBatchSensitiveStage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), true)
+		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
@@ -2231,7 +2232,7 @@ func registerComicPageRoutes(mux *http.ServeMux, production *BatchAutomationCoor
 			writeJSON(w, http.StatusOK, map[string]any{"candidatePages": 0, "updated": 0, "failed": 0})
 			return
 		}
-		result, runErr := director.RunComicPromptExtractionForPages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), videoIDs)
+		result, runErr := director.RunComicPromptExtractionForPages(batchfactoryv11.WithPreparedProduction(r.Context(), prepared), owner, r.PathValue("batchId"), r.PathValue("bookId"), videoIDs)
 		// 提示词提取只写视频级设置；漫画页行才是出图时的唯一提示词来源，
 		// 因此重抽成功后必须同步回页行，并把页面标记为待重新生成。
 		synced, syncFailed := 0, 0

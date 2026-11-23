@@ -27,10 +27,11 @@ func directorForRequest(service *batchfactoryv11.DirectorService, input *textPro
 
 func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.DirectorService, store batchfactoryv11.Store, stages *batchfactoryv11.BookStageService) {
 	runDirector := func(ctx context.Context, runner *batchfactoryv11.DirectorService, owner, batchID, bookID, style string) (batchfactoryv11.DirectorRevision, error) {
-		if _, err := stages.PrepareProductionText(ctx, owner, batchID, bookID); err != nil {
+		prepared, err := stages.PrepareProductionText(ctx, owner, batchID, bookID)
+		if err != nil {
 			return batchfactoryv11.DirectorRevision{}, err
 		}
-		return runner.RunDirectorWithSmartUnifiedStyle(ctx, owner, batchID, bookID, style)
+		return runner.RunDirectorWithSmartUnifiedStyle(batchfactoryv11.WithPreparedProduction(ctx, prepared), owner, batchID, bookID, style)
 	}
 	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/books/{bookId}/director-prompt-candidate", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -83,7 +84,7 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			return
 		}
 		input.ExpectedRevision = prepared.Revision
-		candidate, err := runner.CreateDirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.ExpectedRevision)
+		candidate, err := runner.CreateDirectorPromptCandidate(batchfactoryv11.WithPreparedProduction(r.Context(), prepared), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.ExpectedRevision)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -118,7 +119,7 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			writeStoreError(w, batchfactoryv11.NewConfigRequiredError("正文版本已变化，请重新生成候选提示词"))
 			return
 		}
-		video, err := service.AcceptDirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"), input.CandidateID, input.ExpectedRevision)
+		video, err := service.AcceptDirectorPromptCandidate(batchfactoryv11.WithPreparedProduction(r.Context(), prepared), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"), input.CandidateID, input.ExpectedRevision)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -186,11 +187,12 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			writeStoreError(w, err)
 			return
 		}
-		if _, err := stages.PrepareProductionText(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId")); err != nil {
+		prepared, err := stages.PrepareProductionText(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		value, err := runner.RunHook(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		value, err := runner.RunHook(batchfactoryv11.WithPreparedProduction(r.Context(), prepared), owner, r.PathValue("batchId"), r.PathValue("bookId"))
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -215,11 +217,12 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			writeStoreError(w, err)
 			return
 		}
-		if _, err := stages.PrepareProductionText(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId")); err != nil {
+		prepared, err := stages.PrepareProductionText(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		variants, err := runner.RunOpeningVariants(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.OpeningMeta)
+		variants, err := runner.RunOpeningVariants(batchfactoryv11.WithPreparedProduction(r.Context(), prepared), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.OpeningMeta)
 		if err != nil {
 			writeStoreError(w, err)
 			return

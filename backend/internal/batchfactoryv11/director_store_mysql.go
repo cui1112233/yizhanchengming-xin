@@ -107,6 +107,7 @@ func loadHookRevision(ctx context.Context, q hookQueryer, owner, batchID, bookID
 }
 
 func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, book Book, snapshot DirectorSnapshot, digest, hookID string, output DirectorResult) (DirectorRevision, error) {
+	output.ProductionVersion = ProductionVersion(book)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return DirectorRevision{}, err

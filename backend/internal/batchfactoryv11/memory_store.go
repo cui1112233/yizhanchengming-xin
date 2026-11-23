@@ -845,7 +845,7 @@ func (s *MemoryStore) deleteMemoryBookData(owner, batchID, bookID string) {
 	}
 	for key, assets := range s.bookAssets {
 		if assets.Owner == owner && assets.Value.BatchID == batchID && assets.Value.BookID == bookID {
-			delete(s.bookAssets, key)
+			s.deleteBookAssetRecordLocked(key)
 		}
 	}
 	for key, hooks := range s.hooks {
@@ -1186,6 +1186,7 @@ func (s *MemoryStore) CreateBookAsset(_ context.Context, owner, batchID, bookID 
 	now := time.Now().UTC()
 	asset := BookAsset{ID: s.id("asset"), BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio, Source: input.Source, Revision: 1, CreatedAt: now, UpdatedAt: now}
 	s.bookAssets[asset.ID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
+	s.saveAssetProofLocked(owner, asset, input.ProductionVersion)
 	return asset, nil
 }
 
@@ -1215,6 +1216,7 @@ func (s *MemoryStore) UpdateBookAsset(_ context.Context, owner, batchID, bookID,
 	}
 	asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, asset.ImageModelID, asset.ImageAspectRatio, asset.Revision, asset.UpdatedAt = input.Name, input.FormalName, input.Facts, input.Appearance, input.Relationships, input.Prompt, input.ImageModelID, input.ImageAspectRatio, asset.Revision+1, time.Now().UTC()
 	s.bookAssets[assetID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
+	s.saveAssetProofLocked(owner, asset, input.ProductionVersion)
 	return asset, nil
 }
 
@@ -1228,7 +1230,7 @@ func (s *MemoryStore) DeleteBookAsset(_ context.Context, owner, batchID, bookID,
 	if !ok || owned.Owner != owner || owned.Value.BatchID != batchID || owned.Value.BookID != bookID {
 		return ErrNotFound
 	}
-	delete(s.bookAssets, assetID)
+	s.deleteBookAssetRecordLocked(assetID)
 	for imageID, image := range s.bookAssetImages {
 		if image.Owner == owner && image.Value.AssetID == assetID {
 			delete(s.bookAssetImages, imageID)
@@ -1398,6 +1400,7 @@ func (s *MemoryStore) LatestHookRevision(_ context.Context, owner, batchID, book
 }
 
 func (s *MemoryStore) PersistDirectorRevision(_ context.Context, owner string, book Book, snapshot DirectorSnapshot, digest, hookID string, output DirectorResult) (DirectorRevision, error) {
+	output.ProductionVersion = ProductionVersion(book)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	owned, ok := s.batches[book.BatchID]
@@ -1467,12 +1470,13 @@ func (s *MemoryStore) PersistDirectorRevision(_ context.Context, owner string, b
 		}
 		assetPlan := reconcileDirectorAssets(existingRows, desiredDirectorAssets, hasImage)
 		for _, staleID := range assetPlan.Deletes {
-			delete(s.bookAssets, staleID)
+			s.deleteBookAssetRecordLocked(staleID)
 		}
 		// Matched rows are frozen: no prompt overwrite, no revision bump.
 		for _, seed := range assetPlan.Inserts {
 			seed.ID, seed.Revision, seed.CreatedAt, seed.UpdatedAt = s.id("asset"), 1, now, now
 			s.bookAssets[seed.ID] = memoryOwned[BookAsset]{Owner: owner, Value: seed}
+			s.saveAssetProofLocked(owner, seed, ProductionVersion(book))
 		}
 	}
 	assetIDs := map[string]string{}
@@ -1518,7 +1522,7 @@ func (s *MemoryStore) PersistExtractedBookAssets(_ context.Context, owner string
 	for assetID, ownedAsset := range s.bookAssets {
 		asset := ownedAsset.Value
 		if ownedAsset.Owner == owner && asset.BatchID == book.BatchID && asset.BookID == book.ID && asset.Source == "director" {
-			delete(s.bookAssets, assetID)
+			s.deleteBookAssetRecordLocked(assetID)
 		}
 	}
 	output := DirectorResult{Characters: assets.Characters, Scenes: assets.Scenes, Props: assets.Props}
@@ -1532,6 +1536,7 @@ func (s *MemoryStore) PersistExtractedBookAssets(_ context.Context, owner string
 			found = true
 			if asset.Source != "manual" {
 				asset.Prompt, asset.Source, asset.ExtractionPresetID, asset.ExtractionPresetVersion = seed.Prompt, seed.Source, seed.ExtractionPresetID, seed.ExtractionPresetVersion
+				s.saveAssetProofLocked(owner, asset, ProductionVersion(book))
 				asset.Revision++
 				asset.UpdatedAt = now
 				s.bookAssets[assetID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
@@ -1562,6 +1567,7 @@ func (s *MemoryStore) PersistExtractedBookAssets(_ context.Context, owner string
 		if !found {
 			seed.ID, seed.Revision, seed.CreatedAt, seed.UpdatedAt = s.id("asset"), 1, now, now
 			s.bookAssets[seed.ID] = memoryOwned[BookAsset]{Owner: owner, Value: seed}
+			s.saveAssetProofLocked(owner, seed, ProductionVersion(book))
 		}
 	}
 	return memoryBookAssets(s.bookAssets, book.BatchID, book.ID), nil
@@ -1583,13 +1589,29 @@ func (s *MemoryStore) PersistComicExtractedBookAssets(_ context.Context, owner s
 	for assetID, ownedAsset := range s.bookAssets {
 		asset := ownedAsset.Value
 		if ownedAsset.Owner == owner && asset.BatchID == book.BatchID && asset.BookID == book.ID && normalizeLegacyComicBookAsset(asset).Source == "comic" {
-			delete(s.bookAssets, assetID)
+			s.deleteBookAssetRecordLocked(assetID)
 		}
 	}
 	now := time.Now().UTC()
 	for _, asset := range comicBookAssets(book, snapshot, assets) {
 		asset.ID, asset.Revision, asset.CreatedAt, asset.UpdatedAt = s.id("comic-asset"), 1, now, now
 		s.bookAssets[asset.ID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
+		s.saveAssetProofLocked(owner, asset, ProductionVersion(book))
 	}
 	return memoryBookAssets(s.bookAssets, book.BatchID, book.ID), nil
+}
+
+func (s *MemoryStore) saveAssetProofLocked(owner string, asset BookAsset, version string) {
+	if version == "" {
+		return
+	}
+	d := assetPromptProof(asset, version)
+	s.drafts[draftKey(owner, d.Key, d.Kind, d.Scope)] = d
+}
+
+func (s *MemoryStore) deleteBookAssetRecordLocked(id string) {
+	if a, ok := s.bookAssets[id]; ok {
+		delete(s.drafts, draftKey(a.Owner, id, AssetPromptProofKind, a.Value.BatchID))
+		delete(s.bookAssets, id)
+	}
 }
