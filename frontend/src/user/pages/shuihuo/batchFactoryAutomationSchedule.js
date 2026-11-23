@@ -38,29 +38,28 @@ export function automationPresetSnapshot(presets, presetId) {
   };
 }
 
-// 预设按生产模式（comic/video）分家：config.productionMode 记录归属。
-// 返回 '' 表示旧预设/未标注（通用），漫画与视频下拉都可见并打「通用」标。
+// 历史预设没有生产模式，三个模式都可选择。
+const presetModeLabels = new Map([['video', '视频'], ['comic', '漫画'], ['text', '文本']]);
+
 export function automationPresetMode(preset) {
   const config = preset?.config && typeof preset.config === 'object' && !Array.isArray(preset.config) ? preset.config : {};
   const mode = String(config.productionMode || '').trim().toLowerCase();
-  return ['comic', 'video'].includes(mode) ? mode : '';
+  return presetModeLabels.has(mode) ? mode : '';
 }
 
 export function automationPresetModeLabel(mode) {
-  if (mode === 'comic') return '漫画';
-  if (mode === 'video') return '视频';
-  return '通用';
+  return presetModeLabels.get(mode) || '通用';
 }
 
 // 只保留与当前批次模式匹配（或通用）的预设；mode 为空（无模式上下文）返回全部。
 export function automationPresetsForMode(presets, mode) {
-  if (mode !== 'comic' && mode !== 'video') return Array.isArray(presets) ? [...presets] : [];
+  if (!presetModeLabels.has(mode)) return Array.isArray(presets) ? [...presets] : [];
   return (Array.isArray(presets) ? presets : []).filter(preset => !automationPresetMode(preset) || automationPresetMode(preset) === mode);
 }
 
 // 把当前批次生产模式写进预设 config；mode 为空时保持原 config 不动。
 export function withAutomationPresetMode(config, mode) {
   const next = config && typeof config === 'object' && !Array.isArray(config) ? { ...config } : {};
-  if (mode === 'comic' || mode === 'video') next.productionMode = mode;
+  if (presetModeLabels.has(mode)) next.productionMode = mode;
   return next;
 }

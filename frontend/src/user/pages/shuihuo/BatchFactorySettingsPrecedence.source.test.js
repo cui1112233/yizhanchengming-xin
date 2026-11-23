@@ -22,9 +22,9 @@ test('runtime merge chain keeps the book patch above the batch unified configura
 
 test('batch productionMode stays authoritative over a stale single-book value', () => {
   const fn = helpers.match(/export function effectiveBookSettings\(batch, book\) \{[\s\S]*?\n\}/)?.[0] || '';
-  assert.match(fn, /if \(\['comic', 'video'\]\.includes\(batchPatch\.productionMode\)\) effective\.productionMode = batchPatch\.productionMode;/);
+  assert.match(fn, /if \(\['comic', 'video', 'text'\]\.includes\(batchPatch\.productionMode\)\) effective\.productionMode = batchPatch\.productionMode;/);
   // 视频批次不允许因为单书遗留的 comic 配置进入漫画栏目。
-  assert.match(fn, /else if \(!\['comic', 'video'\]\.includes\(effective\.productionMode\)/);
+  assert.match(fn, /else if \(!\['comic', 'video', 'text'\]\.includes\(effective\.productionMode\)/);
 });
 
 test('a saved unified configuration is pushed through to every book in the batch', () => {

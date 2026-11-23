@@ -62,10 +62,9 @@ test('lets a first-time batch owner save unified settings before creating the ba
   assert.match(source, /BatchFactoryAiReasoningForm/);
   assert.match(source, /BatchFactoryPublishSettingsForm/);
   assert.match(source, /BatchFactoryAutomationPresetManager/);
-  assert.match(source, /const \[initialBatchSettings, setInitialBatchSettings\] = useState\(\{\}\)/);
   assert.match(source, />统一配置<\/Button>/);
   assert.match(source, /新建批量 · 统一配置/);
-  assert.match(source, /<BatchFactoryAutomationPresetManager value=\{initialBatchSettings\} productionMode=\{isComicProduction \? 'comic' : 'video'\} onLoad=\{setInitialBatchSettings\} \/>/);
+  assert.match(source, /<BatchFactoryAutomationPresetManager value=\{initialBatchSettings\} productionMode=\{batchMode\}/);
   assert.match(source, /initialBatchSettings: clone\(initialBatchSettings\)/);
 });
 
@@ -83,6 +82,27 @@ test('shows comic analysis characters separately from the 4000-character capture
   assert.match(source, /comicAnalysisCharacters/);
   assert.match(source, /contentCaptureCharacters/);
   assert.match(source, /comicAnalysisCharacters,/);
+});
+
+test('new batch mode menu shares the three options with unified settings and binds the text page target', () => {
+  assert.match(source, /生产模式<Select[^>]*options=\{PRODUCTION_MODE_OPTIONS\}/);
+  assert.match(source, /单页字数<InputNumber[^>]*value=\{initialBatchSettings\.textPageTarget\}/);
+  const unified = fs.readFileSync(path.join(here, 'BatchFactoryUnifiedSettingsModal.jsx'), 'utf8');
+  assert.match(unified, /selectedPreset = presetOptions\.find\(/);
+});
+
+test('both book list summaries use the effective text target for the book', () => {
+  const list = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8');
+  assert.equal([...list.matchAll(/batchFactorySourceSummary\(book, settings\.productionMode, settings\.textPageTarget\)/g)].length, 2);
+  const helpers = fs.readFileSync(path.join(here, 'batchFactoryNovelListHelpers.js'), 'utf8');
+  assert.match(helpers, /单页约 \$\{textPageTarget\} 字/);
+});
+
+test('creating a text batch through either shell skips automatic model-based classification', () => {
+  for (const name of ['BatchFactoryWorkbenchPage.jsx', 'ShuihuoProductionPage.jsx']) {
+    const page = fs.readFileSync(path.join(here, '..', name), 'utf8');
+    assert.match(page, /if \([^\n]*productionMode !== 'text'\) (?:\{\s*try \{\s*const result = await |void )classifyFetchedBatchMetadata\(batch\.id\)/);
+  }
 });
 
 test('uses the unified button treatment for the new batch toolbar', () => {

@@ -281,9 +281,10 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
       </span><span>入厂内容</span><span>风格</span><span>男女频</span><span>状态</span><span>操作</span>
     </div>
     {books.map((book, index) => {
-      const row = batchFactoryNovelTableRow(book, index, createdAt, { productionStatus, mergeStatus, stageSummary: stageSummaries?.[book.id], productionMode: effectiveBookSettings(batch, book).productionMode });
+      const settings = effectiveBookSettings(batch, book);
+      const row = batchFactoryNovelTableRow(book, index, createdAt, { productionStatus, mergeStatus, stageSummary: stageSummaries?.[book.id], productionMode: settings.productionMode });
       const metadata = book.sourceMetadata || {};
-      const sourceSummary = batchFactorySourceSummary(book);
+      const sourceSummary = batchFactorySourceSummary(book, settings.productionMode, settings.textPageTarget);
       const sourceStatus = batchFactorySourceStatus(book);
       return <div className="batch-factory-novel-list-row" key={book.id} role="row">
         <span className="is-order"><Checkbox checked={selected.has(book.id)} onChange={event => onSelectionChange(event.target.checked ? [...selected, book.id] : [...selected].filter(id => id !== book.id))} aria-label={`选择 ${row.title}`} /><b>{String(index + 1).padStart(2, '0')}</b></span>
@@ -5926,10 +5927,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
           ) : null}
           {books.map((book, index) => {
             const stageSummary = stageSummaries[book.id];
-            const productionMode =
-              effectiveBookSettings(batch, book).productionMode === "comic"
-                ? "comic"
-                : "video";
+            const settings = effectiveBookSettings(batch, book);
+            const productionMode = settings.productionMode || 'video';
             const automationBook = (() => {
               const scoped = automationBookForCard(automationStatus, batch.id, book.id);
               return scoped && !scoped.stale ? scoped : null;
@@ -5954,10 +5953,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             );
             const sourceVersionLabel = batchFactorySourceVersionLabel(book);
             const sourceVersionClass = batchFactorySourceVersionClass(book);
-            const sourceSummary = batchFactorySourceSummary(
-              book,
-              productionMode,
-            );
+            const sourceSummary = batchFactorySourceSummary(book, settings.productionMode, settings.textPageTarget);
             const sourceStatus = batchFactorySourceStatus(book);
             const videos = book.videos || [];
             const lastFailedStage = stageSummary?.lastFailed;

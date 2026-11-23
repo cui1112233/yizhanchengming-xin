@@ -14,7 +14,8 @@ import { duplicateGiantMaterialBookIndexes, parseGiantMaterialIds } from './batc
 import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
 import { comicEstimatedPageRange } from './batchFactoryContentRange.js';
-import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryComicPublishSettingsForm, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal.jsx';
+import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryComicPublishSettingsForm, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm, PRODUCTION_MODE_OPTIONS } from './BatchFactoryUnifiedSettingsModal.jsx';
+import { batchCreationSettings, batchFactoryProductionMode } from './batchFactoryProductionMode';
 import {
   availableGiantMaterialBooks,
   buildGiantMaterialPlaceholderIntakes,
@@ -71,7 +72,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   const [automationConcurrency, setAutomationConcurrency] = useState(4);
   const [contentRangeLines, setContentRangeLines] = useState(5);
   const [comicAnalysisCharacters, setComicAnalysisCharacters] = useState(2000);
-  const [contentCaptureCharacters, setContentCaptureCharacters] = useState(4000);
+  const [captureCharacters, setCaptureCharacters] = useState(4000);
   const [busy, setBusy] = useState(false);
   const [groups, setGroups] = useState([]);
   const [editingPlatformId, setEditingPlatformId] = useState(null);
@@ -80,7 +81,10 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   const [giantError, setGiantError] = useState('');
   const [executorHealth, setExecutorHealth] = useState(null);
   const [giantOriginalReadStrategy, setGiantOriginalReadStrategy] = useState('ocr_first');
-  const [initialBatchSettings, setInitialBatchSettings] = useState({});
+  const [initialSettingsDraft, setInitialBatchSettings] = useState({});
+  const initialBatchSettings = batchCreationSettings(initialSettingsDraft, captureCharacters);
+  const batchMode = batchFactoryProductionMode(initialBatchSettings.productionMode);
+  const contentCaptureCharacters = batchMode === 'text' ? initialBatchSettings.contentRange : captureCharacters;
   const [initialSettingsOpen, setInitialSettingsOpen] = useState(false);
   const giantControllerRef = useRef(null);
   const customCopySessionRef = useRef('');
@@ -130,6 +134,18 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   const isGiantMaterial = platformId === GIANT_MATERIAL_PLATFORM_OPTION.value;
   const isCustomCopy = platformId === CUSTOM_COPY_OPTION.value;
   const isComicProduction = initialBatchSettings.productionMode === 'comic';
+  function changeProductionMode(productionMode) {
+    setInitialBatchSettings(current => ({ ...current, productionMode }));
+    if (productionMode !== batchMode) setAutomationPresetID('');
+  }
+
+  function changeCaptureCharacters(value) {
+    if (batchMode === 'text') {
+      setInitialBatchSettings(current => ({ ...current, contentRange: value }));
+    } else {
+      setCaptureCharacters(value);
+    }
+  }
   const inputBookIds = useMemo(() => manualBookIDsFromInput(inputText), [inputText]);
   const giantDuplicateIndexes = useMemo(() => duplicateGiantMaterialBookIndexes(giantItems.map(item => (
     item.status === 'resolved' ? selectGiantMaterialBook(item.material, item.selectedBookKey) : null
@@ -160,7 +176,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     setAutomationConcurrency(2);
     setContentRangeLines(5);
     setComicAnalysisCharacters(2000);
-    setContentCaptureCharacters(4000);
+    setCaptureCharacters(4000);
     setGroups([]);
     setEditingPlatformId(null);
     setInitialBatchSettings({});
@@ -374,10 +390,8 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       const selectedPreset = (scheduledRun || automationRun) ? automationPresetSnapshot(automationPresets, automationPresetID) : null;
       if ((scheduledRun || automationRun) && !selectedPreset) throw new Error('所选自动化预设不存在或没有可用配置，请重新选择。');
       if (selectedPreset) {
-        // 预设按漫画/视频分家：另一个模式的预设不允许套到当前批次上。
         const presetMode = automationPresetMode(selectedPreset);
-        const batchMode = isComicProduction ? 'comic' : 'video';
-        if (presetMode && presetMode !== batchMode) throw new Error(`所选预设属于${automationPresetModeLabel(presetMode)}生产模式，不能用于当前${batchMode === 'comic' ? '漫画' : '视频'}批次，请换一个预设`);
+        if (presetMode && presetMode !== batchMode) throw new Error(`所选预设属于${automationPresetModeLabel(presetMode)}生产模式，不能用于当前${automationPresetModeLabel(batchMode)}批次，请换一个预设`);
       }
       const giantAutomationPlan = (scheduledRun || automationRun) ? {
         scheduledAt: scheduledAtISO,
@@ -828,15 +842,17 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     ) : null}
 
     <div className="batch-factory-content-controls">
-      <label className="shuihuo-form-label">生产模式<Select value={initialBatchSettings.productionMode || 'video'} onChange={productionMode => setInitialBatchSettings(current => ({ ...current, productionMode }))} options={[{ value: 'video', label: '视频生成' }, { value: 'comic', label: '漫画生成' }]} /></label>
+      <label className="shuihuo-form-label">生产模式<Select value={initialBatchSettings.productionMode || 'video'} onChange={changeProductionMode} options={PRODUCTION_MODE_OPTIONS} /></label>
       {isComicProduction
         ? <label className="shuihuo-form-label">漫画分析<InputNumber min={100} max={100000} step={100} value={comicAnalysisCharacters} onChange={value => setComicAnalysisCharacters(Math.min(100000, Math.max(100, Number(value) || 2000)))} addonAfter="字" /> <small>预计约 {comicEstimatedPageRange(comicAnalysisCharacters).min}-{comicEstimatedPageRange(comicAnalysisCharacters).max} 张 · 最多 35 张</small></label>
-        : <label className="shuihuo-form-label">内容范围<InputNumber min={1} max={500} value={contentRangeLines} onChange={value => setContentRangeLines(value || 5)} addonAfter="行" /></label>}
-      <label className="shuihuo-form-label">内容截取<Select value={contentCaptureCharacters} onChange={setContentCaptureCharacters} options={[1000, 2000, 4000, 8000, 12000, 20000, 50000, 100000].map(value => ({ value, label: `${value} 字` }))} /></label>
+        : batchMode === 'text'
+          ? <label className="shuihuo-form-label">单页字数<InputNumber min={1} precision={0} value={initialBatchSettings.textPageTarget} onChange={value => setInitialBatchSettings(current => ({ ...current, textPageTarget: value ?? 150 }))} addonAfter="字" /></label>
+          : <label className="shuihuo-form-label">内容范围<InputNumber min={1} max={500} value={contentRangeLines} onChange={value => setContentRangeLines(value || 5)} addonAfter="行" /></label>}
+      <label className="shuihuo-form-label">内容截取<Select value={contentCaptureCharacters} onChange={changeCaptureCharacters} options={[1000, 2000, 4000, 8000, 12000, 20000, 50000, 100000].map(value => ({ value, label: `${value} 字` }))} /></label>
     </div>
   </Modal>
   <Modal
-    title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={initialBatchSettings} productionMode={isComicProduction ? 'comic' : 'video'} onLoad={setInitialBatchSettings} /><span>新建批量 · 统一配置</span><BatchFactoryProductionModeControl value={initialBatchSettings.productionMode} onChange={productionMode => setInitialBatchSettings(current => ({ ...current, productionMode }))} /></div>}
+    title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={initialBatchSettings} productionMode={batchMode} onLoad={setInitialBatchSettings} /><span>新建批量 · 统一配置</span><BatchFactoryProductionModeControl value={initialBatchSettings.productionMode} onChange={changeProductionMode} /></div>}
     open={initialSettingsOpen}
     onCancel={() => setInitialSettingsOpen(false)}
     onOk={() => setInitialSettingsOpen(false)}
@@ -867,7 +883,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     <Input id="batch-scheduled-at" type="datetime-local" value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} />
     <small>{automationScheduleMode === 'submit' ? '提前完成生产和合成；到设定时间才上传或发布。' : '到设定时间才开始生产；生成、合成与上传按后续流程继续。'}</small></> : <Alert type="info" showIcon message="创建完成后立即启动自动生产" description="不会直接提交；只有选择全自动模式且成片完成后，才会上传视频管理系统。" />}
     <label className="shuihuo-form-label">自动化预设 <em>*</em></label>
-    <Select value={automationPresetID || undefined} onChange={setAutomationPresetID} placeholder="选择已保存预设" options={automationPresetsForMode(automationPresets, isComicProduction ? 'comic' : 'video').map(item => ({ value: item.id, label: `${item.name} · v${item.version} · ${automationPresetModeLabel(automationPresetMode(item))}` }))} />
+    <Select value={automationPresetID || undefined} onChange={setAutomationPresetID} placeholder="选择已保存预设" options={automationPresetsForMode(automationPresets, batchMode).map(item => ({ value: item.id, label: `${item.name} · v${item.version} · ${automationPresetModeLabel(automationPresetMode(item))}` }))} />
     <label className="shuihuo-form-label">执行模式</label>
     <Select value={automationRunMode} onChange={value => { setAutomationRunMode(value); if (value !== 'full_submit') setAutomationScheduleMode('execute'); }} options={[{ value: 'storyboard_only', label: '只生成分镜' }, { value: 'video_no_submit', label: '生成视频不提交' }, { value: 'full_submit', label: '全自动生成并提交（成片完成后上传）' }]} />
     {automationDialogMode === 'scheduled' ? <><label className="shuihuo-form-label">定时方式</label><Select value={automationScheduleMode} onChange={setAutomationScheduleMode} options={[{ value: 'execute', label: '定时执行（到点才开始生产）' }, { value: 'submit', label: '定时提交（提前生产，到点上传/发布）', disabled: automationRunMode !== 'full_submit' }]} /></> : null}

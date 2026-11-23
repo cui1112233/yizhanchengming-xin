@@ -123,9 +123,10 @@ export function batchFactorySourceVersionClass(book = {}) {
   return ['sensitive', 'original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5'].includes(version) ? version : 'original';
 }
 
-export function batchFactorySourceSummary(book = {}, productionMode = 'video') {
+export function batchFactorySourceSummary(book = {}, productionMode = 'video', textPageTarget = 150) {
   const source = batchFactoryCleanSourceText(book?.sourceText || '');
   if (!source) return { ready: false, text: '暂无可用正文' };
+  if (productionMode === 'text') return { ready: true, text: `已带入 · ${Array.from(source).length} 字 · 单页约 ${textPageTarget} 字` };
   if (productionMode === 'comic') return { ready: true, text: `已带入 · ${source.length} 字 · 漫画分析 ${comicAnalysisCharactersForBook(book)} 字` };
   const productionLines = batchFactoryPreviewText(book?.sourceText || '', book).split(/\r?\n/).filter(Boolean).length;
   return { ready: true, text: `已带入 · ${source.length} 字 · 生产前 ${productionLines} 行` };
@@ -500,8 +501,8 @@ export function effectiveBookSettings(batch, book) {
   const comic = effective?.aiPromptConfig?.comic || {};
   // 批次级 productionMode 是整批唯一的模式开关；单书里遗留的值不得覆盖它，
   // 否则列表按视频渲染、自动化却可能按漫画执行漫画阶段。
-  if (['comic', 'video'].includes(batchPatch.productionMode)) effective.productionMode = batchPatch.productionMode;
-  else if (!['comic', 'video'].includes(effective.productionMode) && comic.enabled === true && String(comic.body || '').trim()) effective.productionMode = 'comic';
+  if (['comic', 'video', 'text'].includes(batchPatch.productionMode)) effective.productionMode = batchPatch.productionMode;
+  else if (!['comic', 'video', 'text'].includes(effective.productionMode) && comic.enabled === true && String(comic.body || '').trim()) effective.productionMode = 'comic';
   return normalizeAudioSourceSettings(effective);
 }
 

@@ -233,7 +233,7 @@ export default function BatchFactoryWorkbenchPage() {
     // a provider failure must never prevent a fetched source from entering
     // production.  The server handles each book independently and persists
     // successful gender/style results before this refresh.
-    void classifyFetchedBatchMetadata(batch.id).then(async result => {
+    if (input?.initialBatchSettings?.productionMode !== 'text') void classifyFetchedBatchMetadata(batch.id).then(async result => {
       const rows = Array.isArray(result?.results) ? result.results : [];
       const classified = rows.filter(item => item?.status === 'classified').length;
       const failed = rows.filter(item => item?.status === 'failed').length;

@@ -80,7 +80,7 @@ function HelpTip({ title, children }) {
   return <Tooltip title={children}><button type="button" className="batch-factory-help-button" aria-label={`查看${title}说明`}>?</button></Tooltip>;
 }
 
-const PRODUCTION_MODE_OPTIONS = [
+export const PRODUCTION_MODE_OPTIONS = [
   { value: 'video', label: '视频生成' },
   { value: 'comic', label: '漫画生成' },
   { value: 'text', label: '文本生成' }
@@ -638,10 +638,8 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad, productionM
   const [selectedPresetId, setSelectedPresetId] = useState('');
   const [presetName, setPresetName] = useState('');
   const [presetBusy, setPresetBusy] = useState(false);
-  const selectedPreset = presets.find(item => item.id === selectedPresetId);
-  // 预设按漫画/视频分家：下拉只显示与当前批次模式匹配（或通用）的预设，
-  // 标签标注归属；旧预设没有 config.productionMode 时视为「通用」。
   const presetOptions = automationPresetsForMode(presets, productionMode);
+  const selectedPreset = presetOptions.find(item => item.id === selectedPresetId);
   const loadPresets = async () => {
     const result = await listAutomationPresets();
     const values = Array.isArray(result?.presets) ? result.presets : [];
@@ -656,7 +654,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad, productionM
   const presetDraftConfig = () => withAutomationPresetMode(normalizeSensitiveSettings(normalizeBatchAutoAudioConfig(value)), productionMode);
   const loadPreset = () => {
     if (!selectedPreset) return message.warning('请先选择自动化预设');
-    Modal.confirm({ title: '确认载入此预设', content: '它只替换当前统一配置草稿；确认当前批量配置后才会应用。', okText: '载入草稿', onOk: () => onLoad(clonePresetConfig) });
+    Modal.confirm({ title: '确认载入此预设', content: '它只替换当前统一配置草稿；确认当前批量配置后才会应用。', okText: '载入草稿', onOk: () => onLoad(withAutomationPresetMode(clonePresetConfig, productionMode)) });
   };
   const editPreset = () => {
     if (!selectedPreset) return message.warning('请先选择自动化预设');
@@ -701,7 +699,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad, productionM
   return <><Tooltip title="自动化预设"><Button type="text" icon={<SettingOutlined />} aria-label="自动化预设" onClick={openPresetManager} /></Tooltip>
   <Modal className="batch-factory-automation-preset-modal" title="自动化预设" open={presetOpen} onCancel={() => setPresetOpen(false)} footer={null} width={620} destroyOnClose><Space direction="vertical" size={14} style={{ width: '100%' }}>
     <Alert type="info" showIcon message={<span>预设只保存统一配置 <HelpTip title="预设只保存统一配置">不保存正文、资产、导演结果或视频结果；载入后仍须确认当前统一配置才会应用到批量。</HelpTip></span>} />
-    <label className="batch-factory-engine-field"><span><b>已保存预设</b>{productionMode ? <small>（{automationPresetModeLabel(productionMode)}）</small> : null}</span><Select allowClear value={selectedPresetId || undefined} onChange={setSelectedPresetId} placeholder="选择自动化预设" options={presetOptions.map(item => ({ value: item.id, label: `${item.name} · v${item.version} · ${automationPresetModeLabel(automationPresetMode(item))}` }))} /></label>
+    <label className="batch-factory-engine-field"><span><b>已保存预设</b>{productionMode ? <small>（{automationPresetModeLabel(productionMode)}）</small> : null}</span><Select allowClear value={selectedPreset?.id} onChange={setSelectedPresetId} placeholder="选择自动化预设" options={presetOptions.map(item => ({ value: item.id, label: `${item.name} · v${item.version} · ${automationPresetModeLabel(automationPresetMode(item))}` }))} /></label>
     <Space wrap><Button disabled={!selectedPreset} onClick={loadPreset}>载入预设</Button><Tooltip title="把当前统一配置草稿保存回所选预设：先载入预设并调整配置，再点此按钮覆盖保存"><Button disabled={!selectedPreset} onClick={editPreset}>编辑所选预设</Button></Tooltip></Space>
     <Divider />
     <label className="batch-factory-engine-field"><span><b>{selectedPreset ? '预设新名称' : '新预设名称'}</b></span><Input value={presetName} maxLength={255} placeholder={selectedPreset?.name || '例如：女频 H3 全自动'} onChange={event => setPresetName(event.target.value)} /></label>

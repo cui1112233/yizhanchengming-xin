@@ -228,7 +228,7 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false, theme = 'dark' 
     setActiveBatchProject(batch);
     setView('batch-novels');
     await refreshProjects();
-    if (batch?.id) {
+    if (batch?.id && input?.initialBatchSettings?.productionMode !== 'text') {
       try {
         const result = await classifyFetchedBatchMetadata(batch.id);
         const rows = Array.isArray(result?.results) ? result.results : [];

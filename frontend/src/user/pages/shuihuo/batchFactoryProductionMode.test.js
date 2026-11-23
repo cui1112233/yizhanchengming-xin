@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as modes from './batchFactoryProductionMode.js';
+import { automationPresetMode, automationPresetModeLabel, automationPresetsForMode, withAutomationPresetMode } from './batchFactoryAutomationSchedule.js';
 import {
   batchFactoryProductionMode,
   batchFactoryProductionModeVisibility,
@@ -16,6 +18,29 @@ test('defaults historical settings to video mode', () => {
     comic: false,
     text: false
   });
+});
+
+test('new text batches seed page, capture and aspect without overriding draft edits', () => {
+  assert.equal(typeof modes.batchCreationSettings, 'function');
+  assert.deepEqual(modes.batchCreationSettings({ productionMode: 'text' }), {
+    productionMode: 'text', textPageTarget: 150, contentRange: 4000, contentCaptureCharacters: 4000, imageAspectRatio: '3:4'
+  });
+  const draft = { productionMode: 'text', textPageTarget: 205, contentRange: 8000, imageAspectRatio: '9:16' };
+  assert.deepEqual(modes.batchCreationSettings(draft, 1000), { ...draft, contentCaptureCharacters: 8000 });
+  assert.equal(modes.batchCreationSettings({ productionMode: 'text', contentCaptureCharacters: 2000 }).contentRange, 2000);
+  assert.equal(modes.batchCreationSettings({ productionMode: 'text' }, 12000).contentRange, 12000);
+  for (const productionMode of ['video', 'comic']) {
+    assert.deepEqual(modes.batchCreationSettings({ productionMode }), { productionMode });
+  }
+});
+
+test('text presets remain isolated while historical generic presets remain selectable', () => {
+  const textPreset = { id: 'text', config: withAutomationPresetMode({ textPageTarget: 240 }, 'text') };
+  const presets = [textPreset, { id: 'generic', config: {} }, { id: 'comic', config: { productionMode: 'comic' } }];
+  assert.equal(automationPresetMode(textPreset), 'text');
+  assert.equal(automationPresetModeLabel('text'), '文本');
+  assert.deepEqual(automationPresetsForMode(presets, 'text').map(preset => preset.id), ['text', 'generic']);
+  assert.deepEqual(automationPresetsForMode(presets, 'comic').map(preset => preset.id), ['generic', 'comic']);
 });
 
 test('video publishing environment is checked only while its tab is visible', () => {
