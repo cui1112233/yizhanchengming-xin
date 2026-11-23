@@ -1308,16 +1308,13 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				writeShuihuoProject(w, r, store, owner, id)
 				return
 			}
-			batches, err := store.ListBatches(r.Context(), owner)
+			batches, err := listShuihuoProjects(r.Context(), store, owner)
 			if err != nil {
 				writeStoreError(w, err)
 				return
 			}
 			projects := make([]map[string]any, 0, len(batches))
 			for _, batch := range batches {
-				if !isShuihuoProjectBatch(batch) {
-					continue
-				}
 				projects = append(projects, shuihuoProject(batch))
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"projects": projects})
@@ -1356,6 +1353,10 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "id is required"})
 				return
 			}
+			if _, err := loadShuihuoProject(r.Context(), store, owner, id); err != nil {
+				writeStoreError(w, err)
+				return
+			}
 			if err := store.DeleteBatch(r.Context(), owner, id); err != nil {
 				writeStoreError(w, err)
 				return
@@ -1378,7 +1379,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "project id is required"})
 			return
 		}
-		batch, err := store.GetBatch(r.Context(), owner, parts[0])
+		batch, err := loadShuihuoProject(r.Context(), store, owner, parts[0])
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -1632,10 +1633,6 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入图片或配音任务，请先使用视频任务"})
 				return
 			}
-			if !isShuihuoProjectBatch(batch) {
-				writeStoreError(w, batchfactoryv11.ErrNotFound)
-				return
-			}
 			if production.ProviderRegistry != nil {
 				if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), store, production.ProviderRegistry, owner, catalogStore); syncErr != nil {
 					writeStoreError(w, syncErr)
@@ -1668,10 +1665,6 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				ModelID   string `json:"modelId,omitempty"`
 			}
 			if !decodeJSON(w, r, &input) {
-				return
-			}
-			if !isShuihuoProjectBatch(batch) {
-				writeStoreError(w, batchfactoryv11.ErrNotFound)
 				return
 			}
 			if production.ProviderRegistry != nil {
@@ -2106,19 +2099,12 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "segment id is required"})
 			return
 		}
-		batches, err := store.ListBatches(r.Context(), owner)
+		batches, err := listShuihuoProjects(r.Context(), store, owner)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
 		for _, batch := range batches {
-			// ListBatches may return compact book records without source metadata.
-			// Always hydrate the batch because editable segments live in that metadata.
-			full, getErr := store.GetBatch(r.Context(), owner, batch.ID)
-			if getErr != nil {
-				continue
-			}
-			batch = full
 			if len(batch.Books) == 0 {
 				continue
 			}
@@ -2328,16 +2314,12 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		assetID := parts[0]
-		batches, err := store.ListBatches(r.Context(), owner)
+		batches, err := listShuihuoProjects(r.Context(), store, owner)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		for _, compact := range batches {
-			batch, getErr := store.GetBatch(r.Context(), owner, compact.ID)
-			if getErr != nil {
-				continue
-			}
+		for _, batch := range batches {
 			if len(batch.Books) == 0 {
 				continue
 			}
@@ -2485,14 +2467,13 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image route not found"})
 			return
 		}
-		batches, err := store.ListBatches(r.Context(), owner)
+		batches, err := listShuihuoProjects(r.Context(), store, owner)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		for _, compact := range batches {
-			batch, getErr := store.GetBatch(r.Context(), owner, compact.ID)
-			if getErr != nil || len(batch.Books) == 0 {
+		for _, batch := range batches {
+			if len(batch.Books) == 0 {
 				continue
 			}
 			for _, asset := range batch.Books[0].AssetRecords {
@@ -2549,14 +2530,13 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		mediaID := parts[0]
-		batches, err := store.ListBatches(r.Context(), owner)
+		batches, err := listShuihuoProjects(r.Context(), store, owner)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		for _, compact := range batches {
-			batch, getErr := store.GetBatch(r.Context(), owner, compact.ID)
-			if getErr != nil || len(batch.Books) == 0 {
+		for _, batch := range batches {
+			if len(batch.Books) == 0 {
 				continue
 			}
 			media := storedShuihuoMedia(batch.Books[0])
@@ -2658,7 +2638,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置导演服务，暂不能重试任务"})
 				return
 			}
-			batches, err := store.ListBatches(r.Context(), owner)
+			batches, err := listShuihuoProjects(r.Context(), store, owner)
 			if err != nil {
 				writeStoreError(w, err)
 				return
@@ -2691,7 +2671,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 			return
 		}
-		batches, err := store.ListBatches(r.Context(), owner)
+		batches, err := listShuihuoProjects(r.Context(), store, owner)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -2718,6 +2698,50 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "task not found"})
 	})))
+}
+
+// Project handlers verify both account and project ownership before using any
+// asset, voice, or video service. A resource ID alone is not a project lookup.
+func loadShuihuoProject(ctx context.Context, store batchfactoryv11.Store, owner, id string) (batchfactoryv11.Batch, error) {
+	batch, err := store.GetBatch(ctx, owner, id)
+	if err != nil {
+		return batchfactoryv11.Batch{}, err
+	}
+	if !isShuihuoProjectBatch(batch) {
+		return batchfactoryv11.Batch{}, batchfactoryv11.ErrNotFound
+	}
+	return batch, nil
+}
+
+func listShuihuoProjects(ctx context.Context, store batchfactoryv11.Store, owner string) ([]batchfactoryv11.Batch, error) {
+	batches, err := store.ListBatches(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	// MySQL's compact rows don't contain settings. Its ownership index avoids
+	// loading Batch Factory book text and assets during a studio resource lookup.
+	var ids map[string]bool
+	if lister, ok := store.(batchShuihuoProjectLister); ok {
+		ids, err = lister.ListShuihuoProjectBatchIDs(ctx, owner)
+		if err != nil {
+			return nil, err
+		}
+	}
+	projects := make([]batchfactoryv11.Batch, 0)
+	for _, batch := range batches {
+		if ids != nil && !ids[batch.ID] {
+			continue
+		}
+		project, err := loadShuihuoProject(ctx, store, owner, batch.ID)
+		if errors.Is(err, batchfactoryv11.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		projects = append(projects, project)
+	}
+	return projects, nil
 }
 
 func isShuihuoProjectBatch(batch batchfactoryv11.Batch) bool {
@@ -3351,6 +3375,8 @@ func generateShuihuoAssetImagesWithPresetCatalog(ctx context.Context, store batc
 	return generateShuihuoAssetImagesWithRepair(ctx, store, files, owner, batch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, nil, nil, owner, catalogStores...)
 }
 
+// Shared renderer used after each module's own route has resolved its book.
+// Batch Factory checks production and asset prompt versions in its V12 route.
 func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, rewrite comicPromptRewriter, userConfig *UserConfigStore, modelConfigOwner string, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
@@ -6150,7 +6176,7 @@ func stringsToShuihuoCandidates(lines []string) []map[string]any {
 }
 
 func writeShuihuoProject(w http.ResponseWriter, r *http.Request, store batchfactoryv11.Store, owner, id string) {
-	batch, err := store.GetBatch(r.Context(), owner, id)
+	batch, err := loadShuihuoProject(r.Context(), store, owner, id)
 	if err != nil {
 		writeStoreError(w, err)
 		return

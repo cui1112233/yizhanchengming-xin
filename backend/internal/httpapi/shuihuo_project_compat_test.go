@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -121,6 +122,85 @@ func TestProjectOwnershipSurvivesOnlyThroughServerCreation(t *testing.T) {
 	}
 }
 
+func TestShuihuoProjectRoutesRejectOrdinaryBatchAndItsResources(t *testing.T) {
+	ctx := context.Background()
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	text := &directorHTTPProvider{output: directorHTTPJSON}
+	video := &productionHTTPAdapter{}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 4, Store: store, Director: &batchfactoryv11.DirectorService{Store: store, Provider: text}, Production: &batchfactoryv11.ProductionService{Store: store, Compiler: &batchfactoryv11.PromptCompilerService{Store: store}, Adapter: video, Enabled: true}})
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "regular", Books: []batchfactoryv11.CreateBookInput{{Title: "book", SourceText: "source", SourceMetadata: map[string]any{"shuihuoSegments": []any{map[string]any{"id": "segment"}}, "shuihuoMedia": []any{map[string]any{"id": "media", "kind": "image"}}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	asset, err := store.CreateBookAsset(ctx, "alice", batch.ID, book.ID, batchfactoryv11.CreateBookAssetInput{Name: "hero", Kind: "character", Prompt: "image"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := store.CreateBookAssetImage(ctx, "alice", batch.ID, book.ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{URL: "https://image.invalid/hero.png", Source: "upload"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := store.CreateProductionJob(ctx, batchfactoryv11.ProductionJob{Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "queued", Tasks: []batchfactoryv11.ProductionTask{{Status: batchfactoryv11.ProductionQueued}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := string(mustJSON(before))
+	const root = "/api/shuihuo-production"
+	project := "/projects/" + batch.ID
+	for _, r := range []struct {
+		method, path string
+		body         any
+	}{
+		{"GET", project, nil}, {"GET", "/projects?id=" + batch.ID, nil}, {"POST", project + "/tasks", map[string]any{"kind": "audio"}}, {"POST", project + "/tasks", map[string]any{"kind": "image"}}, {"POST", project + "/analysis/assets", map[string]any{}}, {"PUT", project + "/source", map[string]any{"sourceText": "new"}},
+		{"PUT", "/segments/segment/voice-settings", map[string]any{"voice": "new"}}, {"PUT", "/asset-images/" + img.ID + "/primary", nil}, {"PUT", "/media/media/primary", nil}, {"DELETE", "/assets/" + asset.ID, nil}, {"POST", "/tasks/" + job.Tasks[0].ID + "/retry", nil}, {"PUT", "/tasks/" + job.Tasks[0].ID + "/cancel", nil},
+		{"DELETE", "/projects?id=" + batch.ID, nil}, {"DELETE", project, nil},
+	} {
+		t.Run(r.method+" "+r.path, func(t *testing.T) {
+			result := signedJSONRequest(t, api, now, "alice", r.method, root+r.path, r.body)
+			if result.Code != http.StatusNotFound {
+				t.Errorf("status=%d body=%s", result.Code, result.Body.String())
+			}
+		})
+	}
+	after, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs, err := store.ListProductionJobs(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(mustJSON(after)) != snapshot || len(jobs) != 1 || jobs[0].Tasks[0].Status != batchfactoryv11.ProductionQueued || text.calls != 0 || video.calls != 0 {
+		t.Fatalf("ordinary batch or task was changed; text calls=%d video calls=%d", text.calls, video.calls)
+	}
+	// Both legacy query and path forms continue to read and delete a real project.
+	for _, query := range []bool{true, false} {
+		created := signedJSONRequest(t, api, now, "alice", "POST", root+"/projects", map[string]any{"name": "studio"})
+		if created.Code != 201 {
+			t.Fatal(created.Body.String())
+		}
+		id := decodeBody[map[string]any](t, created)["id"].(string)
+		path := root + "/projects/" + id
+		if query {
+			path = root + "/projects?id=" + id
+		}
+		if got := signedJSONRequest(t, api, now, "alice", "GET", path, nil); got.Code != 200 {
+			t.Fatal(got.Body.String())
+		}
+		if got := signedJSONRequest(t, api, now, "alice", "DELETE", path, nil); got.Code != 200 {
+			t.Fatal(got.Body.String())
+		}
+		if _, err = store.GetBatch(ctx, "alice", id); !errors.Is(err, batchfactoryv11.ErrNotFound) {
+			t.Fatalf("marked project delete: %v", err)
+		}
+	}
+}
 func TestShuihuoAssetTypeAndTemplateCanBeUpdated(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 3, Store: batchfactoryv11.NewMemoryStore()})
