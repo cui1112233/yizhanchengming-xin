@@ -266,6 +266,14 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	processed := get()
 	shown := processed.Pages[0]
 	call("PATCH", "pages/"+shown.ID, map[string]any{"expectedRevision": shown.Revision, "expectedDocumentRevision": processed.Document.Revision, "text": shown.Text, "background": map[string]string{"kind": "color", "color": "#101010"}}, 200)
+	processed = get()
+	if len(processed.Pages) == 1 {
+		call("POST", "pages/"+processed.Pages[0].ID+"/split", map[string]any{"expectedRevision": processed.Document.Revision, "offset": len([]rune(strings.ReplaceAll(edit["text"].(string), "手动改写", "系统调整")))}, 200)
+	}
+	processed = get()
+	lastProcessed := processed.Pages[1]
+	call("PATCH", "pages/"+lastProcessed.ID, map[string]any{"text": "🙂这是第二页的新句。", "expectedRevision": lastProcessed.Revision, "expectedDocumentRevision": processed.Document.Revision}, 200)
+	authored = edit["text"].(string) + "🙂这是第二页的新句。"
 	set("sensitiveMode", "off")
 	call("POST", "prepare", map[string]any{}, 200)
 	assertText(authored)
@@ -580,6 +588,28 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	set("sensitiveMode", "system")
 	call("POST", "prepare", map[string]any{}, 200)
 	assertText(strings.Replace(spaced, "尾页", "末页", 1))
+	// A repeated transformed token has no unique partial correspondence.
+	if _, err = s.SaveDraft(context.Background(), "alice", batchfactoryv11.Draft{Key: "working-front:" + book.ID, Kind: "working-front-content", Scope: b.ID, Content: "开猫尾。"}); err != nil {
+		t.Fatal(err)
+	}
+	if err = rules.PutConfig(context.Background(), "alice", map[string]any{"knowledgeLibraries": map[string]any{"layout_rules": map[string]any{"sensitive_rules": []any{map[string]any{"enabled": true, "find": "猫", "replace": "猫猫", "apply_to_original": true}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	call("POST", "prepare", map[string]any{}, 200)
+	assertText("开猫猫尾。")
+	amb := get()
+	ambPage := amb.Pages[0]
+	change := map[string]any{"expectedRevision": ambPage.Revision, "expectedDocumentRevision": amb.Document.Revision, "text": "开狗猫尾。"}
+	call("PATCH", "pages/"+ambPage.ID, change, 409)
+	retained, err := s.GetDraft(context.Background(), "alice", "working-front:"+book.ID, "working-front-content", b.ID)
+	if err != nil || retained.Content != "开猫尾。" || get().Document.Revision != amb.Document.Revision {
+		t.Fatal("ambiguous edit mutated author or document")
+	}
+	change["text"] = "开犬尾。"
+	call("PATCH", "pages/"+ambPage.ID, change, 200)
+	set("sensitiveMode", "off")
+	call("POST", "prepare", map[string]any{}, 200)
+	assertText("开犬尾。")
 	// Frozen collections still resolve the original image after a replacement.
 	frozen := signedJSONRequest(t, api, now, "alice", "GET", mediaPath, nil)
 	if !bytes.Equal(media.Body.Bytes(), frozen.Body.Bytes()) {

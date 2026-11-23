@@ -152,10 +152,20 @@ func sensitiveBaseText(ctx context.Context, s batchfactoryv11.Store, owner, batc
 		_, err := s.SaveDraft(ctx, owner, batchfactoryv11.Draft{Key: digest, Kind: "sensitive_source", Scope: book.ID, Content: book.SourceText})
 		return book.SourceText, digest, err
 	}
+	return capturedSensitiveInput(book, limit), "", nil
+}
+func capturedSensitiveInput(book batchfactoryv11.Book, limit int) string {
 	if isBatchCustomCopy(book) {
-		return book.TxtText, "", nil
+		return book.TxtText
 	}
-	return novelfetchworkshop.ProcessRawText(book.TxtText, limit).ProcessedText, "", nil
+	return novelfetchworkshop.ProcessRawText(book.TxtText, limit).ProcessedText
+}
+func sensitiveCaptureLimit(book batchfactoryv11.Book, effective batchfactoryv11.SettingsPatch) int {
+	var capture int
+	if json.Unmarshal(effective["contentCaptureCharacters"], &capture) == nil && capture >= 100 && capture <= 100000 {
+		return capture
+	}
+	return bookCaptureCharacters(book)
 }
 
 func (c *BatchAutomationCoordinator) runBatchSensitiveStage(ctx context.Context, owner, batchID, bookID string, manualRetry bool) (batchfactoryv11.Book, error) {
@@ -187,11 +197,7 @@ func (c *BatchAutomationCoordinator) batchSensitiveStageFromBook(ctx context.Con
 	}
 	effective := c.automationEffectiveSettings(batch, book)
 	mode := batchfactorysensitive.ResolveMode(effective)
-	limit := bookCaptureCharacters(book)
-	var capture int
-	if json.Unmarshal(effective["contentCaptureCharacters"], &capture) == nil && capture >= 100 && capture <= 100000 {
-		limit = capture
-	}
+	limit := sensitiveCaptureLimit(book, effective)
 	state := mapOrEmpty(book.SourceMetadata["batchSensitiveStage"])
 	input, baseKey, err := sensitiveBaseText(ctx, c.store, owner, batchID, book, state, limit)
 	if err != nil {

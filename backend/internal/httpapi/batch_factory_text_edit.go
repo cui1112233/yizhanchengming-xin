@@ -125,12 +125,31 @@ func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequ
 	} else {
 		breaks := txt.SentenceBreaks(text)
 		for _, draft := range drafts[:len(drafts)-1] {
-			if !slices.Contains(breaks, draft.EndOffset) {
+			if _, valid := slices.BinarySearch(breaks, draft.EndOffset); !valid {
 				return fmt.Errorf("%w：请在页末保留完整的句子或段落", txt.ErrInvalid)
 			}
 		}
-		update.VerifyProduction = a.authorDraftWriter(x, snap.AuthorDraftKey, text)
-		snap.AuthorDraftKey = batchfactoryv11.WorkingDraftVersion(text)
+		author, err := a.authorForEdit(x, snap.AuthorDraftKey)
+		if err != nil {
+			return err
+		}
+		if snap.AuthorDraftKey == "" && txt.NormalizeLineEndings(v.ProductionText) != txt.NormalizeLineEndings(x.book.SourceText) {
+			// Earlier editor versions retained a local displayed version only.
+			author, err = txt.MergeAuthorPageEdit(author, txt.Version{ProductionText: x.book.SourceText, ChangeTrace: v.ChangeTrace}, 0, len([]rune(txt.NormalizeLineEndings(x.book.SourceText))), v.ProductionText)
+			if err != nil {
+				return err
+			}
+		}
+		base := v
+		if snap.AuthorDraftKey != "" || v.ProductionText != x.book.SourceText {
+			base.ChangeTrace = nil
+		}
+		merged, err := txt.MergeAuthorPageEdit(author, base, edited.StartOffset, edited.EndOffset, edited.Text)
+		if err != nil {
+			return err
+		}
+		update.VerifyProduction = a.authorDraftWriter(x, snap.AuthorDraftKey, merged)
+		snap.AuthorDraftKey = batchfactoryv11.WorkingDraftVersion(merged)
 		update.ConfigSnapshot, err = json.Marshal(snap)
 		if err != nil {
 			return err
@@ -176,12 +195,20 @@ func (a textAPI) adoptLegacyPageEdit(x textRequest, doc txt.Document, v txt.Vers
 		}
 		pages = append(pages, p.PageDraft)
 	}
-	snap.AuthorDraftKey = batchfactoryv11.WorkingDraftVersion(v.ProductionText)
+	author, err := a.authorForEdit(x, "")
+	if err != nil {
+		return doc, err
+	}
+	merged, err := txt.MergeAuthorPageEdit(author, txt.Version{ProductionText: x.book.SourceText, ChangeTrace: v.ChangeTrace}, 0, len([]rune(txt.NormalizeLineEndings(x.book.SourceText))), v.ProductionText)
+	if err != nil {
+		return doc, err
+	}
+	snap.AuthorDraftKey = batchfactoryv11.WorkingDraftVersion(merged)
 	cfg, err := json.Marshal(snap)
 	if err != nil {
 		return doc, err
 	}
-	_, err = a.repo.PreparePages(x, x.scope, txt.VersionInput{ProductionText: v.ProductionText, SensitiveMode: v.SensitiveMode, ChangeTrace: v.ChangeTrace}, txt.PaginationUpdate{ExpectedRevision: doc.Revision, Pages: pages, ConfigSnapshot: cfg, VerifyProduction: a.authorDraftWriter(x, "", v.ProductionText)})
+	_, err = a.repo.PreparePages(x, x.scope, txt.VersionInput{ProductionText: v.ProductionText, SensitiveMode: v.SensitiveMode, ChangeTrace: v.ChangeTrace}, txt.PaginationUpdate{ExpectedRevision: doc.Revision, Pages: pages, ConfigSnapshot: cfg, VerifyProduction: a.authorDraftWriter(x, "", merged)})
 	if err != nil {
 		return doc, err
 	}
@@ -191,6 +218,41 @@ func (a textAPI) adoptLegacyPageEdit(x textRequest, doc txt.Document, v txt.Vers
 	doc.PaginationVersion++
 	doc.ConfigSnapshot = cfg
 	return doc, nil
+}
+
+// Read exactly the authored input used by the verified policy stage. A pending
+// page edit instead names its working draft by digest. This path never writes.
+func (a textAPI) authorForEdit(x textRequest, pending string) (string, error) {
+	state := mapOrEmpty(x.book.SourceMetadata["batchSensitiveStage"])
+	key := stringValue(state["authoredBase"])
+	if pending != "" {
+		key = pending
+	}
+	var content string
+	if key == "" {
+		effective := a.production.automationEffectiveSettings(x.batch, x.book)
+		content = capturedSensitiveInput(x.book, sensitiveCaptureLimit(x.book, effective))
+	} else {
+		draftKey, kind, scope := key, "sensitive_source", x.scope.BookID
+		if strings.HasPrefix(key, "working:") {
+			draftKey, kind, scope = "working-front:"+x.scope.BookID, "working-front-content", x.scope.BatchID
+		}
+		d, err := a.store.GetDraft(x, x.scope.Owner, draftKey, kind, scope)
+		if errors.Is(err, batchfactoryv11.ErrNotFound) {
+			return "", txt.ErrConflict
+		}
+		if err != nil {
+			return "", err
+		}
+		content = d.Content
+		if strings.TrimPrefix(key, "working:") != sensitiveDigest(content) {
+			return "", txt.ErrConflict
+		}
+	}
+	if pending == "" && state["input"] != sensitiveDigest(content) {
+		return "", fmt.Errorf("%w：作者稿已变化，请重新准备", txt.ErrConflict)
+	}
+	return content, nil
 }
 
 func (a textAPI) authorDraftWriter(x textRequest, pending, content string) func(context.Context, *sql.Tx) error {
