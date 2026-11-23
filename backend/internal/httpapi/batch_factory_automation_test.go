@@ -44,6 +44,76 @@ func (r workflowFailSecondPage) SaveSystemPageArtifact(ctx context.Context, s tx
 	return r.Repository.SaveSystemPageArtifact(ctx, s, id, rev, file)
 }
 
+type staleTextPublishHistory struct {
+	scope   txt.Scope
+	pending cp.Record
+}
+
+func seedStaleTextPublishHistory(t *testing.T, ctx context.Context, store *batchfactoryv11.MySQLStore, version int, tie bool) staleTextPublishHistory {
+	t.Helper()
+	owner := fmt.Sprintf("history-%d-%t", version, tie)
+	b, err := store.CreateBatch(ctx, owner, batchfactoryv11.CreateBatchInput{Title: "升级", Books: []batchfactoryv11.CreateBookInput{{Title: "旧书", SourceMetadata: map[string]any{"textCollectionId": "B"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := txt.Scope{Owner: owner, BatchID: b.ID, BookID: b.Books[0].ID}
+	receipt := func(id string, hour int) cp.Record {
+		return cp.Record{Kind: cp.CollectionKindText, BookID: s.BookID, CollectionID: id, IntentID: "intent-" + id, RequestKey: owner + "-" + id, Status: "published", ImageIDs: []int64{9}, CarouselID: 8, PublishedAt: time.Date(2026, 1, 1, hour, 0, 0, 0, time.UTC)}
+	}
+	raw := func(r cp.Record) {
+		if _, err := store.SaveDraft(ctx, owner, batchfactoryv11.Draft{Kind: textPublishDraftKind, Scope: s.BatchID, Key: r.CollectionID, Content: string(mustJSON(r))}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	oldB := receipt("B", 1)
+	raw(oldB)
+	a := receipt("A", 2)
+	raw(a)
+	if tie {
+		raw(receipt("Z", 2))
+	}
+	pending := cp.Record{Kind: cp.CollectionKindText, BookID: s.BookID, CollectionID: "B", IntentID: "new-B", Status: "pending", RequestKey: owner + "-new-B", LastPublished: &oldB}
+	if version == 1200113 {
+		raw(pending)
+	} else {
+		if err := (collectionDraftRecords{store}).Save(ctx, textPublishRequest(s, "B"), pending); err != nil {
+			t.Fatal(err)
+		}
+		m, err := store.GetBatchRuntimeIndex(ctx, owner, s.BatchID)
+		if err != nil || m.Books[0].SourceMetadata["textLastPublishedCollectionId"] != "B" {
+			t.Fatalf("expected old 1200114 pointer B: %+v %v", m, err)
+		}
+	}
+	return staleTextPublishHistory{s, pending}
+}
+
+func (h staleTextPublishHistory) check(t *testing.T, ctx context.Context, store *batchfactoryv11.MySQLStore, status string) {
+	t.Helper()
+	if status == "failed" {
+		h.pending.Status = status
+		if err := (collectionDraftRecords{store}).Save(ctx, textPublishRequest(h.scope, "B"), h.pending); err != nil {
+			t.Fatal(err)
+		}
+	}
+	idx, err := store.GetBatchRuntimeIndex(ctx, h.scope.Owner, h.scope.BatchID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := idx.Books[0].SourceMetadata
+	out := map[string]any{}
+	if err := addWorkflowPublishSummary(ctx, store, h.scope.Owner, h.scope.BatchID, h.scope.BookID, m, nil, out); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus := status
+	if wantStatus == "pending" {
+		wantStatus = "upload_pending_confirm"
+	}
+	current := workflowReceiptJSON(out["textPublishRecord"])
+	if m["textCollectionId"] != "B" || m["textLastPublishedCollectionId"] != "A" || current["collectionId"] != "B" || current["status"] != wantStatus || workflowReceiptJSON(out["textLastPublishedRecord"])["collectionId"] != "A" {
+		t.Fatalf("%s %s: stale history metadata=%v summary=%v", h.scope.Owner, status, m, out)
+	}
+}
+
 func verifyTextPublishUpgrade(t *testing.T, ctx context.Context, db *sql.DB) {
 	t.Helper()
 	migrations := storage.V12Migrations()
@@ -51,6 +121,7 @@ func verifyTextPublishUpgrade(t *testing.T, ctx context.Context, db *sql.DB) {
 		t.Fatal(err)
 	}
 	store := batchfactoryv11.NewMySQLStore(db)
+	checks := []staleTextPublishHistory{seedStaleTextPublishHistory(t, ctx, store, 1200113, false)}
 	const owner = "upgrade<&>"
 	batch, err := store.CreateBatch(ctx, owner, batchfactoryv11.CreateBatchInput{Title: "旧数据", Books: []batchfactoryv11.CreateBookInput{{Title: "旧书", SourceMetadata: map[string]any{"textCollectionId": "B"}}}})
 	if err != nil {
@@ -85,12 +156,43 @@ func verifyTextPublishUpgrade(t *testing.T, ctx context.Context, db *sql.DB) {
 	if err := storage.RunMigrations(ctx, db, migrations[:14]); err != nil {
 		t.Fatal(err)
 	}
+	checks = append(checks, seedStaleTextPublishHistory(t, ctx, store, 1200114, false))
 	scope := func(id string) string { b, _ := json.Marshal([]string{owner, batch.ID, book, id}); return string(b) }
 	if err := store.BindTextPublishKeys(ctx, map[string]string{"prior-binding": scope("different")}); err != nil {
 		t.Fatal(err)
 	}
-	if err := storage.RunMigrations(ctx, db, migrations); err != nil {
+	if err := storage.RunMigrations(ctx, db, migrations[:15]); err != nil {
 		t.Fatal(err)
+	}
+	checks = append(checks, seedStaleTextPublishHistory(t, ctx, store, 1200115, false))
+	correct := seedStaleTextPublishHistory(t, ctx, store, 1200115, true)
+	if _, err := db.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_metadata_json=JSON_SET(source_metadata_json,'$.textLastPublishedCollectionId','A') WHERE book_id=?`, correct.scope.BookID); err != nil {
+		t.Fatal(err)
+	}
+	checks = append(checks, correct)
+	for range 2 {
+		if err := storage.RunMigrations(ctx, db, migrations); err != nil {
+			t.Fatal(err)
+		}
+		for _, h := range checks {
+			h.check(t, ctx, store, "pending")
+		}
+	}
+	// Exercise the data correction itself twice as well as the normal ledger replay.
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if ok, err := migrations[15].Adopt(ctx, tx); err != nil || !ok {
+		t.Fatalf("repeat history correction: %v %v", ok, err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range checks {
+		h.check(t, ctx, store, "pending")
+		h.check(t, ctx, store, "failed")
 	}
 	for _, key := range []string{"shared-legacy", "prior-binding"} {
 		for _, id := range []string{"older", "B", "already-bound", "different"} {
