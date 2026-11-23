@@ -198,11 +198,66 @@ function uploadStatus(book) {
   return 'pending';
 }
 
+const textStageCopy = {
+  text_process: { pending: '等待处理', failed: '文本处理失败', completed: '文本处理完成' },
+  text_paginate: { pending: '等待分页', failed: '分页失败', completed: '分页完成' },
+  text_render: { pending: '等待渲染', failed: '渲染失败', completed: '渲染完成' },
+  text_validate: { pending: '等待校验', failed: '校验失败', completed: '校验完成' },
+  text_collection: { pending: '等待整理合集', running: '正在整理合集', failed: '合集整理失败' },
+  text_publish: { pending: '等待上传', failed: '上传失败', completed: '已上传' }
+};
+
+function textBookTimeline(book, summary) {
+  const record = summary?.textPublishRecord;
+  const matchesBook = record && (!record.kind || record.kind === 'text') && (!record.bookId || record.bookId === book?.id);
+  // 与发布服务的成功记录一致：远端合集和图片都已落地。
+  const published = matchesBook && record.status === 'published' && Number(record.carouselId) > 0
+    && Array.isArray(record.imageIds) && record.imageIds.length > 0;
+  const awaitingReceipt = matchesBook && ['accepted', 'submitted', 'upload_pending_confirm'].includes(record.status);
+  return Object.entries(textStageCopy).map(([key, copy]) => {
+    const run = latestStageRun(summary, key);
+    let status = statusFromRun(run);
+    if (key === 'text_publish') {
+      if (published) status = 'completed';
+      else if (status === 'completed' || (status === 'pending' && awaitingReceipt)) status = 'running';
+    }
+    const label = copy[status] || stageLabel('runtime', key);
+    const detail = status === 'failed' ? (run?.errorMessage || label) : label;
+    return { key, label, status, detail };
+  });
+}
+
+function textBookState(book, summary, runMode, textAutoUpload, automationBook, manual) {
+  const timeline = textBookTimeline(book, summary);
+  const upload = timeline.find(step => step.key === 'text_publish');
+  const base = { manual, published: false, terminal: false, uploadStatus: upload.status };
+  if (upload.status === 'completed') {
+    return { ...base, ...upload, tone: 'green', published: true, terminal: true };
+  }
+  const failed = timeline.find(step => step.status === 'failed');
+  if (failed) return { ...base, ...failed, tone: 'red', failedStep: failed };
+  if (taskState(automationBook) === 'failed' && !automationBook.stale) {
+    const stage = automationBook.stage;
+    const label = textStageCopy[stage]?.failed || `${stageLabel('runtime', stage, '自动化')}失败`;
+    const detail = automationBook.error || automationBook.message || label;
+    return { ...base, status: 'failed', label, detail, tone: 'red', failedStage: { stage, message: label, errorMessage: detail } };
+  }
+  const active = timeline.find(step => step.status === 'running');
+  if (active) return { ...base, ...active, tone: 'blue' };
+  const last = timeline.filter(step => step.status === 'completed').at(-1);
+  if (!last) return { ...base, status: 'pending', label: '等待处理', detail: '等待文本处理', tone: 'default' };
+  const collectionOnly = ['video_no_submit', 'storyboard_only'].includes(summary?.runMode ?? runMode)
+    && (summary?.textAutoUpload ?? textAutoUpload) !== true;
+  const terminal = last.key === 'text_collection' && collectionOnly;
+  return { ...base, ...last, terminal, status: terminal ? 'completed' : 'pending', tone: terminal ? 'green' : 'cyan' };
+}
+
 export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, stageSummary, stageSummaries, productionMode = 'video' } = {}) {
   // The detail modal historically passed the per-book summary under the
   // plural key. Accept both shapes so its timeline uses the same live status
   // as the list row.
   stageSummary = stageSummary || stageSummaries;
+  if (productionMode === 'text') return textBookTimeline(book, stageSummary);
   // 漫画/视频口径只看批次级 productionMode（effectiveBookSettings 已定批次优先）。
   // 书级遗留信号（旧 patch、漫画资产、comicPrompt）不再把视频批次翻回漫画口径。
   const comicMode = productionMode === 'comic';
@@ -278,10 +333,11 @@ function classificationReady(metadata = {}) {
   return Boolean(gender && gender !== '待确认' && style && !['待判定', '未判定'].includes(style));
 }
 
-export function batchFactoryBookState(book, { productionStatus, mergeStatus, stageSummary, productionMode = 'video', automationBook } = {}) {
+export function batchFactoryBookState(book, { productionStatus, mergeStatus, stageSummary, productionMode = 'video', automationBook, runMode, textAutoUpload } = {}) {
   const sourceText = batchFactorySourceText(book?.sourceText);
   const queueStatus = String(book?.sourceMetadata?.queueStatus || '').trim();
   const manual = hasManualAdjustment(book);
+  if (productionMode === 'text') return textBookState(book, stageSummary, runMode, textAutoUpload, automationBook, manual);
   const classifyStatus = String(book?.sourceMetadata?.classifyStatus || '').trim().toLowerCase();
   const classifyError = String(book?.sourceMetadata?.classifyError || '').trim();
   // Once the backend has explicitly recorded the classification stage, show it
@@ -356,18 +412,26 @@ export function batchFactoryBatchProgress(books, runtime = {}) {
   };
   const values = Array.isArray(books) ? books : [];
   result.total = values.length;
+  if (runtime.productionMode === 'text') result.collectionReady = 0;
   for (const book of values) {
     const state = batchFactoryBookState(book, {
       ...runtime,
       stageSummary: runtime.stageSummaries?.[book?.id] || runtime.stageSummary
     });
-    if (state.label === '完成') result.uploaded += 1;
+    if (runtime.productionMode === 'text') {
+      if (state.published) result.uploaded += 1;
+      else if (state.terminal) result.collectionReady += 1;
+      else if (state.status === 'failed') result.failed += 1;
+      else if (state.status === 'running') result.running += 1;
+      else if (state.key === 'text_collection') result.awaitingUpload += 1;
+      else result.pending += 1;
+    } else if (state.label === '完成') result.uploaded += 1;
     else if (state.label === '异常') result.failed += 1;
     else if (state.label === '执行中…' || state.label === '处理中') result.running += 1;
     else if (state.label === '待上传') result.awaitingUpload += 1;
     else result.pending += 1;
   }
-  result.completionPercent = result.total ? Math.round((result.uploaded / result.total) * 100) : 0;
+  result.completionPercent = result.total ? Math.round(((result.uploaded + (result.collectionReady || 0)) / result.total) * 100) : 0;
   return result;
 }
 
@@ -380,7 +444,9 @@ export function batchFactoryNovelTableRow(book, index, createdAt = '', runtime =
     bookId: String(book?.bookId || '').trim() || '—',
     original: sourceText ? '✓' : '—',
     ai1: '—',
-    websiteSubmit: websiteSubmitLabel(book),
+    websiteSubmit: runtime.productionMode === 'text'
+      ? ({ running: '待回读', completed: '已回读', failed: '失败' }[state.uploadStatus] || '—')
+      : websiteSubmitLabel(book),
     status: state.label,
     state,
     chars: sourceText ? String(sourceText.length) : '—',

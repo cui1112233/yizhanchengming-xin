@@ -24,6 +24,12 @@
     { "id": "comic_images", "mode": "runtime", "label": "整本漫画出图", "terminal": false },
     { "id": "comic_collection", "mode": "runtime", "label": "漫画合集整理", "terminal": false },
     { "id": "comic_publish", "mode": "runtime", "label": "漫画发布", "terminal": false },
+    { "id": "text_process", "mode": "runtime", "label": "文本处理", "terminal": false },
+    { "id": "text_paginate", "mode": "runtime", "label": "正在分页", "terminal": false },
+    { "id": "text_render", "mode": "runtime", "label": "正在渲染", "terminal": false },
+    { "id": "text_validate", "mode": "runtime", "label": "正在校验", "terminal": false },
+    { "id": "text_collection", "mode": "runtime", "label": "合集就绪", "terminal": false },
+    { "id": "text_publish", "mode": "runtime", "label": "正在上传", "terminal": false },
     { "id": "upload_confirm", "mode": "runtime", "label": "已上传待确认", "terminal": false },
     { "id": "published", "mode": "runtime", "label": "发布完成", "terminal": true },
     { "id": "completed", "mode": "runtime", "label": "已完成", "terminal": true }

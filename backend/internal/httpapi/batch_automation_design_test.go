@@ -8,9 +8,31 @@ import (
 	"os"
 	"path/filepath"
 	"qiantie/backend/internal/batchfactoryv11"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestAutomationStagesContractTextRuntime(t *testing.T) {
+	want := []automationStageDefinition{
+		{ID: "text_process", Mode: "runtime", Label: "文本处理"},
+		{ID: "text_paginate", Mode: "runtime", Label: "正在分页"},
+		{ID: "text_render", Mode: "runtime", Label: "正在渲染"},
+		{ID: "text_validate", Mode: "runtime", Label: "正在校验"},
+		{ID: "text_collection", Mode: "runtime", Label: "合集就绪"},
+		{ID: "text_publish", Mode: "runtime", Label: "正在上传"},
+	}
+	var got []automationStageDefinition
+	for _, stage := range automationStageContract {
+		if stage.Mode == "runtime" && strings.HasPrefix(stage.ID, "text_") {
+			got = append(got, stage)
+		}
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("text runtime stages = %+v, want %+v", got, want)
+	}
+}
 
 func TestRuntimeSummaryMissingComicPagesHaveZeroActiveTasks(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()

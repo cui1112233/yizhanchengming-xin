@@ -2,6 +2,105 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { shouldAutoClassifyBook, automationBookForCard, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError, bookFailureIsHistorical } from './batchFactoryBookState.js';
 
+const textStages = [
+  ['text_process', '文本处理', '文本处理失败', '文本处理完成'],
+  ['text_paginate', '正在分页', '分页失败', '分页完成'],
+  ['text_render', '正在渲染', '渲染失败', '渲染完成'],
+  ['text_validate', '正在校验', '校验失败', '校验完成'],
+  ['text_collection', '正在整理合集', '合集整理失败', '合集就绪'],
+  ['text_publish', '正在上传', '上传失败', '已上传']
+];
+const verifiedTextPublish = { status: 'published', carouselId: 42, imageIds: [17, 19] };
+
+test('text timeline follows each backend attempt and displays the stage outcome', () => {
+  const book = { id: 'book', sourceText: '正文' };
+  const timeline = (stageSummary = {}) => batchFactoryBookTimeline(book, { productionMode: 'text', stageSummaries: stageSummary });
+  assert.deepEqual(timeline().map(step => step.key), textStages.map(([key]) => key));
+  assert.equal(batchFactoryBookState(book, { productionMode: 'text' }).label, '等待处理');
+  for (const [stage, running, failed, completed] of textStages) {
+    const runs = [];
+    const summary = { runs };
+    const current = () => timeline(summary).find(step => step.key === stage);
+    runs.push({ stage, status: 'running' });
+    assert.equal(current().status, 'running');
+    assert.equal(current().label, running);
+    assert.equal(batchFactoryBookState(book, { productionMode: 'text', stageSummary: summary }).label, running);
+    runs.push({ stage, status: 'failed', errorMessage: '本次任务失败' });
+    assert.equal(current().status, 'failed');
+    assert.equal(current().label, failed);
+    assert.equal(current().detail, '本次任务失败');
+    runs.push({ stage, status: 'succeeded' });
+    if (stage === 'text_publish') summary.textPublishRecord = verifiedTextPublish;
+    assert.equal(current().status, 'completed');
+    assert.equal(current().label, completed);
+  }
+});
+
+test('text upload completion requires a confirmed text receipt for this book', () => {
+  const book = { id: 'book', status: 'completed', stage: 'published', sourceMetadata: { websiteSubmitStatus: 'uploaded' } };
+  const stageSummary = {
+    runs: [{ stage: 'text_collection', status: 'succeeded' }, { stage: 'text_publish', status: 'succeeded' }],
+    comicPublishedCollectionCount: 1
+  };
+  const runtime = { productionMode: 'text', runMode: 'full_submit', textAutoUpload: true, stageSummary };
+  for (const record of [null, { ...verifiedTextPublish, status: 'accepted' }, { ...verifiedTextPublish, carouselId: 0 },
+    { ...verifiedTextPublish, imageIds: [] }, { ...verifiedTextPublish, kind: 'comic' },
+    { ...verifiedTextPublish, bookId: 'other-book' }]) {
+    stageSummary.textPublishRecord = record;
+    assert.equal(batchFactoryBookState(book, runtime).terminal, false);
+    assert.equal(batchFactoryBookState(book, runtime).label, '正在上传');
+    assert.equal(batchFactoryNovelTableRow(book, 0, '', runtime).websiteSubmit, '待回读');
+    assert.equal(batchFactoryBatchProgress([book], runtime).uploaded, 0);
+  }
+  stageSummary.textPublishRecord = verifiedTextPublish;
+  assert.equal(batchFactoryBookState(book, runtime).label, '已上传');
+  assert.equal(batchFactoryBookState(book, runtime).terminal, true);
+  assert.equal(batchFactoryNovelTableRow(book, 0, '', runtime).websiteSubmit, '已回读');
+  assert.equal(batchFactoryBatchProgress([book], runtime).uploaded, 1);
+});
+
+test('a ready text collection is terminal only for a non-submit job and remains distinct from an upload', () => {
+  const book = { id: 'book' };
+  const stageSummary = { runs: [{ stage: 'text_collection', status: 'succeeded' }] };
+  const runtime = { productionMode: 'text', stageSummary };
+  assert.equal(batchFactoryBookState(book, runtime).terminal, false);
+  stageSummary.runMode = 'full_submit';
+  assert.equal(batchFactoryBookState(book, runtime).terminal, false);
+  assert.equal(batchFactoryBookState(book, runtime).status, 'pending');
+  assert.equal(batchFactoryBatchProgress([book], runtime).awaitingUpload, 1);
+  stageSummary.runMode = 'video_no_submit';
+  stageSummary.textAutoUpload = true;
+  assert.equal(batchFactoryBookState(book, runtime).terminal, false);
+  stageSummary.textAutoUpload = false;
+  const state = batchFactoryBookState(book, runtime);
+  assert.equal(state.label, '合集就绪');
+  assert.equal(state.terminal, true);
+  assert.equal(state.published, false);
+  const batch = batchFactoryBatchProgress([book], runtime);
+  assert.equal(batch.uploaded, 0);
+  assert.equal(batch.completionPercent, 100);
+});
+
+test('a pending receipt keeps the book uploading while stage logs catch up', () => {
+  const runtime = {
+    productionMode: 'text',
+    stageSummary: { textPublishRecord: { kind: 'text', bookId: 'book', status: 'accepted' } }
+  };
+  const state = batchFactoryBookState({ id: 'book' }, runtime);
+  assert.equal(state.label, '正在上传');
+  assert.equal(state.terminal, false);
+  assert.equal(batchFactoryBookState({ id: 'unrelated' }, runtime).label, '等待处理');
+});
+
+test('text preflight failures are visible before stage logs are available', () => {
+  const state = batchFactoryBookState({ id: 'book' }, {
+    productionMode: 'text', automationBook: { stage: 'preflight', status: 'failed', error: '缺少原文' }
+  });
+  assert.equal(state.tone, 'red');
+  assert.match(state.detail, /缺少原文/);
+  assert.equal(state.failedStage.stage, 'preflight');
+});
+
 test('a recovered failure is historical and must not show a retry action', () => {
   const lastFailed = { stage: 'video', updatedAt: '2026-11-04T10:00:00Z', errorMessage: '视频生成失败' };
   const runs = [
