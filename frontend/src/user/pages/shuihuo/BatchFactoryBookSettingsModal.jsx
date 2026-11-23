@@ -188,8 +188,10 @@ function buildRestoreKeys(inherited, edited, currentPatch) {
 
 export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engineTab = 'models', restore = false) {
   if (region === 'engine' && engineTab === 'media') region = 'media';
+  const textBatch = inherited?.productionMode === 'text';
   const patch = {};
   const restoreKeys = [];
+  if (textBatch && region === 'media') return { patch, restoreKeys };
   if (region === 'engine') {
     if (engineTab === 'publish') {
       if (!equal(inherited?.publishRewriteEnabled, edited?.publishRewriteEnabled)) patch.publishRewriteEnabled = edited?.publishRewriteEnabled;
@@ -212,7 +214,7 @@ export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engi
     }
 
     for (const key of ENGINE_MODEL_OVERRIDE_FIELDS) {
-      if (key === 'sensitiveMode') continue;
+      if (key === 'sensitiveMode' || (textBatch && key === 'productionMode')) continue;
       if (!equal(inherited?.[key], edited?.[key])) patch[key] = edited?.[key];
       else if (Object.hasOwn(bookPatch || {}, key)) restoreKeys.push(key);
     }
@@ -342,9 +344,11 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
 	const frozenAutomationPreset = batchPatch?.automationPresetSnapshot && typeof batchPatch.automationPresetSnapshot === 'object'
 	  ? batchPatch.automationPresetSnapshot
 	  : null;
-  const region = REGION_LABELS[activeRegion] ? activeRegion : 'engine';
   const inherited = useMemo(() => ({ ...batchPatch, aiPromptConfig: mergePromptConfig(batchPatch.aiPromptConfig, {}), publishSettings: mergePublishSettings(batchPatch.publishSettings, {}), comicPublishSettings: mergePublishSettings(batchPatch.comicPublishSettings, {}) }), [batch?.id, batch?.settingsState?.revision]);
   const [form, setForm] = useState(() => effectiveValues(batchPatch, bookPatch));
+  const visibility = batchFactoryProductionModeVisibility(batchPatch.productionMode === 'text' ? 'text' : form.productionMode);
+  const productionMode = visibility.mode;
+  const region = REGION_LABELS[activeRegion] && !(visibility.text && activeRegion === 'media') ? activeRegion : 'engine';
   const cachedModels = peekAvailableModelCatalog();
   const [models, setModels] = useState(() => cachedModels?.models || []);
   const [modelsLoading, setModelsLoading] = useState(() => !cachedModels);
@@ -361,7 +365,8 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   const [savingPersonalCategory, setSavingPersonalCategory] = useState('');
   const [editingPersonalPrompt, setEditingPersonalPrompt] = useState({ category: '', id: '', name: '' });
   const [personalPromptNameModal, setPersonalPromptNameModal] = useState({ open: false, category: '', name: '' });
-  const [engineTab, setEngineTab] = useState('models');
+  const [selectedEngineTab, setEngineTab] = useState('models');
+  const engineTab = visibility.text && (selectedEngineTab === 'media' || activeRegion === 'media') ? 'models' : selectedEngineTab;
 
   useEffect(() => {
     if (open) setForm(effectiveValues(batchPatch, bookPatch));
@@ -460,8 +465,6 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   const comicPageRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-page'), [catalog.batch]);
   const comicImageDerivationRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-image-derivation'), [catalog.batch]);
   const ai = form.aiPromptConfig || {};
-  const visibility = batchFactoryProductionModeVisibility(batchPatch.productionMode === 'text' ? 'text' : form.productionMode);
-  const productionMode = visibility.mode;
   const assetRules = ai.assets || {};
   const starredCharacterNames = Array.isArray(form.starredCharacterNames) ? form.starredCharacterNames : [];
   const characterOptions = [...new Map([
@@ -481,7 +484,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
       ? Object.hasOwn(bookPatch, 'productionMode') || Object.hasOwn(bookPatch.aiPromptConfig || {}, 'video') || Object.hasOwn(bookPatch.aiPromptConfig || {}, 'comic')
     : engineTab === 'publish'
       ? Object.hasOwn(bookPatch, 'publishRewriteEnabled') || Object.hasOwn(bookPatch, 'publishSettings')
-      : savedSensitiveOverride || ENGINE_MODEL_OVERRIDE_FIELDS.some(key => Object.hasOwn(bookPatch, key)) || Object.hasOwn(bookPatch, 'openingEnabled') || Object.hasOwn(bookPatch, 'openingCount')
+      : savedSensitiveOverride || ENGINE_MODEL_OVERRIDE_FIELDS.some(key => (!visibility.text || key !== 'productionMode') && Object.hasOwn(bookPatch, key)) || Object.hasOwn(bookPatch, 'openingEnabled') || Object.hasOwn(bookPatch, 'openingCount')
     : region === 'assets'
       ? Object.hasOwn(bookPatch, 'starredCharacterNames') || Object.hasOwn(bookPatch.aiPromptConfig || {}, 'assets')
     : region === 'media'
@@ -659,7 +662,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   const audioDurationStale = Number(form.audioDurationSeconds || 0) > 0
     && String(form.audioDurationFingerprint || '') !== currentAudioFingerprint;
 
-  const mediaBody = <div className="batch-factory-media-setting-stack">
+  const mediaBody = visibility.text ? null : <div className="batch-factory-media-setting-stack">
     <RuleModule title="视频生成" value={{ enabled: productionMode === 'video' }} onChange={next => { if (next.enabled) setProductionMode('video'); }}>
       <PromptSelect required label="视频提示词" value={ai.video} options={Object.assign(videoRules.map(optionFor), { catalog: videoRules })} disabled={loading} onChange={selection => patchAI('video', scoped({ ...ai.video, ...selection, enabled: true }))} />
     </RuleModule>
@@ -745,7 +748,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
           </ConfigCard>
         </div>
       },
-      { key: 'media', label: '画面与视频', children: mediaBody },
+      ...(visibility.text ? [] : [{ key: 'media', label: '画面与视频', children: mediaBody }]),
       {
         key: 'publish',
         label: '发布统一',

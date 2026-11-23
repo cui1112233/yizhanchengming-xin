@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bookSensitiveModeUpdate } from './batchFactoryBookConfigRegions.js';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const unifiedSource = fs.readFileSync(path.join(directory, 'BatchFactoryUnifiedSettingsModal.jsx'), 'utf8');
@@ -84,6 +85,43 @@ test('text mode in single-book settings keeps the text model and hides the image
 
 test('a text batch hides media controls even when a book still carries an old production mode', () => {
   assert.match(bookSource, /batchFactoryProductionModeVisibility\(batchPatch\.productionMode === 'text' \? 'text' : form\.productionMode\)/);
+});
+
+test('text book settings omit the media tab and the video and comic switches', () => {
+  assert.ok(/\.\.\.\(visibility\.text \? \[\] : \[\{ key: 'media', label: '画面与视频', children: mediaBody \}\]\)/.test(bookSource), 'text book settings should omit the media tab');
+  assert.ok(/const engineTab = visibility\.text && \(selectedEngineTab === 'media' \|\| activeRegion === 'media'\) \? 'models' : selectedEngineTab/.test(bookSource), 'stale media tabs and direct entry should fall back to model settings');
+  assert.ok(/const mediaBody = visibility\.text \? null : <div className="batch-factory-media-setting-stack">/.test(bookSource), 'direct access to the media region should hide its mode switches');
+});
+
+test('text book settings cannot save a production mode from stale media controls', () => {
+  const updateSource = bookSource.match(/^export (function buildBookRegionUpdate\b[\s\S]*?^})/m)?.[1];
+  const fieldsSource = bookSource.match(/^const ENGINE_MODEL_OVERRIDE_FIELDS = .+$/m)?.[0];
+  const equalSource = bookSource.match(/^function equal\b.+$/m)?.[0];
+  assert.ok(updateSource && fieldsSource && equalSource, 'expected the book settings update and its field definitions');
+  const buildBookRegionUpdate = new Function('bookSensitiveModeUpdate',
+    [fieldsSource, equalSource, updateSource, 'return buildBookRegionUpdate;'].join('\n')
+  )(bookSensitiveModeUpdate);
+  const inherited = { productionMode: 'text', textModelId: 'batch-text' };
+  const bookPatch = { productionMode: 'video' };
+  const edited = { productionMode: 'comic', textModelId: 'book-text' };
+
+  assert.deepEqual(buildBookRegionUpdate(inherited, bookPatch, 'engine', edited), {
+    patch: { textModelId: 'book-text' },
+    restoreKeys: []
+  });
+  assert.deepEqual(buildBookRegionUpdate(inherited, bookPatch, 'engine', edited, 'media'), {
+    patch: {},
+    restoreKeys: []
+  });
+  assert.deepEqual(buildBookRegionUpdate(inherited, bookPatch, 'media', edited), {
+    patch: {},
+    restoreKeys: []
+  });
+});
+
+test('text unified settings omit AI reasoning and return to the models from a stale reasoning tab', () => {
+  assert.ok(/\.\.\.\(textMode \? \[\] : \[\{ key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm\b/.test(unifiedSource), 'text unified settings should omit media prompts and constraints');
+  assert.ok(/const activeTab = textMode && selectedTab === 'reasoning' \? 'models' : selectedTab/.test(unifiedSource), 'a previously selected reasoning tab should fall back to model settings');
 });
 
 test('production mode switch uses distinct visible colors for video and comic', () => {

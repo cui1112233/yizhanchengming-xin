@@ -714,7 +714,7 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
   const [saving, setSaving] = useState(false);
   const [modeSaving, setModeSaving] = useState(false);
   const [modeNotice, setModeNotice] = useState('');
-  const [activeTab, setActiveTab] = useState('models');
+  const [selectedTab, setActiveTab] = useState('models');
   useEffect(() => {
     if (open) {
       setDraftPatch(normalizeLegacyPatch(batch?.settingsState?.patch));
@@ -780,12 +780,13 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
       message.error(`切换生产模式失败：${apiErrorMessage(error, '请稍后重试')}`);
     } finally { setModeSaving(false); }
   };
-  const productionMode = batchFactoryProductionModeVisibility(draftPatch.productionMode).mode;
+  const { mode: productionMode, text: textMode } = batchFactoryProductionModeVisibility(draftPatch.productionMode);
+  const activeTab = textMode && selectedTab === 'reasoning' ? 'models' : selectedTab;
   return <Modal title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={draftPatch} productionMode={productionMode} onLoad={setDraftPatch} /><span>统一配置</span><BatchFactoryProductionModeControl value={draftPatch.productionMode} disabled={modeSaving} onChange={changeProductionMode} /></div>} open={open} onCancel={onClose} width={980} destroyOnClose={false} className="batch-factory-unified-settings-modal" footer={<Space><span className="batch-factory-unified-settings-scope">保存将覆盖本批次 {(Array.isArray(batch?.books) ? batch.books.length : 0) || 0} 本书的模型等配置（含单书改动）。批次敏感模式仅用于继承的书。</span><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存统一配置</Button></Space>}>
     {modeNotice ? <Alert type="warning" showIcon closable message={modeNotice} style={{ marginBottom: 12 }} onClose={() => setModeNotice('')} /> : null}
     <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={draftPatch} onChange={setDraftPatch} sections={['models', 'audio', 'sensitive']} active={open && activeTab === 'models'} /> },
-      { key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm batchId={batch?.id} productionMode={draftPatch.productionMode} value={draftPatch.aiPromptConfig} onChange={aiPromptConfig => setDraftPatch(current => ({ ...current, aiPromptConfig }))} /> },
+      ...(textMode ? [] : [{ key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm batchId={batch?.id} productionMode={draftPatch.productionMode} value={draftPatch.aiPromptConfig} onChange={aiPromptConfig => setDraftPatch(current => ({ ...current, aiPromptConfig }))} /> }]),
       { key: 'publish', label: '发布统一', children: productionMode === 'comic' ? <BatchFactoryComicPublishSettingsForm value={draftPatch} onChange={setDraftPatch} books={batch?.books || []} /> : <BatchFactoryPublishSettingsForm value={draftPatch} onChange={setDraftPatch} active={batchFactoryShouldLoadPublishEnvironment({ open, activeTab, productionMode })} /> }
     ]} />
   </Modal>;
