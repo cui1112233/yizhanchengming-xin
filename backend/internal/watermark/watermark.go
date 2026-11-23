@@ -3,16 +3,24 @@ package watermark
 
 import (
 	"bytes"
+	_ "embed"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/jpeg"
 	"image/png"
+	"sync"
 
+	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
-	"qiantie/backend/internal/renderfont"
 )
+
+// Keep the existing watermark rasterizer and artwork private to legacy comic watermarks.
+//
+//go:embed legacy-watermark.ttf
+var watermarkBytes []byte
+var legacyWatermarkFont = sync.OnceValues(func() (*truetype.Font, error) { return truetype.Parse(watermarkBytes) })
 
 // Options 控制水印开关与文字内容。
 type Options struct {
@@ -66,10 +74,11 @@ func Apply(data []byte, mediaType string, opts Options) ([]byte, string) {
 		margin = 8
 	}
 
-	face, err := renderfont.Open(renderfont.Noto, fontSize)
+	legacyFont, err := legacyWatermarkFont()
 	if err != nil {
 		return data, mediaType
 	}
+	face := truetype.NewFace(legacyFont, &truetype.Options{Size: fontSize, DPI: 72})
 	defer face.Close()
 
 	// 测量文字宽度
@@ -80,10 +89,7 @@ func Apply(data []byte, mediaType string, opts Options) ([]byte, string) {
 	if boxWidth > width/2 {
 		// 文字太长，缩小字号重试一次
 		fontSize = fontSize * 0.8
-		face, err = renderfont.Open(renderfont.Noto, fontSize)
-		if err != nil {
-			return data, mediaType
-		}
+		face = truetype.NewFace(legacyFont, &truetype.Options{Size: fontSize, DPI: 72})
 		defer face.Close()
 		drawer = &font.Drawer{Face: face}
 		textWidth = drawer.MeasureString(text).Ceil()

@@ -9,18 +9,64 @@ import (
 type Scope struct{ Owner, BatchID, BookID string }
 
 type LayoutConfig struct {
-	AspectRatio      string  `json:"aspectRatio"`
-	TargetCharacters int     `json:"targetCharacters"`
-	FontID           string  `json:"fontId"`
-	FontSize         float64 `json:"fontSize"`
-	FontWeight       int     `json:"fontWeight"`
-	LineHeight       float64 `json:"lineHeight"`
-	ParagraphSpacing float64 `json:"paragraphSpacing"`
-	Padding          int     `json:"padding"`
-	Align            string  `json:"align"`
-	TextColor        string  `json:"textColor"`
-	HighlightColor   string  `json:"highlightColor"`
-	MaxHeightRatio   float64 `json:"maxHeightRatio"`
+	AspectRatio                     string  `json:"aspectRatio"`
+	TargetCharacters                int     `json:"targetCharacters"`
+	FontID                          string  `json:"fontId"`
+	FontSize                        float64 `json:"fontSize"`
+	FontWeight                      int     `json:"fontWeight"`
+	LineHeight                      float64 `json:"lineHeight"`
+	ParagraphSpacing                float64 `json:"paragraphSpacing"`
+	Padding                         int     `json:"padding"`
+	Align                           string  `json:"align"`
+	TextColor                       string  `json:"textColor"`
+	HighlightColor                  string  `json:"highlightColor"`
+	MaxHeightRatio                  float64 `json:"maxHeightRatio"`
+	paddingSet, paragraphSpacingSet bool
+}
+
+// Wire fields use pointers for the two measurements for which zero has
+// an independent meaning. Old snapshots can contain either a full layout
+// or a sparse object, and explicit zeros must survive the next save.
+type layoutValues LayoutConfig
+type layoutWire struct {
+	layoutValues
+	Padding          *int     `json:"padding,omitempty"`
+	ParagraphSpacing *float64 `json:"paragraphSpacing,omitempty"`
+}
+
+func (c *LayoutConfig) UnmarshalJSON(data []byte) error {
+	var w layoutWire
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+	*c = LayoutConfig(w.layoutValues)
+	if w.Padding != nil {
+		c.Padding = *w.Padding
+		c.paddingSet = c.Padding == 0
+	}
+	if w.ParagraphSpacing != nil {
+		c.ParagraphSpacing = *w.ParagraphSpacing
+		c.paragraphSpacingSet = c.ParagraphSpacing == 0
+	}
+	return nil
+}
+func (c LayoutConfig) MarshalJSON() ([]byte, error) {
+	w := layoutWire{layoutValues: layoutValues(c)}
+	if c.Padding != 0 || c.paddingSet {
+		w.Padding = &c.Padding
+	}
+	if c.ParagraphSpacing != 0 || c.paragraphSpacingSet {
+		w.ParagraphSpacing = &c.ParagraphSpacing
+	}
+	return json.Marshal(w)
+}
+
+// Nonzero spacing is intrinsically present, independent of construction in Go
+// or decoding from JSON. Canonical overrides compare equal across persistence.
+func (c LayoutConfig) canonicalSpacing() LayoutConfig {
+	c.paddingSet = c.Padding == 0 && c.paddingSet
+	c.paragraphSpacingSet = c.ParagraphSpacing == 0 && c.paragraphSpacingSet
+	return c
 }
 
 type Background struct {
@@ -163,7 +209,11 @@ func ResolvePageStyle(book PageStyle, prior PageDraft, changes PagePatch) (PageP
 		o.Background = nil
 	}
 	if o.Layout != nil {
-		book.Layout = *o.Layout
+		layout := o.Layout.canonicalSpacing()
+		o.Layout = &layout
+		book.Layout = layout
+	} else {
+		book.Layout = book.Layout.canonicalSpacing()
 	}
 	if o.Background != nil {
 		book.Background = *o.Background

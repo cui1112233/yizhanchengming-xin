@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -37,7 +38,7 @@ func renderCard(t *testing.T, renderer Renderer, in RenderInput) (*image.RGBA, [
 
 func TestRenderFontsIncludeChineseFallback(t *testing.T) {
 	catalog := renderfont.Catalog()
-	if len(catalog) != 2 || !catalog[1].Available || catalog[1].Coverage == "" {
+	if len(catalog) != 2 || !catalog[1].Available || catalog[1].Coverage == "" || catalog[0].Name != "Noto Sans SC" || catalog[1].Name != "Ma Shan Zheng" {
 		t.Fatal(catalog)
 	}
 	a, err := renderfont.Open("noto-sans-sc", 44)
@@ -45,23 +46,56 @@ func TestRenderFontsIncludeChineseFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer a.Close()
-	b, err := renderfont.Open("xiang-hai", 44)
+	b, err := renderfont.Open("ma-shan-zheng", 44)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer b.Close()
-	for _, r := range "你好🍎" {
+	for _, r := range "你好龘🍎" {
 		bounds, _, ok := b.GlyphBounds(r)
 		if !ok || bounds.Empty() {
 			t.Fatalf("missing visible glyph %q", r)
 		}
 		n, _, _ := a.GlyphBounds(r)
-		if (bounds == n) != (r != '你') {
+		if (bounds == n) != (r == '龘' || r == '🍎') {
 			t.Fatalf("wrong font for %q", r)
 		}
 	}
 	if _, err := renderfont.Open("absent", 44); err == nil {
 		t.Fatal("unknown font accepted")
+	}
+}
+
+func TestRenderExplicitZeroJSONRoundTrip(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		pad   int
+		gap   float64
+	}{
+		{`{"fontSize":40}`, 96, 24},
+		{`{"fontSize":40,"padding":0}`, 0, 24},
+		{`{"fontSize":40,"paragraphSpacing":0}`, 96, 0},
+		{`{"padding":0,"paragraphSpacing":0}`, 0, 0},
+	} {
+		var c LayoutConfig
+		if err := json.Unmarshal([]byte(tc.input), &c); err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < 2; i++ {
+			resolved, _, err := resolveLayout(c)
+			if err != nil || resolved.Padding != tc.pad || resolved.ParagraphSpacing != tc.gap {
+				t.Fatalf("%s: got padding %d and spacing %v (%v)", tc.input, resolved.Padding, resolved.ParagraphSpacing, err)
+			}
+			data, err := json.Marshal(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var saved LayoutConfig
+			if err = json.Unmarshal(data, &saved); err != nil {
+				t.Fatal(err)
+			}
+			c = saved
+		}
 	}
 }
 
@@ -86,8 +120,31 @@ func TestRenderCanonicalPixels(t *testing.T) {
 	if n < 100 {
 		t.Fatal("text missing")
 	}
-	if got := fmt.Sprintf("%x", sha256.Sum256(data)); got != "fa266605f737b0eb08a7a8d0556b71ab2dbea6d3eb7916a1712553b3ea0efe06" {
+	if got := fmt.Sprintf("%x", sha256.Sum256(data)); got != "504e9f866a3920baed3ce8743b95927cf46317fbe76f006d712768c2e066d10e" {
 		t.Fatalf("Noto card SHA-256 %s", got)
+	}
+}
+
+func TestRenderExplicitSpacingKeepsStoredStyleComparable(t *testing.T) {
+	c := DefaultRenderLayout()
+	b, err := json.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var persisted LayoutConfig
+	if err = json.Unmarshal(b, &persisted); err != nil {
+		t.Fatal(err)
+	}
+	old, oldStyle, err := ResolvePageStyle(PageStyle{}, PageDraft{Layout: &persisted}, PagePatch{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, nextStyle, err := ResolvePageStyle(PageStyle{}, PageDraft{Layout: &persisted}, PagePatch{Layout: &c})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oldStyle != nextStyle || *old.Layout != *next.Layout {
+		t.Fatal("resaving identical defaults invalidated the rendered page")
 	}
 }
 

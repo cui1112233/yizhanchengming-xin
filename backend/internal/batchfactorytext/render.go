@@ -101,7 +101,7 @@ type MeasureResult struct {
 }
 
 func DefaultRenderLayout() LayoutConfig {
-	return LayoutConfig{AspectRatio: "3:4", TargetCharacters: DefaultTargetCharacters, FontID: renderfont.Noto, FontSize: 44, FontWeight: 400, LineHeight: 1.65, ParagraphSpacing: 24, Padding: 96, Align: "left", TextColor: "#FFFFFF", HighlightColor: "#E53935", MaxHeightRatio: .75}
+	return LayoutConfig{AspectRatio: "3:4", TargetCharacters: DefaultTargetCharacters, FontID: renderfont.Noto, FontSize: 44, FontWeight: 400, LineHeight: 1.65, ParagraphSpacing: 24, Padding: 96, Align: "left", TextColor: "#FFFFFF", HighlightColor: "#E53935", MaxHeightRatio: .75, paddingSet: true, paragraphSpacingSet: true}
 }
 
 var canvasSizes = map[string]image.Point{
@@ -112,14 +112,11 @@ func resolveLayout(c LayoutConfig) (LayoutConfig, image.Point, error) {
 	defaults := DefaultRenderLayout()
 	// Sparse book snapshots inherit missing spacing. The layout editor starts
 	// from DefaultRenderLayout and can set either measurement explicitly to zero.
-	fullGeometry := c.AspectRatio != "" && c.FontID != "" && c.FontSize > 0 && c.LineHeight > 0 && c.MaxHeightRatio > 0
-	if !fullGeometry {
-		if c.Padding == 0 {
-			c.Padding = defaults.Padding
-		}
-		if c.ParagraphSpacing == 0 {
-			c.ParagraphSpacing = defaults.ParagraphSpacing
-		}
+	if c.Padding == 0 && !c.paddingSet {
+		c.Padding = defaults.Padding
+	}
+	if c.ParagraphSpacing == 0 && !c.paragraphSpacingSet {
+		c.ParagraphSpacing = defaults.ParagraphSpacing
 	}
 	if c.AspectRatio == "" {
 		c.AspectRatio = defaults.AspectRatio
