@@ -59,6 +59,58 @@ test('text upload completion requires a confirmed text receipt for this book', (
   assert.equal(batchFactoryBatchProgress([book], runtime).uploaded, 1);
 });
 
+test('a previous text receipt preserves republish eligibility while the new attempt runs or fails', () => {
+  const book = { id: 'book' };
+  const previous = { stage: 'text_publish', status: 'succeeded', attempt: 1, requestId: 'first' };
+  const current = { stage: 'text_publish', status: 'running', attempt: 2, requestId: 'second', createdAt: '2026-11-24T11:00:00Z' };
+  const stageSummary = {
+    runs: [previous, current],
+    textPublishRecord: { ...verifiedTextPublish, requestKey: 'first', attempt: 1, publishedAt: '2026-11-24T11:01:00Z' }
+  };
+  const runtime = { productionMode: 'text', stageSummary };
+  const timeline = () => batchFactoryBookTimeline(book, runtime).at(-1);
+  const state = () => batchFactoryBookState(book, runtime);
+  const progress = () => batchFactoryBatchProgress([book], runtime);
+  assert.equal(timeline().label, '正在上传');
+  assert.equal(state().published, true);
+  assert.equal(state().terminal, false);
+  assert.equal(progress().running, 1);
+  assert.equal(progress().uploaded, 0);
+  current.status = 'failed';
+  current.errorMessage = '第二次上传超时';
+  assert.equal(timeline().label, '上传失败');
+  assert.equal(state().detail, '第二次上传超时');
+  assert.equal(state().published, true);
+  assert.equal(state().terminal, false);
+  assert.equal(progress().failed, 1);
+  assert.equal(progress().completionPercent, 0);
+  stageSummary.textPublishRecord = { ...verifiedTextPublish, requestKey: 'second', attempt: 2 };
+  assert.equal(timeline().label, '已上传');
+  assert.equal(state().terminal, true);
+  assert.equal(progress().completionPercent, 100);
+});
+
+test('text receipt comparison uses attempt identity or publication time when a request key is missing', () => {
+  const run = { stage: 'text_publish', status: 'running', attempt: 2, createdAt: '2026-11-24T11:00:00Z' };
+  const stageSummary = { runs: [run] };
+  const state = () => batchFactoryBookState({ id: 'book' }, { productionMode: 'text', stageSummary });
+  for (const [fields, terminal] of [
+    [{ attempt: 1 }, false], [{ attempt: 2 }, true],
+    [{ publishedAt: '2026-11-24T10:59:00Z' }, false], [{ publishedAt: '2026-11-24T11:01:00Z' }, true],
+    [{}, false]
+  ]) {
+    stageSummary.textPublishRecord = { ...verifiedTextPublish, ...fields };
+    assert.equal(state().terminal, terminal);
+  }
+  run.status = 'succeeded';
+  assert.equal(state().terminal, false);
+  stageSummary.runs = [
+    { stage: 'text_publish', status: 'succeeded' },
+    { stage: 'text_publish', status: 'succeeded' }
+  ];
+  assert.equal(state().terminal, false);
+});
+
 test('a ready text collection is terminal only for a non-submit job and remains distinct from an upload', () => {
   const book = { id: 'book' };
   const stageSummary = { runs: [{ stage: 'text_collection', status: 'succeeded' }] };

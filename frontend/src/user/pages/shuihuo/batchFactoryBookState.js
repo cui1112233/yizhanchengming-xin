@@ -207,30 +207,50 @@ const textStageCopy = {
   text_publish: { pending: '等待上传', failed: '上传失败', completed: '已上传' }
 };
 
+function textReceiptMatchesRun(record, run, runs) {
+  if (!run) return true;
+  const runKey = run.requestKey || run.requestId;
+  const receiptKey = record.requestKey || record.requestId;
+  const identities = [
+    [runKey, receiptKey],
+    [run.id, record.runId],
+    [run.attempt, record.attempt]
+  ].filter(([left, right]) => left && right);
+  if (identities.length) return identities.every(([left, right]) => String(left) === String(right));
+  const started = Date.parse(run.createdAt || run.startedAt || run.updatedAt);
+  const received = Date.parse(record.publishedAt || record.createdAt);
+  if (Number.isFinite(started) && Number.isFinite(received)) return received > started;
+  // 旧版无关联字段的摘要仅在首次上传阶段已成功时沿用成功回执。
+  return taskState(run) === 'succeeded' && !runKey && !run.id
+    && !(Number(run.attempt) > 1) && !Number.isFinite(started)
+    && !runs.some(other => other !== run && other.stage === 'text_publish' && taskState(other) === 'succeeded');
+}
+
 function textBookTimeline(book, summary) {
   const record = summary?.textPublishRecord;
   const matchesBook = record && (!record.kind || record.kind === 'text') && (!record.bookId || record.bookId === book?.id);
   // 与发布服务的成功记录一致：远端合集和图片都已落地。
-  const published = matchesBook && record.status === 'published' && Number(record.carouselId) > 0
-    && Array.isArray(record.imageIds) && record.imageIds.length > 0;
+  const published = Boolean(matchesBook && record.status === 'published' && Number(record.carouselId) > 0
+    && Array.isArray(record.imageIds) && record.imageIds.length > 0);
   const awaitingReceipt = matchesBook && ['accepted', 'submitted', 'upload_pending_confirm'].includes(record.status);
   return Object.entries(textStageCopy).map(([key, copy]) => {
     const run = latestStageRun(summary, key);
     let status = statusFromRun(run);
     if (key === 'text_publish') {
-      if (published) status = 'completed';
-      else if (status === 'completed' || (status === 'pending' && awaitingReceipt)) status = 'running';
+      const current = matchesBook && textReceiptMatchesRun(record, run, summary.runs);
+      if (current && published) status = 'completed';
+      else if (status === 'completed' || (status === 'pending' && current && awaitingReceipt)) status = 'running';
     }
     const label = copy[status] || stageLabel('runtime', key);
     const detail = status === 'failed' ? (run?.errorMessage || label) : label;
-    return { key, label, status, detail };
+    return key === 'text_publish' ? { key, label, status, detail, published } : { key, label, status, detail };
   });
 }
 
 function textBookState(book, summary, runMode, textAutoUpload, automationBook, manual) {
   const timeline = textBookTimeline(book, summary);
   const upload = timeline.find(step => step.key === 'text_publish');
-  const base = { manual, published: false, terminal: false, uploadStatus: upload.status };
+  const base = { manual, published: upload.published, terminal: false, uploadStatus: upload.status };
   if (upload.status === 'completed') {
     return { ...base, ...upload, tone: 'green', published: true, terminal: true };
   }
@@ -419,7 +439,7 @@ export function batchFactoryBatchProgress(books, runtime = {}) {
       stageSummary: runtime.stageSummaries?.[book?.id] || runtime.stageSummary
     });
     if (runtime.productionMode === 'text') {
-      if (state.published) result.uploaded += 1;
+      if (state.uploadStatus === 'completed') result.uploaded += 1;
       else if (state.terminal) result.collectionReady += 1;
       else if (state.status === 'failed') result.failed += 1;
       else if (state.status === 'running') result.running += 1;
