@@ -224,6 +224,29 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 	if uploads != 2 {
 		t.Fatalf("selected category did not trigger another attempt: %d", uploads)
 	}
+	confirmedRepublish := func(intent string, force bool) {
+		t.Helper()
+		c := coordinator(repo)
+		c.textPublish = func(_ context.Context, r txt.EnsureRequest, col txt.Collection) (bool, error) {
+			if col.ID != fixedCover.ID || r.ForcePublish != force || r.PublishRequestKey == "" {
+				t.Fatalf("wrong scoped upload: %+v %s", r, col.ID)
+			}
+			uploads++
+			return true, nil
+		}
+		r := req
+		r.Target, r.CollectionID, r.PublishIntentKey, r.ForcePublish = "published", fixedCover.ID, intent, force
+		if out, err := c.textEnsure(ctx, r); err != nil || !out.Published {
+			t.Fatalf("pinned publish: %+v %v", out, err)
+		}
+	}
+	confirmedRepublish("", false)
+	confirmedRepublish("first-confirmation", true)
+	confirmedRepublish("first-confirmation", true) // Restart after the stage succeeded, before the job cleared its flag.
+	confirmedRepublish("second-confirmation", true)
+	if uploads != 4 {
+		t.Fatalf("two confirmations should create two additional uploads, got %d total", uploads)
+	}
 	if err := files.Remove(locked.StorageRef); err != nil {
 		t.Fatal(err)
 	}
@@ -403,6 +426,16 @@ func TestAutomationTextNewerManualReceiptSupersedesFinishedRun(t *testing.T) {
 		if out := read(old, newest); out["textPublishSource"] == "manual" || out["textPublishRecord"] != nil {
 			t.Fatalf("manual receipt hid newer automatic %s: %+v", state, out)
 		}
+	}
+	// Reusing the very same remote upload binds a new current run, but keeps the original manual receipt identity.
+	manual := map[string]any{"kind": "text", "bookId": bookID, "collectionId": "auto", "intentId": "same-remote", "requestKey": "manual-request", "carouselId": 1, "imageIds": []int{9}, "status": "published", "publishedAt": ended.Add(time.Hour * 2)}
+	saved("auto", map[string]any{"runId": old.ID, "attempt": old.Attempt, "requestKey": old.RequestID, "intentId": "same-remote", "carouselId": 1, "imageIds": []int{9}, "status": "published", "lastPublished": manual})
+	rebound := old
+	rebound.Status = batchfactoryv11.ProductionRunning
+	out := read(rebound)
+	current, historical := workflowReceiptJSON(out["textPublishRecord"]), workflowReceiptJSON(out["textLastPublishedRecord"])
+	if current["runId"] != old.ID || historical["runId"] != nil || historical["requestKey"] != "manual-request" {
+		t.Fatalf("rebound receipt replaced original manual identity: %+v", out)
 	}
 	// Even with a more recent write timestamp, a receipt that identifies an old
 	// automatic attempt cannot become the manual result by changing the pointer.

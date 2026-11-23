@@ -73,11 +73,8 @@ func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store,
 				summary["textPublishSource"] = "manual"
 			}
 		}
-		history := &rec
-		if !rec.Confirmed() {
-			history = rec.LastPublished
-		}
-		if scoped(history) && history.Confirmed() {
+		history := rec.HistoricalPublished()
+		if scoped(history) {
 			published := history.PublishedAt
 			if published.IsZero() {
 				published = draft.UpdatedAt
@@ -183,7 +180,13 @@ func validateAutomationTextSettings(x textRequest) error {
 // Both the manual text endpoints and the automation worker use the same prepared
 // drafts, render inputs, artifact writer and cryptographic file validation.
 func (c *BatchAutomationCoordinator) configureTextWorkflow(repo txt.Repository, files *localartifact.Store) {
-	if repo == nil || files == nil || c.textEnsure != nil {
+	if repo == nil {
+		return
+	}
+	if c.textPublishCollection == nil {
+		c.textPublishCollection = repo.GetCollection
+	}
+	if files == nil || c.textEnsure != nil {
 		return
 	}
 	a := textAPI{c.store, repo, files, c}

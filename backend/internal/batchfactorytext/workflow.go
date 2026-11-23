@@ -14,6 +14,7 @@ type EnsureRequest struct {
 	FrozenSettings                  map[string]json.RawMessage
 	Target                          string
 	SourceKey                       string
+	PublishIntentKey                string // Persisted once for an explicitly confirmed republish.
 	PublishSettingsKey              string // Digest of only the selected publish mapping.
 	CollectionID                    string // A pending upload resumes with the same immutable collection.
 	PublishRunID, PublishRequestKey string
@@ -137,7 +138,11 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 	}
 	publish := func(verifyErr error) error {
 		key := fingerprint(res.Collection.ID, req.PublishSettingsKey)
-		return stage("text_publish", "正在上传", key, !req.ForcePublish && verifyErr == nil && req.PublishSettingsKey != "", func() error {
+		if req.PublishIntentKey != "" {
+			key = fingerprint(key, req.PublishIntentKey)
+		}
+		reuse := !req.ForcePublish || req.PublishIntentKey != ""
+		return stage("text_publish", "正在上传", key, reuse && verifyErr == nil && req.PublishSettingsKey != "", func() error {
 			if verifyErr != nil {
 				return verifyErr
 			}

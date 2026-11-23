@@ -49,6 +49,7 @@ type BatchAutomationCoordinator struct {
 	providerSync          func(context.Context, string) error
 	promptCatalog         *prompt.Catalog
 	publish121            *BatchFactory121Publisher
+	textPublishCollection func(context.Context, txt.Scope, string) (txt.Collection, error)
 	textEnsure            func(context.Context, txt.EnsureRequest) (txt.EnsureResult, error)
 	textPublish           func(context.Context, txt.EnsureRequest, txt.Collection) (bool, error)
 	comicGenerate         func(context.Context, string, string, string) (batchfactoryv11.ComicCollection, error)
@@ -1911,8 +1912,12 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	if len(targetBooks) == 0 {
 		return nil, fmt.Errorf("%w: 没有可自动生产的书籍", batchfactoryv11.ErrInvalid)
 	}
+	overrides, err := c.textPublishOverrides(ctx, owner, batchID, input["bookIds"], input["textPublishOverrides"])
+	if err != nil {
+		return nil, err
+	}
 	if automationBoolValue(input["queueIfActive"]) {
-		if queued, found, queueErr := c.queueBooksBehindActiveAutomation(owner, batchID, batch.SettingsState.Patch, targetBooks, input); found || queueErr != nil {
+		if queued, found, queueErr := c.queueBooksBehindActiveAutomation(owner, batchID, batch.SettingsState.Patch, targetBooks, input, overrides); found || queueErr != nil {
 			return queued, queueErr
 		}
 	}
@@ -2022,7 +2027,11 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 			status, stage, message = "scheduled", "scheduled", "等待北京时间到点后开始生产"
 		}
 		books[book.ID] = map[string]any{"bookId": book.ID, "title": book.Title, "status": status, "stage": stage, "message": message, "attempts": 0, "retryCount": 0, "updatedAt": c.now()}
-		if err := freezeAutomationTextSettings(books[book.ID].(map[string]any), batch.SettingsState.Patch, book); err != nil {
+		entry := books[book.ID].(map[string]any)
+		if err := freezeAutomationTextSettings(entry, batch.SettingsState.Patch, book); err != nil {
+			return nil, err
+		}
+		if err := overrides[book.ID].apply(entry); err != nil {
 			return nil, err
 		}
 	}
@@ -2109,7 +2118,7 @@ const automationFollowUpStage = "waiting_active_run"
 // queueBooksBehindActiveAutomation 把用户明确选择的新书追加到同一任务的后续队列。
 // 它只写 queued 条目，不取消、不重启当前 run，因此当前正在调用模型的书不会被
 // 二次提交；本轮结束后 run() 再领取这些条目继续执行。
-func (c *BatchAutomationCoordinator) queueBooksBehindActiveAutomation(owner, batchID string, batchSettings batchfactoryv11.SettingsPatch, targetBooks []batchfactoryv11.Book, input map[string]any) (map[string]any, bool, error) {
+func (c *BatchAutomationCoordinator) queueBooksBehindActiveAutomation(owner, batchID string, batchSettings batchfactoryv11.SettingsPatch, targetBooks []batchfactoryv11.Book, input map[string]any, overrides map[string]textPublishOverride) (map[string]any, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	state, err := c.loadLocked()
@@ -2143,24 +2152,35 @@ func (c *BatchAutomationCoordinator) queueBooksBehindActiveAutomation(owner, bat
 		books = map[string]any{}
 		active["books"] = books
 	}
-	added := 0
+	for bookID := range overrides {
+		if books[bookID] != nil {
+			return nil, true, fmt.Errorf("%w：所选书已在当前任务中，请在原任务中重试", batchfactoryv11.ErrConflict)
+		}
+	}
+	additions := map[string]any{}
 	for _, book := range targetBooks {
 		if _, tracked := books[book.ID]; tracked {
 			continue
 		}
-		books[book.ID] = map[string]any{
+		entry := map[string]any{
 			"bookId": book.ID, "title": book.Title,
 			"status": "queued", "stage": automationFollowUpStage,
 			"message": "当前任务完成后自动继续", "attempts": 0, "retryCount": 0,
 			"updatedAt": c.now(),
 		}
-		if err := freezeAutomationTextSettings(books[book.ID].(map[string]any), batchSettings, book); err != nil {
+		if err := freezeAutomationTextSettings(entry, batchSettings, book); err != nil {
 			return nil, true, err
 		}
-		added++
+		if err := overrides[book.ID].apply(entry); err != nil {
+			return nil, true, err
+		}
+		additions[book.ID] = entry
 	}
-	if added == 0 {
+	if len(additions) == 0 {
 		return nil, true, fmt.Errorf("%w: 选择的小说已在当前任务中，不会重复执行", batchfactoryv11.ErrConflict)
+	}
+	for bookID, entry := range additions {
+		books[bookID] = entry
 	}
 	active["counts"] = automationCountsFromBooks(books)
 	active["updatedAt"] = c.now()
@@ -3935,11 +3955,18 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					scoped.SettingsState.Patch = settings
 					book.SettingsState.Patch = nil
 					pinned := automationStringValue(entry["textPendingPublishCollectionId"], "")
-					if reason := c.automationBookPreflightReason(ctx, owner, scoped, book, jobRunMode); pinned == "" && reason != "" {
-						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "blocked", "preflight", reason, c.now()
-						appendAutomationBookLog(entry, c.now(), "preflight", reason)
+					if pinned != "" && jobSubmitDeferred {
+						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "scheduled", "waiting_submit", "合集就绪，等待定时上传", c.now()
 						persist()
 						continue
+					}
+					if pinned == "" {
+						if reason := c.automationBookPreflightReason(ctx, owner, scoped, book, jobRunMode); reason != "" {
+							entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "blocked", "preflight", reason, c.now()
+							appendAutomationBookLog(entry, c.now(), "preflight", reason)
+							persist()
+							continue
+						}
 					}
 					if pinned == "" && !hasVerifiedBatchOriginal(book) {
 						fetched, fetchErr := c.fetchAutomationSource(ctx, owner, batchID, book, true)
@@ -3957,7 +3984,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						persist()
 					}
 					target := "collection"
-					upload := jobRunMode == "full_submit" || jobAutoPublish || string(settings["textAutoUpload"]) == "true"
+					upload := pinned != "" || jobRunMode == "full_submit" || jobAutoPublish || string(settings["textAutoUpload"]) == "true"
 					if upload && !jobSubmitDeferred {
 						target = "published"
 					}
@@ -3972,6 +3999,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					}
 					req := txt.EnsureRequest{Scope: txt.Scope{Owner: owner, BatchID: batchID, BookID: book.ID}, FrozenSettings: settings, Target: target, ForceSensitive: automationBoolValue(entry["retrySensitiveManually"]), Progress: progress}
 					req.CollectionID = pinned
+					req.PublishIntentKey = automationStringValue(entry["textPublishIntentId"], "")
+					req.ForcePublish = req.PublishIntentKey != ""
 					req.CollectionReady = func(collection txt.Collection) {
 						entry["textCollectionId"] = collection.ID
 						if upload {
@@ -4018,6 +4047,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					if result.Published {
 						stage, message = "text_publish", "已上传"
 						delete(entry, "textPendingPublishCollectionId")
+						delete(entry, "textPublishIntentId")
 					} else if upload && jobSubmitDeferred {
 						status, stage, message = "scheduled", "waiting_submit", "合集就绪，等待定时上传"
 					}
@@ -5637,6 +5667,14 @@ func (c *BatchAutomationCoordinator) Resume(ctx context.Context, owner, batchID 
 }
 
 func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID string, bookIDs []string) (map[string]any, error) {
+	return c.retry(ctx, owner, batchID, bookIDs, nil)
+}
+
+func (c *BatchAutomationCoordinator) retry(ctx context.Context, owner, batchID string, bookIDs []string, requested map[string]textPublishOverride) (map[string]any, error) {
+	overrides, err := c.textPublishOverrides(ctx, owner, batchID, bookIDs, requested)
+	if err != nil {
+		return nil, err
+	}
 	set := map[string]bool{}
 	for _, id := range bookIDs {
 		if strings.TrimSpace(id) != "" {
@@ -5702,9 +5740,39 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 			}
 		}
 	}
-	// 重试只调度未成功的书：已完成/已发布、正在执行、等待定时提交或等待人工
-	// 确认的书都不进入新一轮 run。显式传了 bookIds 时先与 job 跟踪的书取交集。
+	// 常规重试只调度未成功的书。明确指定文本合集时，先核对原任务和冻结配置，
+	// 再允许把该书加入本轮上传，包括用户已经确认再次上传的已完成书。
 	selected := selectRetryableAutomationBooks(books, set, currentSourceBookIDs)
+	prepared := map[string]map[string]any{}
+	for bookID, override := range overrides {
+		entry, _ := books[bookID].(map[string]any)
+		book, exists := findBatchBookByID(prefetchedBatch, bookID)
+		if !exists || entry == nil {
+			c.mu.Unlock()
+			return nil, fmt.Errorf("%w：所选书不在原任务中", batchfactoryv11.ErrInvalid)
+		}
+		if _, isText, settingsErr := automationTextSettings(entry, prefetchedBatch, book); !isText || settingsErr != nil {
+			c.mu.Unlock()
+			return nil, fmt.Errorf("%w：所选书没有可用的文本任务配置", batchfactoryv11.ErrInvalid)
+		}
+		next := cloneAutomationEntry(entry)
+		if _, frozen := next["frozenTextSettings"]; !frozen {
+			if err := freezeAutomationTextSettings(next, prefetchedBatch.SettingsState.Patch, book); err != nil {
+				c.mu.Unlock()
+				return nil, err
+			}
+		}
+		if err := override.apply(next); err != nil {
+			c.mu.Unlock()
+			return nil, err
+		}
+		next["status"], next["stage"], next["resumeStage"], next["retryRequested"] = "queued", "text_publish", "text_publish", true
+		next["message"], next["error"], next["updatedAt"] = "等待上传所选文本合集", "", c.now()
+		delete(next, "needsManual")
+		delete(next, "retryAt")
+		prepared[bookID] = next
+		selected[bookID] = true
+	}
 	if len(selected) == 0 {
 		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 没有需要重试的书，已完成或正在执行的书不会重复执行", batchfactoryv11.ErrConflict)
@@ -5739,20 +5807,11 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		target["retryAttempt"] = automationNumberValue(target["retryAttempt"], 0) + 1
 	}
 	resetRetryableAutomationBooks(books, selected, c.now())
-	if reopened {
-		var running, failed, ready int
-		for _, raw := range books {
-			entry, _ := raw.(map[string]any)
-			switch automationStringValue(entry["status"], "") {
-			case "completed":
-				ready++
-			case "running":
-				running++
-			default:
-				failed++
-			}
-		}
-		target["counts"] = automationCounts(len(books), running, failed, ready)
+	for bookID, entry := range prepared {
+		books[bookID] = entry
+	}
+	if reopened || len(prepared) > 0 {
+		target["counts"] = automationCountsFromBooks(books)
 	}
 	if err := c.saveLocked(state); err != nil {
 		c.mu.Unlock()
@@ -5762,6 +5821,13 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 	// worker 启动后会持续更新书/节点/页账本；这时再遍历 target 会触发
 	// concurrent map read and map write，并直接杀死整个 Go 进程。
 	response := publicAutomationJob(target)
+	needsProviderSync := !prefetchedBatchOK
+	for _, book := range prefetchedBatch.Books {
+		if selected[book.ID] {
+			_, isText, _ := automationTextSettings(mapOrEmpty(books[book.ID]), prefetchedBatch, book)
+			needsProviderSync = needsProviderSync || !isText
+		}
+	}
 	c.mu.Unlock()
 	batch := prefetchedBatch
 	if !prefetchedBatchOK {
@@ -5771,11 +5837,6 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		}
 		batch = loaded
 	}
-	if c.providerSync != nil {
-		if err := c.providerSync(ctx, owner); err != nil {
-			return nil, err
-		}
-	}
 	// run() indexes one job entry per batch book and would panic on books this
 	// job never tracked (a batch run can cover a subset). Relaunch only the
 	// selected (not-yet-successful) books; completed entries stay out of this run.
@@ -5784,6 +5845,11 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 	for _, book := range batch.Books {
 		if selected[book.ID] {
 			scoped.Books = append(scoped.Books, book)
+		}
+	}
+	if needsProviderSync && c.providerSync != nil {
+		if err := c.providerSync(ctx, owner); err != nil {
+			return nil, err
 		}
 	}
 	if len(scoped.Books) == 0 {
@@ -6044,12 +6110,13 @@ func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordina
 			return
 		}
 		var input struct {
-			BookIDs []string `json:"bookIds"`
+			BookIDs              []string                       `json:"bookIds"`
+			TextPublishOverrides map[string]textPublishOverride `json:"textPublishOverrides"`
 		}
 		if !decodeJSON(w, r, &input) {
 			return
 		}
-		result, err := coordinator.Retry(r.Context(), owner, r.PathValue("batchId"), input.BookIDs)
+		result, err := coordinator.retry(r.Context(), owner, r.PathValue("batchId"), input.BookIDs, input.TextPublishOverrides)
 		if err != nil {
 			writeStoreError(w, err)
 			return
