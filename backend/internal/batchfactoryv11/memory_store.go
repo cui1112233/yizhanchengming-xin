@@ -26,7 +26,7 @@ type MemoryStore struct {
 	patches               map[string]SettingsPatch
 	configVersions        map[string]memoryOwned[ConfigVersion]
 	prompts               map[string][]Prompt
-	drafts                map[string]Draft
+	drafts                map[[4]string]Draft
 	bookAssets            map[string]memoryOwned[BookAsset]
 	bookAssetImages       map[string]memoryOwned[BookAssetImage]
 	comicPages            map[string]memoryOwned[ComicPage]
@@ -55,7 +55,7 @@ func NewMemoryStore() *MemoryStore {
 		patches:               map[string]SettingsPatch{},
 		configVersions:        map[string]memoryOwned[ConfigVersion]{systemDefault.ID: {Owner: "", Value: systemDefault}},
 		prompts:               map[string][]Prompt{},
-		drafts:                map[string]Draft{},
+		drafts:                map[[4]string]Draft{},
 		bookAssets:            map[string]memoryOwned[BookAsset]{},
 		bookAssetImages:       map[string]memoryOwned[BookAssetImage]{},
 		comicPages:            map[string]memoryOwned[ComicPage]{},
@@ -825,7 +825,7 @@ func (s *MemoryStore) DeleteBatch(_ context.Context, owner, batchID string) erro
 		}
 	}
 	for key, draft := range s.drafts {
-		if draft.Scope == batchID {
+		if key[0] == owner && draft.Scope == batchID {
 			delete(s.drafts, key)
 		}
 	}
@@ -1094,8 +1094,8 @@ func (s *MemoryStore) CreatePrompt(_ context.Context, owner string, p Prompt) (P
 	s.prompts[owner] = append(s.prompts[owner], p)
 	return p, nil
 }
-func draftKey(owner, key, kind, scope string) string {
-	return owner + ":" + key + ":" + kind + ":" + scope
+func draftKey(owner, key, kind, scope string) [4]string {
+	return [4]string{owner, key, kind, scope}
 }
 func (s *MemoryStore) GetDraft(_ context.Context, owner, key, kind, scope string) (Draft, error) {
 	s.mu.Lock()

@@ -63,7 +63,7 @@ func TestCarouselReadbackAfterDisconnectBeforeJSON(t *testing.T) {
 		t.Fatalf("result=%+v checked=%v creates=%d err=%v", result, checked, creates, err)
 	}
 	got, err := client.Readback(context.Background(), ReceiptLookup{ImageIDs: result.ImageIDs, ImageSignatures: result.ImageSignatures})
-	if err != nil || got.CarouselID != 17 || !slices.Equal(got.ImageIDs, ids) || creates != 1 || reads != 2 {
+	if err != nil || got.CarouselID != 0 || creates != 1 || reads != 0 {
 		t.Fatal(got, reads, creates, err)
 	}
 }
@@ -100,6 +100,7 @@ func TestCarouselReadbackFollowsOnlyServerProvidedSameOriginLocation(t *testing.
 		if r.URL.Path == createPath {
 			creates++
 			w.Header().Set("Location", "/receipts/123")
+			w.Header().Set("X-Operation-ID", "provider-op")
 			w.WriteHeader(202)
 			return
 		}
@@ -112,7 +113,7 @@ func TestCarouselReadbackFollowsOnlyServerProvidedSameOriginLocation(t *testing.
 			w.WriteHeader(202)
 			return
 		}
-		io.WriteString(w, `{"code":"SUCCESS","data":{"carousel_id":41,"image_ids":[5,6]}}`)
+		io.WriteString(w, `{"code":"SUCCESS","data":{"operation_id":"provider-op","carousel_id":41,"image_ids":[5,6]}}`)
 	}))
 	defer server.Close()
 	c := NewClient(Config{BaseURL: server.URL, APIKey: "test", HTTPClient: server.Client()})
@@ -126,7 +127,7 @@ func TestCarouselReadbackFollowsOnlyServerProvidedSameOriginLocation(t *testing.
 			t.Fatal(value)
 		}
 	}
-	lookup := ReceiptLookup{ReceiptPath: pending.path, ImageIDs: []int64{5, 6}}
+	lookup := ReceiptLookup{IntentID: "local-attempt", OperationID: pending.operation, ReceiptPath: pending.path, ImageIDs: []int64{5, 6}}
 	first, err := c.Readback(context.Background(), lookup)
 	if err != nil || first.CarouselID != 0 {
 		t.Fatal(first, err)
@@ -150,6 +151,39 @@ func TestCarouselDefiniteRejectionAndAmbiguousResponse(t *testing.T) {
 			_, err := c.CreateCarousel(context.Background(), CreateCarouselRequest{ProducerAdminName: "m", Name: "book", ImageIDs: []int64{5, 6}, WorkIDs: []int64{7}, AudioCategoryID: 1, AudioID: 2})
 			if err == nil || errors.Is(err, ErrCarouselReceiptPending) != tc.pending {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestCarouselReceiptRequiresMatchingOperationAndExactPageOrder(t *testing.T) {
+	for _, tc := range []struct {
+		name, body    string
+		wantID        int64
+		wantRejection bool
+	}{
+		{"missing identity", `{"code":"SUCCESS","data":{"image_ids":[1,2],"carousel_id":7}}`, 0, false},
+		{"other operation", `{"code":"SUCCESS","data":{"request_id":"other","image_ids":[1,2],"carousel_id":7}}`, 0, false},
+		{"wrong order", `{"code":"SUCCESS","data":{"request_id":"here","image_ids":[2,1],"carousel_id":7}}`, 0, false},
+		{"missing target", `{"code":"SUCCESS","data":{"request_id":"here","carousel_id":7}}`, 0, false},
+		{"running", `{"code":"SUCCESS","data":{"status":"PROCESSING","request_id":"here","image_ids":[1,2],"carousel_id":7}}`, 0, false},
+		{"unrelated rejection", `{"code":"SUCCESS","data":{"status":"REJECTED","request_id":"other","reason":"no"}}`, 0, false},
+		{"rejection", `{"code":"SUCCESS","data":{"status":"REJECTED","request_id":"here","reason":"拒绝原因"}}`, 0, true},
+		{"matching", `{"code":"SUCCESS","data":{"request_id":"here","image_ids":[1,2],"carousel_id":7}}`, 7, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "GET" || r.URL.Path != "/status/opaque" {
+					t.Fatal("unexpected read")
+				}
+				io.WriteString(w, tc.body)
+			}))
+			defer s.Close()
+			c := NewClient(Config{BaseURL: s.URL, APIKey: "test", HTTPClient: s.Client()})
+			result, err := c.Readback(context.Background(), ReceiptLookup{IntentID: "here", ReceiptPath: "/status/opaque", ImageIDs: []int64{1, 2}})
+			var rejected *RejectedReceipt
+			if errors.As(err, &rejected) != tc.wantRejection || result.CarouselID != tc.wantID || rejected != nil && (rejected.IntentID != "here" || rejected.Reason != "拒绝原因") {
+				t.Fatal(result, err)
 			}
 		})
 	}

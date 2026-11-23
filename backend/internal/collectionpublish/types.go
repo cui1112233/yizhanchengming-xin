@@ -26,6 +26,7 @@ type Reference struct {
 	ID   string         `json:"id"`
 }
 type PublishRequest struct {
+	Resuming                                               bool
 	RunID, MappingRevision                                 string
 	Attempt                                                int
 	Kind                                                   CollectionKind
@@ -47,6 +48,11 @@ type Collection struct {
 	Pages    []Page
 }
 type Record struct {
+	Reused            bool           `json:"reused,omitempty"`
+	Phase             string         `json:"phase,omitempty"`
+	DispatchID        string         `json:"-"`
+	OperationID       string         `json:"-"`
+	ErrorMessage      string         `json:"errorMessage,omitempty"`
 	PriorCarouselIDs  []int64        `json:"priorCarouselIds,omitempty"`
 	ReceiptPath       string         `json:"-"`
 	ImageSignatures   []string       `json:"-"`
@@ -95,4 +101,19 @@ func (r Record) Confirmed() bool {
 type Records interface {
 	Load(context.Context, PublishRequest) (Record, bool, error)
 	Save(context.Context, PublishRequest, Record) error
+}
+
+// HistoricalPublished returns the identity of the physical successful attempt.
+// A workflow-derived record shares its intent ID with that original receipt.
+func (r *Record) HistoricalPublished() *Record {
+	if r == nil {
+		return nil
+	}
+	if r.LastPublished != nil && r.LastPublished.Confirmed() && (!r.Confirmed() || r.Reused || r.IntentID != "" && r.LastPublished.IntentID == r.IntentID) {
+		return r.LastPublished
+	}
+	if r.Confirmed() {
+		return r
+	}
+	return nil
 }

@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,7 +59,7 @@ func (f *textPublishTestClient) Publish(_ context.Context, r n8comic.PublishRequ
 func (f *textPublishTestClient) Readback(_ context.Context, in n8comic.ReceiptLookup) (n8comic.PublishResult, error) {
 	f.readbackCalls++
 	if f.confirmedReadback && in.ReceiptPath == "/receipt?private-proof=7" && len(in.ImageSignatures) == 2 && in.PreviousCarouselID == 19 {
-		return n8comic.PublishResult{CarouselID: 29, ImageIDs: []int64{21, 22}}, nil
+		return n8comic.PublishResult{ReceiptIntentID: in.IntentID, CarouselID: 29, ImageIDs: []int64{21, 22}}, nil
 	}
 	return n8comic.PublishResult{}, nil
 }
@@ -171,12 +173,64 @@ func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 	if err != nil || !bound {
 		t.Fatal(bound, err)
 	}
-	reused := call("GET", nil).Publish
+	reply := call("GET", nil)
+	if reply.LastPublished == nil || reply.LastPublished.RequestKey != "another-upload" || reply.LastPublished.RunID != "" {
+		t.Fatalf("origin=%+v", reply.LastPublished)
+	}
+	reused := reply.Publish
 	if reused.RunID != "next-run" || reused.Attempt != 2 || reused.RequestKey != "next-key" || reused.IntentID != second.Publish.IntentID || reused.LastPublished.RequestKey != "another-upload" || client.calls != 2 {
 		t.Fatal(reused)
 	}
 	foreign := signedJSONRequest(t, api, now, "bob", http.MethodGet, path, nil)
 	if foreign.Code != 404 {
 		t.Fatalf("foreign=%d", foreign.Code)
+	}
+}
+
+func TestPublicDraftRoutesProtectCollectionReceipts(t *testing.T) {
+	ctx := context.Background()
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	router := NewRouter(RouterOptions{BridgeSecret: "secret", Slice: 1, Store: store, Now: func() time.Time { return now }})
+	ordinary := map[string]any{"key": "plain", "kind": "scratch", "scope": "batch", "content": "hello"}
+	good := signedJSONRequest(t, router, now, "alice", "PUT", "/api/batch-factory/v12/drafts", ordinary)
+	if good.Code != 200 {
+		t.Fatalf("ordinary draft should work: %d %s", good.Code, good.Body.String())
+	}
+	good = signedJSONRequest(t, router, now, "alice", "GET", "/api/batch-factory/v12/drafts?key=plain&kind=scratch&scope=batch", nil)
+	if good.Code != 200 || !bytes.Contains(good.Body.Bytes(), []byte("hello")) {
+		t.Fatal(good.Code, good.Body.String())
+	}
+	for _, kind := range []string{n8ComicPublishDraftKind, n8ComicPublishDraftKind + "-history", textPublishDraftKind, textPublishDraftKind + "-history", "collection-publish-text-history"} {
+		d := batchfactoryv11.Draft{Key: "book-c", Scope: "batch", Kind: kind, Content: `{"status":"pending","_receiptPath":"private-tag"}`}
+		if _, err := store.SaveDraft(ctx, "alice", d); err != nil {
+			t.Fatal(err)
+		}
+		for _, version := range []string{"v11", "v12"} {
+			path := "/api/batch-factory/" + version + "/drafts"
+			for _, k := range []string{kind, strings.ToUpper(kind)} {
+				query := url.Values{"kind": {k}, "key": {d.Key}, "scope": {d.Scope}}
+				response := signedJSONRequest(t, router, now, "alice", "GET", path+"?"+query.Encode(), nil)
+				if response.Code < 400 || bytes.Contains(response.Body.Bytes(), []byte("private-tag")) {
+					t.Fatalf("%s %s GET: %d", version, k, response.Code)
+				}
+				response = signedJSONRequest(t, router, now, "alice", "PUT", path, map[string]any{"kind": k, "scope": d.Scope, "key": d.Key, "content": `{"status":"published","carouselId":99}`})
+				if response.Code < 400 {
+					t.Fatalf("%s %s PUT: %d", version, k, response.Code)
+				}
+			}
+			response := signedJSONRequest(t, router, now, "alice", "GET", path, nil)
+			if bytes.Contains(response.Body.Bytes(), []byte("private-tag")) {
+				t.Fatal("private field exposed")
+			}
+			response = signedJSONRequest(t, router, now, "alice", "PUT", path, map[string]any{"kind": "scratch", "scope": "s", "key": "k", "content": `{"_imageSignatures":["private"]}`})
+			if response.Code < 400 {
+				t.Fatal("accepted private receipt fields")
+			}
+		}
+		got, err := store.GetDraft(ctx, "alice", d.Key, d.Kind, d.Scope)
+		if err != nil || got.Content != d.Content {
+			t.Fatal(got, err)
+		}
 	}
 }

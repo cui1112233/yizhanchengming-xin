@@ -1010,7 +1010,7 @@ func (p *BatchFactoryN8ComicPublisher) Publish(ctx context.Context, owner, batch
 			}
 			out.Kind = req.Kind
 			out.ID = c.ID
-			out.Name, err = p.collectionName(req.Producer, book.Title)
+			out.Name, err = p.collectionName(r.Producer, book.Title)
 			if err != nil {
 				return out, err
 			}

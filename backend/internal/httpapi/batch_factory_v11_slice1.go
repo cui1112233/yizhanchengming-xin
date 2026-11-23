@@ -577,7 +577,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			return
 		}
 		q := r.URL.Query()
-		draft, err := store.GetDraft(r.Context(), owner, q.Get("key"), q.Get("kind"), q.Get("scope"))
+		draft, err := batchfactoryv11.GetPublicDraft(r.Context(), store, owner, q.Get("key"), q.Get("kind"), q.Get("scope"))
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -598,7 +598,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			writeStoreError(w, batchfactoryv11.ErrInvalid)
 			return
 		}
-		draft, err := store.SaveDraft(r.Context(), owner, input)
+		draft, err := batchfactoryv11.SavePublicDraft(r.Context(), store, owner, input)
 		if err != nil {
 			writeStoreError(w, err)
 			return

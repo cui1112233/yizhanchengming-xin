@@ -66,6 +66,8 @@ func publishDraftKind(k cp.CollectionKind) string {
 // store carries them; normal status responses and workflow summaries omit them.
 type storedPublishRecord struct {
 	cp.Record
+	PrivateDispatchID  string   `json:"_dispatchId,omitempty"`
+	PrivateOperationID string   `json:"_operationId,omitempty"`
 	PrivateReceiptPath string   `json:"_receiptPath,omitempty"`
 	PrivateSignatures  []string `json:"_imageSignatures,omitempty"`
 }
@@ -104,6 +106,7 @@ func (d collectionDraftRecords) Load(ctx context.Context, r cp.PublishRequest) (
 	}
 	rec = stored.Record
 	rec.ReceiptPath, rec.ImageSignatures = stored.PrivateReceiptPath, stored.PrivateSignatures
+	rec.DispatchID, rec.OperationID = stored.PrivateDispatchID, stored.PrivateOperationID
 	if rec.Kind != "" && rec.Kind != r.Kind || rec.BookID != "" && rec.BookID != r.BookID {
 		return rec, false, batchfactoryv11.ErrNotFound
 	}
@@ -124,7 +127,7 @@ func (d collectionDraftRecords) Load(ctx context.Context, r cp.PublishRequest) (
 	return rec, true, nil
 }
 func (d collectionDraftRecords) Save(ctx context.Context, r cp.PublishRequest, rec cp.Record) error {
-	if prev := rec.LastPublished; prev != nil && prev.RequestKey != "" && (rec.Status == "pending" || rec.RunID != "" && rec.IntentID == prev.IntentID) {
+	if prev := rec.LastPublished; prev != nil && prev.RequestKey != "" && (rec.Status == "uploading" || rec.Status == "pending" || rec.RunID != "" && rec.IntentID == prev.IntentID) {
 		raw, err := json.Marshal(prev)
 		if err != nil {
 			return err
@@ -134,7 +137,7 @@ func (d collectionDraftRecords) Save(ctx context.Context, r cp.PublishRequest, r
 			return err
 		}
 	}
-	raw, err := json.Marshal(storedPublishRecord{rec, rec.ReceiptPath, rec.ImageSignatures})
+	raw, err := json.Marshal(storedPublishRecord{Record: rec, PrivateDispatchID: rec.DispatchID, PrivateOperationID: rec.OperationID, PrivateReceiptPath: rec.ReceiptPath, PrivateSignatures: rec.ImageSignatures})
 	if err != nil {
 		return err
 	}
@@ -296,10 +299,7 @@ func rememberManualTextCollection(x textRequest, store batchfactoryv11.Store, id
 	return batchfactoryv11.ErrConflict
 }
 func writeTextPublishResult(w http.ResponseWriter, rec cp.Record) {
-	history := rec.LastPublished
-	if rec.Confirmed() {
-		history = &rec
-	}
+	history := rec.HistoricalPublished()
 	writeJSON(w, 200, map[string]any{"published": rec.Confirmed(), "publish": rec, "lastPublished": history})
 }
 
@@ -318,6 +318,9 @@ func (t textCollectionPublisher) automation(ctx context.Context, r txt.EnsureReq
 	input := textPublishInput{runID: r.PublishRunID, attempt: r.PublishAttempt, Force: r.ForcePublish}
 	input.RequestKey = r.PublishRequestKey
 	rec, err := t.publish(ctx, r.Scope, book, r.FrozenSettings, c.ID, input)
+	if err == nil && rec.Status == "failed" {
+		return false, errors.New(rec.ErrorMessage)
+	}
 	return rec.Confirmed(), err
 }
 
@@ -346,8 +349,10 @@ func (t textCollectionPublisher) publish(ctx context.Context, s txt.Scope, book 
 		if c.ID != id || c.Status != "ready" || len(c.Items) == 0 || c.CoverArtifactID == "" {
 			return out, txt.ErrNotReady
 		}
-		if err = t.resolveMapping(ctx, r, book, settings); err != nil {
-			return out, err
+		if !r.Resuming {
+			if err = t.resolveMapping(ctx, r, book, settings); err != nil {
+				return out, err
+			}
 		}
 		// Hash only the selected routing values after resolving the configuration.
 		data, err := json.Marshal([]any{r.Producer, r.OrganizationID, r.WebsiteProfileID, r.CategoryID, r.AudioCategoryID, r.AudioID, r.WorkIDs})

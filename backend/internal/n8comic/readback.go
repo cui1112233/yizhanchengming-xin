@@ -13,8 +13,8 @@ import (
 )
 
 type pendingReceipt struct {
-	path  string
-	cause error
+	path, operation string
+	cause           error
 }
 
 func (e *pendingReceipt) Error() string {
@@ -24,11 +24,12 @@ func (e *pendingReceipt) Unwrap() []error { return []error{ErrCarouselReceiptPen
 
 // ReceiptLookup carries evidence saved for this specific create attempt.
 type ReceiptLookup struct {
-	PriorCarouselIDs   []int64
-	ReceiptPath        string
-	ImageSignatures    []string
-	ImageIDs           []int64
-	PreviousCarouselID int64
+	IntentID, OperationID string
+	PriorCarouselIDs      []int64
+	ReceiptPath           string
+	ImageSignatures       []string
+	ImageIDs              []int64
+	PreviousCarouselID    int64
 }
 
 func (c *Client) receiptPath(location string) string {
@@ -54,48 +55,20 @@ func (c *Client) receiptPath(location string) string {
 	return path
 }
 
-// Readback performs read-only queries. A provider that returns image IDs but
-// omits their carousel ownership cannot confirm a carousel this way.
+// A carousel must be confirmed by its create operation. Identical images may
+// be reused across unrelated carousels, even with the same page order.
+type RejectedReceipt struct{ IntentID, Reason string }
+
+func (e *RejectedReceipt) Error() string { return e.Reason }
+
 func (c *Client) Readback(ctx context.Context, in ReceiptLookup) (PublishResult, error) {
 	if !c.Configured() {
 		return PublishResult{}, errors.New("N8 发布回查服务未配置")
 	}
-	var locationErr error
-	if path := c.receiptPath(in.ReceiptPath); path != "" {
-		result, err := c.readReceiptLocation(ctx, path)
-		locationErr = err
-		if err == nil && result.CarouselID > 0 && result.CarouselID != in.PreviousCarouselID && !slices.Contains(in.PriorCarouselIDs, result.CarouselID) && len(result.ImageIDs) > 0 && (len(in.ImageIDs) == 0 || slices.Equal(in.ImageIDs, result.ImageIDs)) {
-			return result, nil
-		}
+	path := c.receiptPath(in.ReceiptPath)
+	if path == "" || in.IntentID == "" || len(in.ImageIDs) == 0 || slices.ContainsFunc(in.ImageIDs, func(id int64) bool { return id <= 0 }) {
+		return PublishResult{}, nil
 	}
-	if len(in.ImageSignatures) == 0 || len(in.ImageSignatures) != len(in.ImageIDs) {
-		return PublishResult{}, locationErr
-	}
-	var carouselID int64
-	for i, sig := range in.ImageSignatures {
-		if sig == "" || in.ImageIDs[i] <= 0 {
-			return PublishResult{}, nil
-		}
-		var image struct {
-			ImageID    int64 `json:"image_id"`
-			CarouselID int64 `json:"carousel_id"`
-		}
-		if err := c.post(ctx, readPath, map[string]any{"signature": sig}, &image); err != nil {
-			var apiErr *APIError
-			if errors.As(err, &apiErr) && apiErr.Code == "IMAGE_NOT_READY" {
-				return PublishResult{}, nil
-			}
-			return PublishResult{}, err
-		}
-		if image.ImageID != in.ImageIDs[i] || image.CarouselID <= 0 || image.CarouselID == in.PreviousCarouselID || slices.Contains(in.PriorCarouselIDs, image.CarouselID) || (i > 0 && image.CarouselID != carouselID) {
-			return PublishResult{}, nil
-		}
-		carouselID = image.CarouselID
-	}
-	return PublishResult{CarouselID: carouselID, ImageIDs: slices.Clone(in.ImageIDs)}, nil
-}
-
-func (c *Client) readReceiptLocation(ctx context.Context, path string) (PublishResult, error) {
 	origin, err := url.Parse(c.baseURL)
 	if err != nil {
 		return PublishResult{}, err
@@ -104,7 +77,6 @@ func (c *Client) readReceiptLocation(ctx context.Context, path string) (PublishR
 	if err != nil {
 		return PublishResult{}, err
 	}
-	// A receipt can be signed by its URL. Never follow redirects off this resource.
 	client := *c.httpClient
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	res, err := client.Do(req)
@@ -119,17 +91,56 @@ func (c *Client) readReceiptLocation(ctx context.Context, path string) (PublishR
 		return PublishResult{}, fmt.Errorf("N8 回执查询 HTTP 状态码 %d", res.StatusCode)
 	}
 	var envelope struct {
-		Code string `json:"code"`
-		Data struct {
-			CarouselID int64   `json:"carousel_id"`
-			ImageIDs   []int64 `json:"image_ids"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			CarouselID  int64   `json:"carousel_id"`
+			ImageIDs    []int64 `json:"image_ids"`
+			OperationID string  `json:"operation_id"`
+			RequestID   string  `json:"request_id"`
+			Status      string  `json:"status"`
+			Reason      string  `json:"reason"`
+			Message     string  `json:"message"`
 		} `json:"data"`
 	}
 	if err = json.NewDecoder(io.LimitReader(res.Body, 4<<20)).Decode(&envelope); err != nil {
 		return PublishResult{}, err
 	}
-	if envelope.Code != "SUCCESS" {
+	row := envelope.Data
+	if row.OperationID == "" {
+		row.OperationID = res.Header.Get("X-Operation-ID")
+	}
+	if row.RequestID == "" {
+		row.RequestID = res.Header.Get("X-Request-ID")
+	}
+	if row.RequestID != "" && row.RequestID != in.IntentID || row.OperationID != "" && in.OperationID != "" && row.OperationID != in.OperationID {
 		return PublishResult{}, nil
 	}
-	return PublishResult{CarouselID: envelope.Data.CarouselID, ImageIDs: envelope.Data.ImageIDs}, nil
+	correlated := row.RequestID == in.IntentID || in.OperationID != "" && row.OperationID == in.OperationID
+	if !correlated || len(row.ImageIDs) > 0 && !slices.Equal(in.ImageIDs, row.ImageIDs) {
+		return PublishResult{}, nil
+	}
+	state := strings.ToUpper(strings.TrimSpace(row.Status))
+	if state == "" {
+		state = strings.ToUpper(strings.TrimSpace(envelope.Code))
+	}
+	switch state {
+	case "FAILED", "REJECTED", "CANCELLED", "CANCELED", "DENIED":
+		reason := strings.TrimSpace(row.Reason)
+		if reason == "" {
+			reason = strings.TrimSpace(row.Message)
+		}
+		if reason == "" {
+			reason = strings.TrimSpace(envelope.Message)
+		}
+		if reason == "" {
+			reason = "发布平台已拒绝本次上传"
+		}
+		return PublishResult{}, &RejectedReceipt{IntentID: in.IntentID, Reason: reason}
+	case "SUCCESS", "SUCCEEDED", "COMPLETED", "PUBLISHED", "DONE":
+		if envelope.Code == "SUCCESS" && row.CarouselID > 0 && row.CarouselID != in.PreviousCarouselID && !slices.Contains(in.PriorCarouselIDs, row.CarouselID) && slices.Equal(in.ImageIDs, row.ImageIDs) {
+			return PublishResult{ReceiptIntentID: in.IntentID, CarouselID: row.CarouselID, ImageIDs: row.ImageIDs}, nil
+		}
+	}
+	return PublishResult{}, nil
 }

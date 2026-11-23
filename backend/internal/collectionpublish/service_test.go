@@ -145,7 +145,7 @@ func TestCollectionPublishPendingReadbackResumesWithoutSending(t *testing.T) {
 	ctx := context.Background()
 	records := testRecords{}
 	r := PublishRequest{Kind: CollectionKindText, Owner: "owner", BatchID: "batch", BookID: "b", CollectionID: "c", RunID: "new-run", Attempt: 2}
-	records.Save(ctx, r, Record{Status: "pending", Kind: r.Kind, BookID: "b", CollectionID: "c", IntentID: "pending-intent", ImageIDs: []int64{3, 4}, PageCount: 2, LastPublished: &Record{Status: "published", CarouselID: 9, ImageIDs: []int64{3, 4}}})
+	records.Save(ctx, r, Record{Status: "pending", Kind: r.Kind, BookID: "b", CollectionID: "c", IntentID: "pending-intent", ReceiptPath: "/receipts/pending", ImageIDs: []int64{3, 4}, PageCount: 2, LastPublished: &Record{Status: "published", CarouselID: 9, ImageIDs: []int64{3, 4}}})
 	reads := 0
 	svc := Service{Records: records, Readback: func(ctx context.Context, in n8comic.ReceiptLookup) (n8comic.PublishResult, error) {
 		reads++
@@ -153,7 +153,7 @@ func TestCollectionPublishPendingReadbackResumesWithoutSending(t *testing.T) {
 		if reads > 1 {
 			id = 17
 		}
-		return n8comic.PublishResult{CarouselID: id, ImageIDs: []int64{3, 4}}, nil
+		return n8comic.PublishResult{ReceiptIntentID: in.IntentID, CarouselID: id, ImageIDs: []int64{3, 4}}, nil
 	}}
 	pending, ok, err := svc.Status(ctx, r)
 	if err != nil || !ok || pending.Status != "pending" || pending.LastPublished.CarouselID != 9 {
@@ -186,5 +186,96 @@ func TestCollectionPublishFailedRepublishNeedsForceWhenHistoryConfirmed(t *testi
 	current, _, _ := svc.Status(ctx, r)
 	if current.IntentID != "failed-forced" {
 		t.Fatal("ordinary history lookup overwrote latest", current)
+	}
+}
+
+func TestCollectionPublishCrashResumesUploadsAndProtectsCreateBoundary(t *testing.T) {
+	ctx := context.Background()
+	records := testRecords{}
+	req := PublishRequest{Kind: CollectionKindText, Owner: "o", BatchID: "b", BookID: "book", CollectionID: "c", Producer: "m", CategoryID: "tag", OrganizationID: "org", AudioID: 1, AudioCategoryID: 2, WorkIDs: []int64{3}}
+	prepare := func(context.Context, *PublishRequest) (Collection, error) {
+		return Collection{Kind: req.Kind, ID: req.CollectionID, Name: "name", Pages: []Page{{Ordinal: 1}, {Ordinal: 2}}}, nil
+	}
+	crash := func(svc *Service) {
+		t.Helper()
+		defer func() {
+			if recover() != "power loss" {
+				t.Fatal("expected interrupted process")
+			}
+		}()
+		_, _ = svc.Publish(ctx, req, prepare)
+	}
+	first := Service{Records: records, Submit: func(ctx context.Context, in n8comic.PublishRequest) (n8comic.PublishResult, error) {
+		current, _, _ := records.Load(ctx, req)
+		if current.Status != "uploading" || current.Phase != "uploading" {
+			t.Fatalf("before create: %+v", current)
+		}
+		if err := in.OnImage(0, 7); err != nil {
+			t.Fatal(err)
+		}
+		panic("power loss")
+	}}
+	crash(&first)
+	uploaded, _, _ := records.Load(ctx, req)
+	if uploaded.ImageIDs[0] != 7 || uploaded.ImageIDs[1] != 0 || uploaded.Status != "uploading" {
+		t.Fatal(uploaded)
+	}
+	second := Service{Records: records, Submit: func(ctx context.Context, in n8comic.PublishRequest) (n8comic.PublishResult, error) {
+		if len(in.UploadedImageIDs) != 2 || in.UploadedImageIDs[0] != 7 || in.UploadedImageIDs[1] != 0 || in.IntentID != uploaded.IntentID {
+			t.Fatalf("resume evidence: %+v", in)
+		}
+		if err := in.OnImage(1, 8); err != nil {
+			t.Fatal(err)
+		}
+		if err := in.BeforeCreate(n8comic.PublishResult{ImageIDs: []int64{7, 8}}); err != nil {
+			t.Fatal(err)
+		}
+		panic("power loss")
+	}}
+	crash(&second)
+	third := Service{Records: records, Submit: func(context.Context, n8comic.PublishRequest) (n8comic.PublishResult, error) {
+		t.Fatal("resent an ambiguous create")
+		return n8comic.PublishResult{}, nil
+	}}
+	rec, err := third.Publish(ctx, req, prepare)
+	if err != nil || rec.Phase != "create_unknown" || rec.Status != "pending" || rec.ImageIDs[1] != 8 {
+		t.Fatal(rec, err)
+	}
+}
+
+func TestCollectionPublishRejectedAsyncAttemptAllowsRetry(t *testing.T) {
+	ctx := context.Background()
+	req := PublishRequest{Kind: CollectionKindText, Owner: "o", BatchID: "b", BookID: "s", CollectionID: "c", Producer: "m", CategoryID: "g", OrganizationID: "org", AudioID: 1, AudioCategoryID: 2, WorkIDs: []int64{8}}
+	prepare := func(context.Context, *PublishRequest) (Collection, error) {
+		return Collection{Kind: req.Kind, ID: req.CollectionID, Name: "book", Pages: []Page{{Ordinal: 1}, {Ordinal: 2}}}, nil
+	}
+	records := testRecords{}
+	calls := 0
+	svc := Service{Records: records, Submit: func(ctx context.Context, in n8comic.PublishRequest) (n8comic.PublishResult, error) {
+		calls++
+		proof := n8comic.PublishResult{ImageIDs: []int64{7, 8}}
+		if err := in.BeforeCreate(proof); err != nil {
+			t.Fatal(err)
+		}
+		if calls == 1 {
+			proof.ReceiptPath = "/receipt/one"
+			return proof, n8comic.ErrCarouselReceiptPending
+		}
+		proof.CarouselID = 66
+		return proof, nil
+	}, Readback: func(ctx context.Context, in n8comic.ReceiptLookup) (n8comic.PublishResult, error) {
+		return n8comic.PublishResult{}, &n8comic.RejectedReceipt{IntentID: in.IntentID, Reason: "分类已停用"}
+	}}
+	original, err := svc.Publish(ctx, req, prepare)
+	if err != nil || original.Status != "pending" {
+		t.Fatal(original, err)
+	}
+	rejected, _, err := svc.Status(ctx, req)
+	if err != nil || rejected.Status != "failed" || rejected.ErrorMessage != "分类已停用" {
+		t.Fatal(rejected, err)
+	}
+	next, err := svc.Publish(ctx, req, prepare)
+	if err != nil || !next.Confirmed() || next.IntentID == original.IntentID || calls != 2 {
+		t.Fatal(next, err, calls)
 	}
 }

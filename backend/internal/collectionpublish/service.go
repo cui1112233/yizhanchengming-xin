@@ -110,7 +110,13 @@ func (s *Service) Publish(ctx context.Context, r PublishRequest, prepare func(co
 	if found && old.Confirmed() && !r.Force {
 		return s.reuse(ctx, r, old, old)
 	}
-	if found && !r.Force && old.LastPublished != nil && old.LastPublished.Confirmed() {
+	resuming := found && old.Status == "uploading" && old.IntentID != ""
+	if resuming {
+		r.Resuming = true
+		r.Producer, r.OrganizationID, r.WebsiteProfileID, r.CategoryID = old.ProducerAdminName, old.OrganizationID, old.WebsiteProfileID, old.CategoryID
+		r.WorkIDs, r.AudioCategoryID, r.AudioID = old.WorkIDs, old.AudioCategoryID, old.AudioID
+	}
+	if found && !resuming && !r.Force && old.LastPublished != nil && old.LastPublished.Confirmed() {
 		return s.reuse(ctx, r, old, *old.LastPublished)
 	}
 	coll, err := prepare(ctx, &r)
@@ -135,16 +141,19 @@ func (s *Service) Publish(ctx context.Context, r PublishRequest, prepare func(co
 		}
 		images[i] = p.Image
 	}
-	rec := Record{RunID: r.RunID, Attempt: r.Attempt, MappingRevision: r.MappingRevision, Kind: r.Kind, BookID: r.BookID, CollectionID: r.CollectionID, IntentID: rand.Text(), RequestKey: r.RequestKey, Status: "pending", Name: coll.Name, ProducerAdminName: r.Producer, OrganizationID: r.OrganizationID, CategoryID: r.CategoryID, WebsiteProfileID: r.WebsiteProfileID, AudioCategoryID: r.AudioCategoryID, AudioID: r.AudioID, WorkIDs: slices.Clone(r.WorkIDs), PageCount: len(images)}
+	rec := Record{RunID: r.RunID, Attempt: r.Attempt, MappingRevision: r.MappingRevision, Kind: r.Kind, BookID: r.BookID, CollectionID: r.CollectionID, IntentID: rand.Text(), RequestKey: r.RequestKey, DispatchID: rand.Text(), Phase: "preparing", Status: "uploading", Name: coll.Name, ProducerAdminName: r.Producer, OrganizationID: r.OrganizationID, CategoryID: r.CategoryID, WebsiteProfileID: r.WebsiteProfileID, AudioCategoryID: r.AudioCategoryID, AudioID: r.AudioID, WorkIDs: slices.Clone(r.WorkIDs), PageCount: len(images)}
 	rec.PriorCarouselIDs = slices.Clone(old.PriorCarouselIDs)
-	if old.Confirmed() {
-		if !slices.Contains(rec.PriorCarouselIDs, old.CarouselID) {
-			rec.PriorCarouselIDs = append(rec.PriorCarouselIDs, old.CarouselID)
+	if history := old.HistoricalPublished(); history != nil {
+		origin := *history
+		origin.LastPublished = nil
+		rec.LastPublished = &origin
+		if !slices.Contains(rec.PriorCarouselIDs, origin.CarouselID) {
+			rec.PriorCarouselIDs = append(rec.PriorCarouselIDs, origin.CarouselID)
 		}
-		old.LastPublished = nil
-		rec.LastPublished = &old
-	} else {
-		rec.LastPublished = old.LastPublished
+	}
+	if resuming {
+		rec.IntentID, rec.RequestKey, rec.RunID, rec.Attempt, rec.Name, rec.MappingRevision = old.IntentID, old.RequestKey, old.RunID, old.Attempt, old.Name, old.MappingRevision
+		rec.ImageIDs = slices.Clone(old.ImageIDs)
 	}
 	// Historical incomplete receipts contain image IDs in the frozen collection order.
 	if found && (old.Status == "upload_incomplete" || old.Status == "uploaded") && len(old.ImageIDs) == len(images) && old.ProducerAdminName == r.Producer {
@@ -165,7 +174,7 @@ func (s *Service) Publish(ctx context.Context, r PublishRequest, prepare func(co
 			release()
 			return Record{}, err
 		}
-		if exists != found || current.IntentID != old.IntentID || current.Status != old.Status {
+		if exists != found || current.IntentID != old.IntentID || current.Status != old.Status || current.DispatchID != old.DispatchID {
 			release()
 			return current, nil
 		}
@@ -177,20 +186,42 @@ func (s *Service) Publish(ctx context.Context, r PublishRequest, prepare func(co
 	} else if err = s.Records.Save(ctx, r, rec); err != nil {
 		return Record{}, err
 	}
-	pending := rec
-	checkpoint := func(proof n8comic.PublishResult) error {
-		rec.ImageIDs = slices.Clone(proof.ImageIDs)
-		rec.ImageSignatures = slices.Clone(proof.ImageSignatures)
-		current, err := s.saveCurrent(ctx, r, pending, rec)
+	expected := rec
+	checkpoint := func(next Record) error {
+		current, err := s.saveCurrent(ctx, r, expected, next)
 		if err != nil {
 			return err
 		}
-		if current.IntentID != pending.IntentID || current.Status != "pending" {
-			return errors.New("合集上传记录已经更新")
+		if current.IntentID != next.IntentID || current.DispatchID != next.DispatchID || current.Phase != next.Phase {
+			return errors.New("另一个上传请求正在处理本合集")
 		}
+		expected = current
 		return nil
 	}
-	result, sendErr := s.Submit(ctx, n8comic.PublishRequest{BeforeCreate: checkpoint, ProducerAdminName: r.Producer, Name: coll.Name, Images: images, WorkIDs: r.WorkIDs, AudioCategoryID: r.AudioCategoryID, AudioID: r.AudioID, UploadedImageIDs: rec.ImageIDs})
+	rec.Phase, rec.Message = "uploading", "正在上传合集图片；中断后可继续上传剩余图片。"
+	if err := checkpoint(rec); err != nil {
+		return Record{}, err
+	}
+	onImage := func(index int, id int64) error {
+		if len(rec.ImageIDs) == 0 {
+			rec.ImageIDs = make([]int64, len(images))
+		} else {
+			rec.ImageIDs = slices.Clone(rec.ImageIDs)
+		}
+		if index < 0 || index >= len(rec.ImageIDs) || id <= 0 {
+			return ErrInvalid
+		}
+		rec.ImageIDs[index] = id
+		return checkpoint(rec)
+	}
+	beforeCreate := func(proof n8comic.PublishResult) error {
+		rec.ImageIDs = slices.Clone(proof.ImageIDs)
+		rec.ImageSignatures = slices.Clone(proof.ImageSignatures)
+		rec.Phase, rec.Status, rec.Message = "create_unknown", "pending", pendingMessage
+		return checkpoint(rec)
+	}
+	result, sendErr := s.Submit(ctx, n8comic.PublishRequest{IntentID: rec.IntentID, OnImage: onImage, BeforeCreate: beforeCreate, ProducerAdminName: r.Producer, Name: rec.Name, Images: images, WorkIDs: r.WorkIDs, AudioCategoryID: r.AudioCategoryID, AudioID: r.AudioID, UploadedImageIDs: slices.Clone(rec.ImageIDs)})
+	rec.OperationID = result.OperationID
 	rec.ReceiptPath = result.ReceiptPath
 	if len(result.ImageSignatures) > 0 {
 		rec.ImageSignatures = slices.Clone(result.ImageSignatures)
@@ -199,20 +230,20 @@ func (s *Service) Publish(ctx context.Context, r PublishRequest, prepare func(co
 	if len(result.ImageIDs) > 0 {
 		rec.ImageIDs = slices.Clone(result.ImageIDs)
 	}
-	rec.Status = "published"
+	rec.Status, rec.Phase, rec.Message = "published", "confirmed", ""
 	switch {
 	case errors.Is(sendErr, n8comic.ErrCarouselReceiptPending):
-		rec.Status = "pending"
+		rec.Status, rec.Phase = "pending", "create_unknown"
 		rec.Message = pendingMessage
 		sendErr = nil
 	case sendErr != nil:
-		rec.Status = "failed"
+		rec.Status, rec.Phase, rec.ErrorMessage = "failed", "failed", sendErr.Error()
 		if slices.ContainsFunc(rec.ImageIDs, func(id int64) bool { return id > 0 }) {
 			rec.Status = "upload_incomplete"
 			sendErr = fmt.Errorf("%w：%w", ErrIncomplete, sendErr)
 		}
 	case !rec.Confirmed():
-		rec.Status = "pending"
+		rec.Status, rec.Phase = "pending", "create_unknown"
 		rec.Message = pendingMessage
 	default:
 		now := time.Now
@@ -224,7 +255,7 @@ func (s *Service) Publish(ctx context.Context, r PublishRequest, prepare func(co
 	// A caller may disconnect after the remote reply. Keep the receipt durable.
 	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
-	if rec, err = s.saveCurrent(saveCtx, r, pending, rec); err != nil {
+	if rec, err = s.saveCurrent(saveCtx, r, expected, rec); err != nil {
 		return Record{}, fmt.Errorf("保存上传回执失败：%w", err)
 	}
 	return rec, sendErr
@@ -256,22 +287,28 @@ func (s *Service) Status(ctx context.Context, r PublishRequest) (Record, bool, e
 
 func (s *Service) refresh(ctx context.Context, r PublishRequest, old Record) (Record, error) {
 	old.Message = pendingMessage
-	if s.Readback == nil {
+	if s.Readback == nil || old.ReceiptPath == "" || old.IntentID == "" || len(old.ImageIDs) == 0 {
 		return old, nil
 	}
-	proof := n8comic.ReceiptLookup{PriorCarouselIDs: old.PriorCarouselIDs, ReceiptPath: old.ReceiptPath, ImageSignatures: old.ImageSignatures, ImageIDs: old.ImageIDs}
+	proof := n8comic.ReceiptLookup{IntentID: old.IntentID, OperationID: old.OperationID, PriorCarouselIDs: old.PriorCarouselIDs, ReceiptPath: old.ReceiptPath, ImageSignatures: old.ImageSignatures, ImageIDs: old.ImageIDs}
 	if old.LastPublished != nil {
 		proof.PreviousCarouselID = old.LastPublished.CarouselID
 	}
 	remote, err := s.Readback(ctx, proof)
 	if err != nil {
+		var rejection *n8comic.RejectedReceipt
+		if errors.As(err, &rejection) && rejection.IntentID == old.IntentID {
+			next := old
+			next.Status, next.Phase, next.Message, next.ErrorMessage = "failed", "failed", rejection.Reason, rejection.Reason
+			return s.saveCurrent(ctx, r, old, next)
+		}
 		return old, nil
-	} // Transient read failures leave the original intent pending.
-	if remote.CarouselID <= 0 || remote.CarouselID == proof.PreviousCarouselID || slices.Contains(old.PriorCarouselIDs, remote.CarouselID) || len(old.ImageIDs) > 0 && !slices.Equal(old.ImageIDs, remote.ImageIDs) {
+	}
+	if remote.ReceiptIntentID != old.IntentID || remote.CarouselID <= 0 || remote.CarouselID == proof.PreviousCarouselID || slices.Contains(old.PriorCarouselIDs, remote.CarouselID) || !slices.Equal(old.ImageIDs, remote.ImageIDs) {
 		return old, nil
 	}
 	next := old
-	next.Status = "published"
+	next.Status, next.Phase = "published", "confirmed"
 	next.CarouselID = remote.CarouselID
 	next.ImageIDs = slices.Clone(remote.ImageIDs)
 	next.Message = ""
@@ -292,12 +329,10 @@ func (s *Service) reuse(ctx context.Context, r PublishRequest, current, receipt 
 	if r.RunID == "" || r.RunID == receipt.RunID && r.Attempt == receipt.Attempt && r.RequestKey == receipt.RequestKey {
 		return receipt, nil
 	}
-	origin := receipt
-	if receipt.LastPublished != nil && receipt.LastPublished.IntentID == receipt.IntentID {
-		origin = *receipt.LastPublished
-	}
+	origin := *receipt.HistoricalPublished()
 	origin.LastPublished = nil
 	next := receipt
+	next.Reused = true
 	next.LastPublished = &origin
 	next.RunID, next.Attempt, next.RequestKey = r.RunID, r.Attempt, r.RequestKey
 	return s.saveCurrent(ctx, r, current, next)
@@ -315,7 +350,7 @@ func (s *Service) saveCurrent(ctx context.Context, r PublishRequest, expected, n
 	if err != nil {
 		return Record{}, err
 	}
-	if !ok || latest.IntentID != expected.IntentID || latest.Status != expected.Status || latest.RequestKey != expected.RequestKey {
+	if !ok || latest.IntentID != expected.IntentID || latest.Status != expected.Status || latest.RequestKey != expected.RequestKey || latest.DispatchID != expected.DispatchID || latest.Phase != expected.Phase {
 		return latest, nil
 	}
 	if err = s.Records.Save(ctx, r, next); err != nil {
