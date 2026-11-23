@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"slices"
 	"strconv"
@@ -127,21 +126,34 @@ func (d collectionDraftRecords) Load(ctx context.Context, r cp.PublishRequest) (
 	return rec, true, nil
 }
 func (d collectionDraftRecords) Save(ctx context.Context, r cp.PublishRequest, rec cp.Record) error {
+	var archive *batchfactoryv11.Draft
 	if prev := rec.LastPublished; prev != nil && prev.RequestKey != "" && (rec.Status == "uploading" || rec.Status == "pending" || rec.RunID != "" && rec.IntentID == prev.IntentID) {
 		raw, err := json.Marshal(prev)
 		if err != nil {
 			return err
 		}
-		_, err = d.store.SaveDraft(ctx, r.Owner, batchfactoryv11.Draft{Kind: publishDraftKind(r.Kind) + "-history", Scope: r.BatchID, Key: archivedPublishKey(r.CollectionID, prev.RequestKey), Content: string(raw)})
-		if err != nil {
-			return err
-		}
+		archive = &batchfactoryv11.Draft{Kind: publishDraftKind(r.Kind) + "-history", Scope: r.BatchID, Key: archivedPublishKey(r.CollectionID, prev.RequestKey), Content: string(raw)}
 	}
 	raw, err := json.Marshal(storedPublishRecord{Record: rec, PrivateDispatchID: rec.DispatchID, PrivateOperationID: rec.OperationID, PrivateReceiptPath: rec.ReceiptPath, PrivateSignatures: rec.ImageSignatures})
 	if err != nil {
 		return err
 	}
-	_, err = d.store.SaveDraft(ctx, r.Owner, batchfactoryv11.Draft{Kind: publishDraftKind(r.Kind), Scope: r.BatchID, Key: r.CollectionID, Content: string(raw)})
+	draft := batchfactoryv11.Draft{Kind: publishDraftKind(r.Kind), Scope: r.BatchID, Key: r.CollectionID, Content: string(raw)}
+	if r.Kind == cp.CollectionKindText {
+		writer, ok := d.store.(interface {
+			SaveTextPublishReceipt(context.Context, string, cp.Record, batchfactoryv11.Draft, *batchfactoryv11.Draft) error
+		})
+		if !ok {
+			return batchfactoryv11.ErrUnavailable
+		}
+		return writer.SaveTextPublishReceipt(ctx, r.Owner, rec, draft, archive)
+	}
+	if archive != nil {
+		if _, err = d.store.SaveDraft(ctx, r.Owner, *archive); err != nil {
+			return err
+		}
+	}
+	_, err = d.store.SaveDraft(ctx, r.Owner, draft)
 	return err
 }
 func (p *BatchFactoryN8ComicPublisher) configureCollectionClaim(redisURL string) {
@@ -249,9 +261,6 @@ func (t textCollectionPublisher) route(m *http.ServeMux, options RouterOptions) 
 		if _, err := t.repo.GetCollection(x, x.scope, id); err != nil {
 			return err
 		}
-		if err := rememberManualTextCollection(x, a.store, id); err != nil {
-			return err
-		}
 		rec, err := t.publish(x, x.scope, x.book, x.settings, id, in)
 		if err != nil {
 			switch {
@@ -269,35 +278,6 @@ func (t textCollectionPublisher) route(m *http.ServeMux, options RouterOptions) 
 	}))
 }
 
-// Manual publishing has no automation run. Persist the selected immutable
-// collection so the book list can read the same receipt as the media panel.
-func rememberManualTextCollection(x textRequest, store batchfactoryv11.Store, id string) error {
-	book := x.book
-	for range automationBookWriteAttempts {
-		if book.SourceMetadata["textCollectionId"] == id {
-			return nil
-		}
-		metadata := maps.Clone(book.SourceMetadata)
-		if metadata == nil {
-			metadata = map[string]any{}
-		}
-		metadata["textCollectionId"] = id
-		_, err := store.UpdateBookMetadata(x, x.scope.Owner, x.scope.BatchID, x.scope.BookID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: book.Revision})
-		if !errors.Is(err, batchfactoryv11.ErrConflict) {
-			return err
-		}
-		batch, err := store.GetBatch(x, x.scope.Owner, x.scope.BatchID)
-		if err != nil {
-			return err
-		}
-		var found bool
-		book, found = findBatchBookByID(batch, x.scope.BookID)
-		if !found {
-			return batchfactoryv11.ErrNotFound
-		}
-	}
-	return batchfactoryv11.ErrConflict
-}
 func writeTextPublishResult(w http.ResponseWriter, rec cp.Record) {
 	history := rec.HistoricalPublished()
 	writeJSON(w, 200, map[string]any{"published": rec.Confirmed(), "publish": rec, "lastPublished": history})

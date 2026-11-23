@@ -46,14 +46,15 @@ type StageCheckpoint struct {
 }
 
 type Workflow struct {
-	Repo       Repository
-	Track      func(context.Context, Scope, StageCheckpoint, bool, func() error) error
-	Process    func(context.Context, EnsureRequest, bool) (WorkflowProduction, error)
-	Prepare    func(context.Context, EnsureRequest, WorkflowProduction, Document, bool) error
-	Render     func(context.Context, EnsureRequest, Document, Page) error // An empty page identifies the cover.
-	VerifyFile func(context.Context, PageArtifact, string) error
-	Validate   func(context.Context, EnsureRequest, Document) error
-	Publish    func(context.Context, EnsureRequest, Collection) (bool, error)
+	Repo            Repository
+	Track           func(context.Context, Scope, StageCheckpoint, bool, func() error) error
+	Process         func(context.Context, EnsureRequest, bool) (WorkflowProduction, error)
+	Prepare         func(context.Context, EnsureRequest, WorkflowProduction, Document, bool) error
+	Render          func(context.Context, EnsureRequest, Document, Page) error // An empty page identifies the cover.
+	VerifyFile      func(context.Context, PageArtifact, string) error
+	Validate        func(context.Context, EnsureRequest, Document) error
+	Publish         func(context.Context, EnsureRequest, Collection) (bool, error)
+	VerifyPublished func(context.Context, EnsureRequest, Collection) error
 }
 
 func fingerprint(parts ...any) string {
@@ -142,7 +143,9 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 			key = fingerprint(key, req.PublishIntentKey)
 		}
 		reuse := !req.ForcePublish || req.PublishIntentKey != ""
-		return stage("text_publish", "正在上传", key, reuse && verifyErr == nil && req.PublishSettingsKey != "", func() error {
+		executed := false
+		err := stage("text_publish", "正在上传", key, reuse && verifyErr == nil && req.PublishSettingsKey != "", func() error {
+			executed = true
 			if verifyErr != nil {
 				return verifyErr
 			}
@@ -158,6 +161,13 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 			}
 			return err
 		})
+		if err != nil || executed {
+			return err
+		}
+		if w.VerifyPublished == nil {
+			return errors.New("文本上传回执查询未配置")
+		}
+		return w.VerifyPublished(ctx, req, res.Collection)
 	}
 	if req.CollectionID != "" && req.Target == "published" {
 		res.Stage = "text_publish"

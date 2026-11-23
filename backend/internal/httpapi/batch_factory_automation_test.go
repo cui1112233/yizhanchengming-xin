@@ -19,6 +19,7 @@ import (
 
 	txt "qiantie/backend/internal/batchfactorytext"
 	"qiantie/backend/internal/batchfactoryv11"
+	cp "qiantie/backend/internal/collectionpublish"
 	"qiantie/backend/internal/giantmaterialresolver"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/novelfetchworkshop"
@@ -60,6 +61,15 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := batchfactoryv11.NewMySQLStore(db)
+	if err := store.BindTextPublishKeys(ctx, map[string]string{"already-claimed": "scope-a"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.BindTextPublishKeys(ctx, map[string]string{"a-new-key": "scope-a", "already-claimed": "scope-b"}); !errors.Is(err, batchfactoryv11.ErrConflict) {
+		t.Fatalf("global binding conflict: %v", err)
+	}
+	if err := store.BindTextPublishKeys(ctx, map[string]string{"a-new-key": "scope-b", "already-claimed": "scope-a"}); err != nil {
+		t.Fatalf("partial binding commit: %v", err)
+	}
 	settings := batchfactoryv11.SettingsPatch{"productionMode": mustJSON("text"), "sensitiveMode": mustJSON("off"), "textPageTarget": mustJSON(6)}
 	original := "第一段文字。\n第二段文字。\n第三段文字。"
 	b, err := store.CreateBatch(ctx, "workflow-test", batchfactoryv11.CreateBatchInput{Title: "文本自动任务", InitialBatchSettings: settings, Books: []batchfactoryv11.CreateBookInput{{Title: "测试书", SourceText: original, TxtText: original, SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}})
@@ -202,6 +212,12 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 		t.Fatalf("cover-only recovery: %+v", fixedCover)
 	}
 	uploads := 0
+	records := collectionDraftRecords{store}
+	confirm := func(ctx context.Context, r txt.EnsureRequest, col txt.Collection) (bool, error) {
+		uploads++
+		rec := cp.Record{Kind: cp.CollectionKindText, BookID: r.BookID, CollectionID: col.ID, RunID: r.PublishRunID, Attempt: r.PublishAttempt, RequestKey: r.PublishRequestKey, IntentID: r.PublishRequestKey, Status: "published", CarouselID: int64(uploads), ImageIDs: []int64{9}}
+		return true, records.Save(ctx, textPublishRequest(scope, col.ID), rec)
+	}
 	publish := func(otherProfileName, category string) {
 		t.Helper()
 		settings["publishSettings"] = mustJSON(map[string]any{"websiteProfileId": "selected", "bookCategory": category, "websiteProfiles": []any{map[string]any{"id": "selected"}, map[string]any{"id": "other", "name": otherProfileName}}})
@@ -209,7 +225,7 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 		publishReq := req
 		publishReq.Target = "published"
 		c := coordinator(repo)
-		c.textPublish = func(context.Context, txt.EnsureRequest, txt.Collection) (bool, error) { uploads++; return true, nil }
+		c.textPublish = confirm
 		out, err := c.textEnsure(ctx, publishReq)
 		if err != nil || !out.Published || out.Collection.ID != fixedCover.ID {
 			t.Fatalf("publish: %+v %v", out, err)
@@ -231,8 +247,7 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 			if col.ID != fixedCover.ID || r.ForcePublish != force || r.PublishRequestKey == "" {
 				t.Fatalf("wrong scoped upload: %+v %s", r, col.ID)
 			}
-			uploads++
-			return true, nil
+			return confirm(ctx, r, col)
 		}
 		r := req
 		r.Target, r.CollectionID, r.PublishIntentKey, r.ForcePublish = "published", fixedCover.ID, intent, force
@@ -246,6 +261,76 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 	confirmedRepublish("second-confirmation", true)
 	if uploads != 4 {
 		t.Fatalf("two confirmations should create two additional uploads, got %d total", uploads)
+	}
+	// A later manual attempt is authoritative even when automation has a successful checkpoint.
+	manual := cp.Record{Kind: cp.CollectionKindText, BookID: scope.BookID, CollectionID: fixedCover.ID, IntentID: "manual-same", RequestKey: "manual-same", Status: "pending"}
+	prev, _, err := records.Load(ctx, textPublishRequest(scope, fixedCover.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manual.LastPublished = &prev
+	r := req
+	r.Target, r.CollectionID = "published", fixedCover.ID
+	for _, state := range []string{"pending", "uploading", "failed"} {
+		manual.Status = state
+		if err := records.Save(ctx, textPublishRequest(scope, fixedCover.ID), manual); err != nil {
+			t.Fatal(err)
+		}
+		c := coordinator(repo)
+		c.textPublish = confirm
+		result, err := c.textEnsure(ctx, r)
+		if result.Published || err == nil || (state != "failed" && !errors.Is(err, txt.ErrPublishPending)) || uploads != 4 {
+			t.Fatalf("manual %s masked: %+v %v calls=%d", state, result, err, uploads)
+		}
+	}
+	// Upgrade an existing book whose sole pointer predates the history field.
+	if _, err := db.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_metadata_json=JSON_REMOVE(source_metadata_json,'$.textLastPublishedCollectionId') WHERE book_id=?`, scope.BookID); err != nil {
+		t.Fatal(err)
+	}
+	manual.CollectionID, manual.IntentID, manual.LastPublished = fixed.ID, "manual-other", nil
+	for _, state := range []string{"pending", "failed", "published"} {
+		manual.Status = state
+		if state == "published" {
+			manual.CarouselID = 77
+			manual.ImageIDs = []int64{88}
+		}
+		if err := records.Save(ctx, textPublishRequest(scope, fixed.ID), manual); err != nil {
+			t.Fatal(err)
+		}
+		index, err := store.GetBatchRuntimeIndex(ctx, scope.Owner, scope.BatchID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		meta := index.Books[0].SourceMetadata
+		last := fixedCover.ID
+		if state == "published" {
+			last = fixed.ID
+		}
+		if meta["textCollectionId"] != fixed.ID || meta["textLastPublishedCollectionId"] != last {
+			t.Fatalf("%s: pointers %+v", state, meta)
+		}
+		out := map[string]any{}
+		if err := addWorkflowPublishSummary(ctx, store, scope.Owner, scope.BatchID, scope.BookID, fixed.ID, nil, out, last); err != nil {
+			t.Fatal(err)
+		}
+		if workflowReceiptJSON(out["textPublishRecord"])["collectionId"] != fixed.ID || workflowReceiptJSON(out["textLastPublishedRecord"])["collectionId"] != last {
+			t.Fatalf("%s: summary %+v", state, out)
+		}
+	}
+	// A rejected current write must also roll back its archived receipt and book pointers.
+	archive := batchfactoryv11.Draft{Kind: textPublishDraftKind + "-history", Scope: scope.BatchID, Key: "rollback-history", Content: "{}"}
+	bad := batchfactoryv11.Draft{Kind: textPublishDraftKind, Scope: scope.BatchID, Key: strings.Repeat("k", 1024), Content: "{}"}
+	probe := manual
+	probe.CollectionID = bad.Key
+	if err := store.SaveTextPublishReceipt(ctx, scope.Owner, probe, bad, &archive); err == nil {
+		t.Fatal("oversized draft succeeded")
+	}
+	if _, err := store.GetDraft(ctx, scope.Owner, archive.Key, archive.Kind, archive.Scope); !errors.Is(err, batchfactoryv11.ErrNotFound) {
+		t.Fatalf("archive leaked: %v", err)
+	}
+	index, err := store.GetBatchRuntimeIndex(ctx, scope.Owner, scope.BatchID)
+	if err != nil || index.Books[0].SourceMetadata["textLastPublishedCollectionId"] != fixed.ID || index.Books[0].SourceMetadata["textCollectionId"] != fixed.ID {
+		t.Fatalf("failed write changed pointers: %+v %v", index.Books, err)
 	}
 	if err := files.Remove(locked.StorageRef); err != nil {
 		t.Fatal(err)
@@ -432,6 +517,7 @@ func TestAutomationTextNewerManualReceiptSupersedesFinishedRun(t *testing.T) {
 	saved("auto", map[string]any{"runId": old.ID, "attempt": old.Attempt, "requestKey": old.RequestID, "intentId": "same-remote", "carouselId": 1, "imageIds": []int{9}, "status": "published", "lastPublished": manual})
 	rebound := old
 	rebound.Status = batchfactoryv11.ProductionRunning
+	rebound.UpdatedAt = time.Now().Add(time.Hour)
 	out := read(rebound)
 	current, historical := workflowReceiptJSON(out["textPublishRecord"]), workflowReceiptJSON(out["textLastPublishedRecord"])
 	if current["runId"] != old.ID || historical["runId"] != nil || historical["requestKey"] != "manual-request" {

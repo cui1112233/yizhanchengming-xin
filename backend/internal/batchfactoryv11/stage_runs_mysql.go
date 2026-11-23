@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/go-sql-driver/mysql"
 	"sort"
 	"time"
 )
@@ -18,9 +19,12 @@ func (s *MySQLStore) CreateBookStageRun(ctx context.Context, value BookStageRun)
 	if err := ensureBookOwnership(ctx, s.db, value.Owner, value.BatchID, value.BookID); err != nil {
 		return BookStageRun{}, err
 	}
-	id, err := newID("book-stage")
-	if err != nil {
-		return BookStageRun{}, err
+	keyed := value.Stage == "text_publish" && value.ID != ""
+	if !keyed {
+		value.ID, err = newID("book-stage")
+		if err != nil {
+			return BookStageRun{}, err
+		}
 	}
 	now := time.Now().UTC()
 	if value.CreatedAt.IsZero() {
@@ -29,8 +33,11 @@ func (s *MySQLStore) CreateBookStageRun(ctx context.Context, value BookStageRun)
 	if value.UpdatedAt.IsZero() {
 		value.UpdatedAt = value.CreatedAt
 	}
-	value.ID = id
 	_, err = s.db.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_stage_runs(id,owner_username,batch_id,book_id,stage,status,attempt,request_id,input_revision,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, value.BookID, value.Stage, value.Status, value.Attempt, nullableString(value.RequestID), nullableString(value.InputRevision), nullableString(value.ErrorMessage), value.CreatedAt, value.UpdatedAt)
+	var duplicate *mysql.MySQLError
+	if keyed && errors.As(err, &duplicate) && duplicate.Number == 1062 {
+		return BookStageRun{}, ErrConflict
+	}
 	if err != nil {
 		return BookStageRun{}, err
 	}

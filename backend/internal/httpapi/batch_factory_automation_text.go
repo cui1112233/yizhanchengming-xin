@@ -18,7 +18,7 @@ import (
 
 // The publisher saves an owner-scoped receipt under the immutable collection ID.
 // Read the current attempt and its last confirmed predecessor independently.
-func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store, owner, batchID, bookID, manualCollectionID string, runs []batchfactoryv11.BookStageRun, summary map[string]any) error {
+func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store, owner, batchID, bookID, manualCollectionID string, runs []batchfactoryv11.BookStageRun, summary map[string]any, historyCollectionIDs ...string) error {
 	var uploads []batchfactoryv11.BookStageRun
 	for _, r := range runs {
 		if r.Stage == "text_publish" && r.CollectionID != "" {
@@ -30,7 +30,7 @@ func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store,
 	if len(uploads) > 0 {
 		latest = uploads[0]
 	}
-	ids := []string{manualCollectionID}
+	ids := append([]string{manualCollectionID}, historyCollectionIDs...)
 	for _, r := range uploads {
 		ids = append(ids, r.CollectionID)
 	}
@@ -60,9 +60,8 @@ func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store,
 			continue
 		}
 		if id == manualCollectionID && rec.RunID == "" && rec.Attempt == 0 {
-			finished := latest.Status == batchfactoryv11.ProductionSucceeded || latest.Status == batchfactoryv11.ProductionFailed
 			knownKey := rec.RequestKey != "" && slices.ContainsFunc(uploads, func(r batchfactoryv11.BookStageRun) bool { return rec.RequestKey == r.RequestID })
-			manualCurrent = !knownKey && (latest.ID == "" || finished && draft.UpdatedAt.After(latest.UpdatedAt))
+			manualCurrent = !knownKey && (latest.ID == "" || draft.UpdatedAt.After(latest.UpdatedAt))
 		}
 		if id == manualCollectionID && manualCurrent || !manualCurrent && matchingWorkflowPublishAttempt(rec, latest) {
 			if rec.Status == "pending" {
@@ -74,7 +73,7 @@ func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store,
 			}
 		}
 		history := rec.HistoricalPublished()
-		if scoped(history) {
+		if scoped(history) && (len(historyCollectionIDs) == 0 || historyCollectionIDs[0] == "" || id == historyCollectionIDs[0]) {
 			published := history.PublishedAt
 			if published.IsZero() {
 				published = draft.UpdatedAt
@@ -86,6 +85,77 @@ func addWorkflowPublishSummary(ctx context.Context, store batchfactoryv11.Store,
 		}
 	}
 	return nil
+}
+
+// A checkpoint records what automation saw on a previous pass. The current
+// receipt can have changed since then, particularly after a manual republish.
+func (c *BatchAutomationCoordinator) checkCurrentTextReceipt(ctx context.Context, s txt.Scope, id string, reusing bool) error {
+	draft, err := c.store.GetDraft(ctx, s.Owner, id, textPublishDraftKind, s.BatchID)
+	if errors.Is(err, batchfactoryv11.ErrNotFound) {
+		if !reusing {
+			return nil
+		}
+		return errors.New("找不到当前文本合集的上传回执，请先核对平台记录")
+	}
+	if err != nil {
+		return err
+	}
+	var record cp.Record
+	if err := json.Unmarshal([]byte(draft.Content), &record); err != nil {
+		return err
+	}
+	if record.Kind != cp.CollectionKindText || record.BookID != s.BookID || record.CollectionID != id {
+		return batchfactoryv11.ErrConflict
+	}
+	if record.Confirmed() {
+		return nil
+	}
+	if !reusing {
+		if record.RunID != "" || record.Attempt != 0 {
+			return nil
+		}
+		repo, ok := c.store.(batchfactoryv11.BookStageRunRepository)
+		if !ok {
+			return batchfactoryv11.ErrUnavailable
+		}
+		runs, err := repo.ListBookStageRuns(ctx, s.Owner, s.BatchID, s.BookID)
+		if err != nil {
+			return err
+		}
+		var latest batchfactoryv11.BookStageRun
+		wasPublished := false
+		for _, r := range runs {
+			if r.Stage != "text_publish" || len(r.InputRevision) <= 64 || r.InputRevision[64:] != id {
+				continue
+			}
+			wasPublished = wasPublished || r.Status == batchfactoryv11.ProductionSucceeded
+			if r.Attempt > latest.Attempt {
+				latest = r
+			}
+		}
+		if !wasPublished || latest.Status == batchfactoryv11.ProductionRunning && latest.UpdatedAt.After(draft.UpdatedAt) {
+			return nil
+		}
+	}
+	if record.Status == "pending" && c.textPublishStatus != nil {
+		current, found, err := c.textPublishStatus(ctx, textPublishRequest(s, id))
+		if err != nil {
+			return err
+		}
+		if !found || current.BookID != s.BookID || current.CollectionID != id || current.Kind != cp.CollectionKindText {
+			return batchfactoryv11.ErrConflict
+		}
+		record = current
+		if record.Confirmed() {
+			return nil
+		}
+	}
+	switch record.Status {
+	case "pending", "uploading", "upload_pending_confirm":
+		return txt.ErrPublishPending
+	default:
+		return errors.New("当前文本合集尚未成功上传，请核对最新上传记录")
+	}
 }
 
 func matchingWorkflowPublishAttempt(rec cp.Record, run batchfactoryv11.BookStageRun) bool {
@@ -220,13 +290,21 @@ func (c *BatchAutomationCoordinator) configureTextWorkflow(repo txt.Repository, 
 				return c.textPublish(ctx, r, collection)
 			}
 		}
+		w.VerifyPublished = func(ctx context.Context, r txt.EnsureRequest, candidate txt.Collection) error {
+			return c.checkCurrentTextReceipt(ctx, r.Scope, candidate.ID, true)
+		}
 		w.Track = func(ctx context.Context, s txt.Scope, checkpoint txt.StageCheckpoint, reuse bool, run func() error) error {
+			if checkpoint.Stage == "text_publish" && !req.ForcePublish {
+				if err := c.checkCurrentTextReceipt(ctx, s, checkpoint.CollectionID, false); err != nil {
+					return err
+				}
+			}
 			return c.stages.TrackTextStage(ctx, s.Owner, s.BatchID, s.BookID, checkpoint.Stage, checkpoint.Fingerprint, checkpoint.CollectionID, reuse, func(attempt batchfactoryv11.BookStageRun) error {
 				if checkpoint.Stage == "text_publish" {
 					publishAttempt = attempt
 				}
 				return run()
-			})
+			}, req.PublishIntentKey)
 		}
 		// A legacy manual edit may exist only in the text document. Import its
 		// authored draft once before approving or reusing upstream production text.

@@ -327,6 +327,9 @@ func NewRouter(options RouterOptions) http.Handler {
 		textPublisher.route(v12, options)
 		if options.AutomationCoordinator != nil && options.AutomationCoordinator.textPublish == nil {
 			options.AutomationCoordinator.textPublish = textPublisher.automation
+			if options.N8ComicPublisher != nil {
+				options.AutomationCoordinator.textPublishStatus = options.N8ComicPublisher.collectionService().Status
+			}
 		}
 	}
 	if options.NovelFetchFetcher != nil {

@@ -23,7 +23,7 @@ func sourceWriteMetadata(current, patch map[string]any, original, origin string)
 		metadata[key] = value
 	}
 	for key, value := range patch {
-		if key != "rawSourceStatus" && key != "rawSourceOrigin" && key != "batchSensitiveStage" {
+		if key != "rawSourceStatus" && key != "rawSourceOrigin" && key != "batchSensitiveStage" && key != "textCollectionId" && key != "textLastPublishedCollectionId" {
 			metadata[key] = value
 		}
 	}
@@ -55,6 +55,11 @@ func replaceBookMetadata(current, replacement map[string]any, currentID, newID s
 			if value, ok := current[key]; ok {
 				facts[key] = value
 			}
+		}
+	}
+	for _, key := range []string{"textCollectionId", "textLastPublishedCollectionId"} {
+		if value, ok := current[key]; ok {
+			facts[key] = value
 		}
 	}
 	return sourceWriteMetadata(facts, replacement, "", "")

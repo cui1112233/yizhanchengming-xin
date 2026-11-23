@@ -66,7 +66,7 @@ func TestTextWorkflowFingerprintsFollowChangedSettings(t *testing.T) {
 	src := WorkflowProduction{VersionInput: VersionInput{ProductionText: "正文"}, Snapshot: json.RawMessage(`{"layout":{"fontSize":24},"sourceVersion":"v"}`)}
 	var reflows, renders, publishes int
 	journal := map[string]string{}
-	w := Workflow{Repo: repo, VerifyFile: func(context.Context, PageArtifact, string) error { return nil },
+	w := Workflow{Repo: repo, VerifyPublished: func(context.Context, EnsureRequest, Collection) error { return nil }, VerifyFile: func(context.Context, PageArtifact, string) error { return nil },
 		Track: func(_ context.Context, _ Scope, checkpoint StageCheckpoint, reuse bool, run func() error) error {
 			stage, key := checkpoint.Stage, checkpoint.Fingerprint
 			if reuse && journal[stage] == key {

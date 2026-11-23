@@ -847,7 +847,7 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 	if err != nil {
 		return Batch{}, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT b.id,b.revision,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.textCollectionId')),'') FROM batch_factory_v12_books b LEFT JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.batch_id=? AND b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.ordinal,b.id`, id, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT b.id,b.revision,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.textCollectionId')),''),COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.textLastPublishedCollectionId')),'') FROM batch_factory_v12_books b LEFT JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.batch_id=? AND b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.ordinal,b.id`, id, owner)
 	if err != nil {
 		return Batch{}, err
 	}
@@ -855,12 +855,12 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 	batch.Books = []Book{}
 	for rows.Next() {
 		var book Book
-		var collectionID string
-		if err := rows.Scan(&book.ID, &book.Revision, &collectionID); err != nil {
+		var collectionID, lastPublishedID string
+		if err := rows.Scan(&book.ID, &book.Revision, &collectionID, &lastPublishedID); err != nil {
 			return Batch{}, err
 		}
-		if collectionID != "" {
-			book.SourceMetadata = map[string]any{"textCollectionId": collectionID}
+		if collectionID != "" || lastPublishedID != "" {
+			book.SourceMetadata = map[string]any{"textCollectionId": collectionID, "textLastPublishedCollectionId": lastPublishedID}
 		}
 		book.BatchID = batch.ID
 		videoRows, err := s.db.QueryContext(ctx, `SELECT id,ordinal FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`, id, book.ID, owner)

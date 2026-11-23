@@ -39,6 +39,7 @@ type MemoryStore struct {
 	productionJobs        map[string]memoryOwned[ProductionJob]
 	productionRequests    map[string]string
 	hiddenProductionTasks map[string]bool
+	textPublishKeys       map[string]string
 	bookStageRuns         map[string]memoryOwned[BookStageRun]
 	mergeJobs             map[string]memoryOwned[MergeJob]
 	mergeRequests         map[string]string
@@ -276,7 +277,13 @@ func (s *MemoryStore) CreateBookStageRun(_ context.Context, value BookStageRun) 
 	if !found {
 		return BookStageRun{}, ErrNotFound
 	}
-	value.ID = s.id("book-stage")
+	if value.Stage == "text_publish" && value.ID != "" {
+		if _, exists := s.bookStageRuns[value.ID]; exists {
+			return BookStageRun{}, ErrConflict
+		}
+	} else {
+		value.ID = s.id("book-stage")
+	}
 	now := time.Now().UTC()
 	if value.CreatedAt.IsZero() {
 		value.CreatedAt = now
@@ -1109,6 +1116,9 @@ func (s *MemoryStore) GetDraft(_ context.Context, owner, key, kind, scope string
 func (s *MemoryStore) SaveDraft(_ context.Context, owner string, d Draft) (Draft, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.saveDraftLocked(owner, d), nil
+}
+func (s *MemoryStore) saveDraftLocked(owner string, d Draft) Draft {
 	k := draftKey(owner, d.Key, d.Kind, d.Scope)
 	old := s.drafts[k]
 	d.Revision = old.Revision + 1
@@ -1117,7 +1127,7 @@ func (s *MemoryStore) SaveDraft(_ context.Context, owner string, d Draft) (Draft
 	}
 	d.UpdatedAt = time.Now().UTC()
 	s.drafts[k] = d
-	return d, nil
+	return d
 }
 
 func validBookAssetKind(kind string) bool {

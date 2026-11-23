@@ -2,10 +2,10 @@ package httpapi
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	txt "qiantie/backend/internal/batchfactorytext"
@@ -15,7 +15,10 @@ import (
 type textPublishOverride struct {
 	CollectionID string `json:"collectionId"`
 	Force        bool   `json:"force"`
+	RequestKey   string `json:"requestKey"`
 }
+
+var textConfirmationKey = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 
 // Resolve every override before writing a job. The database lookup pins the
 // collection to the authenticated owner, batch and explicitly selected book.
@@ -40,7 +43,18 @@ func (c *BatchAutomationCoordinator) textPublishOverrides(ctx context.Context, o
 	for _, bookID := range ids {
 		selected[bookID] = true
 	}
+	bindings := map[string]string{}
 	for bookID, o := range overrides {
+		if o.Force || o.RequestKey != "" {
+			if !textConfirmationKey.MatchString(o.RequestKey) {
+				return nil, fmt.Errorf("%w：上传确认编号无效", batchfactoryv11.ErrInvalid)
+			}
+			scope, _ := json.Marshal([]string{owner, batchID, bookID, o.CollectionID})
+			if bound, ok := bindings[o.RequestKey]; ok && bound != string(scope) {
+				return nil, batchfactoryv11.ErrConflict
+			}
+			bindings[o.RequestKey] = string(scope)
+		}
 		if !selected[bookID] || strings.TrimSpace(bookID) == "" || strings.TrimSpace(o.CollectionID) == "" || len(o.CollectionID) > 64 {
 			return nil, fmt.Errorf("%w：请为所选书籍填写准确的文本合集", batchfactoryv11.ErrInvalid)
 		}
@@ -60,7 +74,43 @@ func (c *BatchAutomationCoordinator) textPublishOverrides(ctx context.Context, o
 			return nil, fmt.Errorf("%w：所选文本合集尚未就绪", batchfactoryv11.ErrConflict)
 		}
 	}
+	if len(bindings) > 0 {
+		binder, ok := c.store.(interface {
+			BindTextPublishKeys(context.Context, map[string]string) error
+		})
+		if !ok {
+			return nil, batchfactoryv11.ErrUnavailable
+		}
+		if err := binder.BindTextPublishKeys(ctx, bindings); err != nil {
+			return nil, err
+		}
+	}
 	return overrides, nil
+}
+
+// An HTTP replay may arrive while the original job is still scheduled or
+// running. Only acknowledge a selection carrying the same explicit confirmation.
+func confirmedTextReplay(job map[string]any, count int, overrides map[string]textPublishOverride) bool {
+	if len(overrides) == 0 || len(overrides) != count {
+		return false
+	}
+	entries := mapOrEmpty(job["books"])
+	hasConfirmation := false
+	for bookID, o := range overrides {
+		e := mapOrEmpty(entries[bookID])
+		if e["textCollectionId"] != o.CollectionID {
+			return false
+		}
+		if o.Force {
+			if e["textPublishConfirmationKey"] != o.RequestKey {
+				return false
+			}
+			hasConfirmation = true
+		} else if e["textPublishConfirmationKey"] != nil {
+			return false
+		}
+	}
+	return hasConfirmation
 }
 
 func (o textPublishOverride) apply(entry map[string]any) error {
@@ -73,8 +123,10 @@ func (o textPublishOverride) apply(entry map[string]any) error {
 	entry["textPendingPublishCollectionId"] = o.CollectionID
 	entry["textCollectionId"] = o.CollectionID
 	delete(entry, "textPublishIntentId")
+	delete(entry, "textPublishConfirmationKey")
 	if o.Force {
-		entry["textPublishIntentId"] = rand.Text()
+		entry["textPublishConfirmationKey"] = o.RequestKey
+		entry["textPublishIntentId"] = o.RequestKey
 	}
 	return nil
 }

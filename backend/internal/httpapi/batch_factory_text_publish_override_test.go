@@ -28,7 +28,7 @@ func TestTextPublishOverridesRejectForeignCollectionBeforeStarting(t *testing.T)
 	registerBatchAutomationRoutes(api, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, c, "v12")
 	for _, route := range []string{"start", "retry"} {
 		for _, example := range []struct{ overrideBook, collection string }{{allowed, "foreign"}, {batch.Books[1].ID, "mine"}} {
-			body := map[string]any{"bookIds": []string{allowed}, "textPublishOverrides": map[string]any{example.overrideBook: map[string]any{"collectionId": example.collection, "force": true}}}
+			body := map[string]any{"bookIds": []string{allowed}, "textPublishOverrides": map[string]any{example.overrideBook: map[string]any{"collectionId": example.collection, "force": true, "requestKey": "test-confirmation"}}}
 			resp := signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/batch-factory/v12/batches/"+batch.ID+"/automation/"+route, body)
 			if resp.Code != http.StatusBadRequest && resp.Code != http.StatusNotFound {
 				t.Fatalf("%s: %d %s", route, resp.Code, resp.Body.String())
@@ -65,10 +65,14 @@ func TestSignedTextStartPersistsOnlySelectedUploadOverrides(t *testing.T) {
 	registerBatchAutomationRoutes(api, BridgeAuth{Secret: "secret", Now: now}, c, "v12")
 	first, second := batch.Books[0].ID, batch.Books[1].ID
 	body := map[string]any{"bookIds": []string{first, second}, "presetId": preset.ID, "productionMode": "text", "runMode": "video_no_submit", "scheduledAt": now().Add(time.Hour).Format(time.RFC3339),
-		"textPublishOverrides": map[string]textPublishOverride{first: {CollectionID: "ready-" + first, Force: true}, second: {CollectionID: "ready-" + second}}}
+		"textPublishOverrides": map[string]textPublishOverride{first: {CollectionID: "ready-" + first, Force: true, RequestKey: "confirmation-1"}, second: {CollectionID: "ready-" + second}}}
 	resp := signedJSONRequest(t, api, now(), "alice", http.MethodPost, "/api/batch-factory/v12/batches/"+batch.ID+"/automation/start", body)
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("start %d %s", resp.Code, resp.Body.String())
+	}
+	replay := signedJSONRequest(t, api, now(), "alice", http.MethodPost, "/api/batch-factory/v12/batches/"+batch.ID+"/automation/start", body)
+	if replay.Code != http.StatusCreated {
+		t.Fatalf("repeat same start: %d %s", replay.Code, replay.Body.String())
 	}
 	recovered := NewBatchAutomationCoordinator(store, presets, &batchfactoryv11.BookStageService{Store: store}, nil, nil, nil, nil, reader, now)
 	entries := mapOrEmpty(recovered.activeAutomationJob("alice", batch.ID)["books"])
@@ -84,19 +88,33 @@ func TestSignedTextStartPersistsOnlySelectedUploadOverrides(t *testing.T) {
 }
 
 func TestTextPublishOverridesValidateAllBeforeMutation(t *testing.T) {
-	c := &BatchAutomationCoordinator{textPublishCollection: func(_ context.Context, s txt.Scope, id string) (txt.Collection, error) {
+	c := &BatchAutomationCoordinator{store: batchfactoryv11.NewMemoryStore(), textPublishCollection: func(_ context.Context, s txt.Scope, id string) (txt.Collection, error) {
 		if id != "ready-"+s.BookID {
 			return txt.Collection{}, txt.ErrNotFound
 		}
 		return txt.Collection{ID: id, Status: "ready"}, nil
 	}}
-	overrides := map[string]textPublishOverride{"a": {CollectionID: "ready-a", Force: true}, "b": {CollectionID: "ready-b"}}
+	overrides := map[string]textPublishOverride{"a": {CollectionID: "ready-a", Force: true, RequestKey: "confirmation-1"}, "b": {CollectionID: "ready-b"}}
 	for _, ids := range [][]string{nil, {"a"}, {"b"}} {
 		if _, err := c.textPublishOverrides(context.Background(), "alice", "batch", ids, overrides); !errors.Is(err, batchfactoryv11.ErrInvalid) {
 			t.Fatalf("selection %v: %v", ids, err)
 		}
 	}
-	if _, err := c.textPublishOverrides(context.Background(), "alice", "batch", []string{"a", "b"}, overrides); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if _, err := c.textPublishOverrides(context.Background(), "alice", "batch", []string{"a", "b"}, overrides); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, change := range []struct {
+		owner, book, key string
+		want             error
+	}{
+		{"bob", "a", "confirmation-1", batchfactoryv11.ErrConflict}, {"alice", "b", "confirmation-1", batchfactoryv11.ErrConflict},
+		{"alice", "a", "", batchfactoryv11.ErrInvalid}, {"alice", "a", "bad key!", batchfactoryv11.ErrInvalid},
+	} {
+		o := map[string]textPublishOverride{change.book: {CollectionID: "ready-" + change.book, Force: true, RequestKey: change.key}}
+		if _, err := c.textPublishOverrides(context.Background(), change.owner, "batch", []string{change.book}, o); !errors.Is(err, change.want) {
+			t.Fatalf("scope %+v: %v", change, err)
+		}
 	}
 }

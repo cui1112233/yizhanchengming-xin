@@ -232,7 +232,7 @@ func (s *BookStageService) finish(ctx context.Context, owner string, run BookSta
 // TrackTextStage journals the latest attempt for each fingerprint. Artifact
 // checks belong to the workflow, which can demand a fresh attempt if a page
 // or a cover was restored by the user since the previous success.
-func (s *BookStageService) TrackTextStage(ctx context.Context, owner, batchID, bookID, id, key, collectionID string, reuse bool, run func(BookStageRun) error) error {
+func (s *BookStageService) TrackTextStage(ctx context.Context, owner, batchID, bookID, id, key, collectionID string, reuse bool, run func(BookStageRun) error, confirmedKeys ...string) error {
 	stage := BookStage(id)
 	if !strings.HasPrefix(id, "text_") || !validBookStage(stage) {
 		return ErrInvalid
@@ -256,10 +256,34 @@ func (s *BookStageService) TrackTextStage(ctx context.Context, owner, batchID, b
 		}
 		key += collectionID
 	}
+	requestKey := ""
+	if stage == "text_publish" && len(confirmedKeys) > 0 {
+		requestKey = confirmedKeys[0]
+	}
 	attempt := s.nextAttempt(runs, stage)
 	var started BookStageRun
 	for _, prev := range runs {
-		if prev.Stage != stage || prev.Attempt != attempt-1 {
+		if prev.Stage != stage {
+			continue
+		}
+		if requestKey != "" && prev.RequestID == requestKey {
+			if len(prev.InputRevision) <= 64 || prev.InputRevision[64:] != collectionID {
+				return ErrConflict
+			}
+			switch prev.Status {
+			case ProductionSucceeded:
+				if reuse {
+					return nil
+				}
+				return run(prev)
+			case ProductionFailed:
+				return fmt.Errorf("%w：本次上传已失败，请确认后发起新的上传", ErrConflict)
+			case ProductionRunning:
+				started = prev
+			}
+			break
+		}
+		if prev.Attempt != attempt-1 {
 			continue
 		}
 		if reuse && prev.Status == ProductionSucceeded && prev.InputRevision == key {
@@ -268,15 +292,26 @@ func (s *BookStageService) TrackTextStage(ctx context.Context, owner, batchID, b
 		// An upload can already be in flight. An upgraded settings fingerprint
 		// must not allocate another request for the same immutable collection.
 		if stage == "text_publish" && prev.Status == ProductionRunning && len(prev.InputRevision) > 64 && prev.InputRevision[64:] == collectionID {
+			if requestKey != "" && prev.InputRevision != key {
+				return fmt.Errorf("%w：当前合集仍有上传在进行", ErrConflict)
+			}
 			started = prev
 		}
 	}
 	if started.ID == "" {
-		requestID := ""
-		if stage == "text_publish" {
+		requestID := requestKey
+		if stage == "text_publish" && requestID == "" {
 			requestID = rand.Text()
 		}
-		started, err = repo.CreateBookStageRun(ctx, BookStageRun{Owner: owner, BatchID: batchID, BookID: bookID, Stage: stage, Status: ProductionRunning, InputRevision: key, RequestID: requestID, Attempt: attempt})
+		next := BookStageRun{Owner: owner, BatchID: batchID, BookID: bookID, Stage: stage, Status: ProductionRunning, InputRevision: key, RequestID: requestID, Attempt: attempt}
+		if requestKey != "" {
+			// The existing primary key arbitrates two workers that both observed no run.
+			next.ID = fmt.Sprintf("%x", sha256.Sum256([]byte(owner+"\x00"+batchID+"\x00"+bookID+"\x00"+requestKey)))
+		}
+		started, err = repo.CreateBookStageRun(ctx, next)
+		if next.ID != "" && errors.Is(err, ErrConflict) {
+			return txt.ErrPublishPending
+		}
 	}
 	if err != nil {
 		return err

@@ -21,6 +21,7 @@ import (
 	txt "qiantie/backend/internal/batchfactorytext"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
+	cp "qiantie/backend/internal/collectionpublish"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
@@ -49,6 +50,7 @@ type BatchAutomationCoordinator struct {
 	providerSync          func(context.Context, string) error
 	promptCatalog         *prompt.Catalog
 	publish121            *BatchFactory121Publisher
+	textPublishStatus     func(context.Context, cp.PublishRequest) (cp.Record, bool, error)
 	textPublishCollection func(context.Context, txt.Scope, string) (txt.Collection, error)
 	textEnsure            func(context.Context, txt.EnsureRequest) (txt.EnsureResult, error)
 	textPublish           func(context.Context, txt.EnsureRequest, txt.Collection) (bool, error)
@@ -1922,6 +1924,13 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 		}
 	}
 	if active := c.activeAutomationJob(owner, batchID); active != nil {
+		c.mu.Lock()
+		if confirmedTextReplay(active, len(targetBooks), overrides) {
+			response := publicAutomationJob(active)
+			c.mu.Unlock()
+			return response, nil
+		}
+		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 当前批次已有自动生产任务（%s），请先暂停、停止或重试原任务", batchfactoryv11.ErrConflict, automationStringValue(active["id"], "未命名任务"))
 	}
 	presetID := automationStringValue(input["presetId"], "")
@@ -2151,6 +2160,9 @@ func (c *BatchAutomationCoordinator) queueBooksBehindActiveAutomation(owner, bat
 	if books == nil {
 		books = map[string]any{}
 		active["books"] = books
+	}
+	if confirmedTextReplay(active, len(targetBooks), overrides) {
+		return publicAutomationJob(active), true, nil
 	}
 	for bookID := range overrides {
 		if books[bookID] != nil {
@@ -5704,6 +5716,11 @@ func (c *BatchAutomationCoordinator) retry(ctx context.Context, owner, batchID s
 	// ctx.Err() 分支把书改写成 stopped（“测试任务已停止”），用户却以为自己
 	// 只是点了重试。
 	if automationStringValue(target["state"], "") == "running" {
+		if confirmedTextReplay(target, len(set), overrides) {
+			response := publicAutomationJob(target)
+			c.mu.Unlock()
+			return response, nil
+		}
 		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 任务正在执行，完成后再重试", batchfactoryv11.ErrConflict)
 	}

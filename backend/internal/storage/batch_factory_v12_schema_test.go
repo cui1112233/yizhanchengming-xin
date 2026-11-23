@@ -52,19 +52,21 @@ func TestV12H3KernelSchemaPersistsTimelineCompilationAndProductionTrace(t *testi
 
 func TestV12MigrationsRegisterH3KernelAfterUpgradeAudit(t *testing.T) {
 	migrations := V12Migrations()
-	if len(migrations) != 13 {
-		t.Fatalf("V12 migration count=%d, want 13: %+v", len(migrations), migrations)
+	if len(migrations) != 14 {
+		t.Fatalf("V12 migration count=%d, want 14: %+v", len(migrations), migrations)
 	}
-	if migrations[0].Version != 1200101 || migrations[1].Version != 1200102 || migrations[2].Version != 1200103 || migrations[3].Version != 1200104 || migrations[4].Version != 1200105 || migrations[5].Version != 1200106 || migrations[6].Version != 1200107 || migrations[7].Version != 1200108 || migrations[8].Version != 1200109 || migrations[9].Version != 1200110 || migrations[10].Version != 1200111 || migrations[11].Version != 1200112 {
-		t.Fatalf("V12 migration order=%+v", migrations)
+	for i, migration := range migrations {
+		if int(migration.Version) != 1200101+i {
+			t.Fatalf("V12 migration %d has version %d", i, migration.Version)
+		}
 	}
 }
 
 func TestV12TextProductionMigrationCreatesDurablePageAndCollectionTables(t *testing.T) {
 	migrations := V12Migrations()
-	m := migrations[len(migrations)-1]
+	m := migrations[12]
 	if m.Version != 1200113 || m.CallbackChecksum != "batch-factory-v12-text-production-v1" {
-		t.Fatalf("missing V12 text production migration: last version %d, marker %q", m.Version, m.CallbackChecksum)
+		t.Fatalf("missing V12 text production migration: version %d, marker %q", m.Version, m.CallbackChecksum)
 	}
 	tables := map[string][]string{
 		"documents":        {"original_text mediumtext", "active_version_id", "pagination_version", "config_snapshot_json", "cover_artifact_id", "cover_locked", "(owner_username, book_id)"},
