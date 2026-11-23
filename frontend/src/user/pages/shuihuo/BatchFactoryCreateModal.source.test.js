@@ -170,7 +170,7 @@ test('lets giant batches choose a mutually exclusive original acquisition priori
   assert.match(source, /const \[giantOriginalReadStrategy, setGiantOriginalReadStrategy\] = useState\('ocr_first'\)/);
   assert.match(source, /originalReadStrategy: giantOriginalReadStrategy/);
   assert.match(source, /giantOriginalReadStrategy === 'direct_first'/);
-  assert.match(source, /await fetchBookOriginal\(batchId, book\.id\)/);
+  assert.match(source, /await fetchBookOriginal\(batchId, book\.id, \{ maxTxt: contentCaptureCharacters \}\)/);
   assert.match(source, /await createGiantMaterialJob\(/);
 });
 

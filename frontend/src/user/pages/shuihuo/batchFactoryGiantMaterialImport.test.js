@@ -117,7 +117,9 @@ test('records direct-first for every book in a multi-ID giant intake', () => {
   const payload = buildGiantMaterialPlaceholderIntakes([
     { giantMaterialId: '7689285397448523826', material, book: material.books[0] },
     { giantMaterialId: '7689285397448523827', material, book: material.books[1] }
-  ], { originalReadStrategy: 'direct_first' });
+  ], { originalReadStrategy: 'direct_first', contentCaptureCharacters: 8000 });
+  assert.equal(payload.metadata.contentCaptureCharacters, 8000);
+  assert.deepEqual(payload.books.map(book => book.sourceMetadata.contentCaptureCharacters), [8000, 8000]);
   assert.deepEqual(payload.books.map(book => book.sourceMetadata.originalReadStrategy), ['direct_first', 'direct_first']);
 });
 

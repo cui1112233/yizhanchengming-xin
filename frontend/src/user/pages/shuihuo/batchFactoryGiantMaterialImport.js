@@ -105,7 +105,7 @@ export function buildGiantMaterialIntake({ giantMaterialId, material, extraction
 
 // 占位登记：解析成功后立刻把书登记进批量（正文为空），Windows 执行器读取完成后再回填正文。
 // 这样新书会马上出现在制作区，用户不用等 OCR 读完才看到书。
-export function buildGiantMaterialPlaceholderIntake({ giantMaterialId, material, book, contentRangeLines = 5, importedAt = new Date().toISOString(), originalReadStrategy: requestedStrategy } = {}) {
+export function buildGiantMaterialPlaceholderIntake({ giantMaterialId, material, book, contentRangeLines = 5, contentCaptureCharacters = 4000, importedAt = new Date().toISOString(), originalReadStrategy: requestedStrategy } = {}) {
   const normalizedID = normalizeGiantMaterialId(giantMaterialId);
   const selected = book || selectGiantMaterialBook(material);
   const platformBookId = text(selected?.platformBookId || selected?.bookId);
@@ -147,7 +147,8 @@ export function buildGiantMaterialPlaceholderIntake({ giantMaterialId, material,
         originalReadStage: 'pending',
         originalReadError: '',
         contentPending: true,
-        contentRangeLines: rangeLines
+        contentRangeLines: rangeLines,
+        contentCaptureCharacters
       }
     }],
     metadata: {
@@ -158,6 +159,7 @@ export function buildGiantMaterialPlaceholderIntake({ giantMaterialId, material,
       sourceContentVersion,
       contentPending: true,
       contentRangeLines: rangeLines,
+      contentCaptureCharacters,
       sourceImportedAt: text(importedAt) || new Date().toISOString()
     }
   };
@@ -165,7 +167,7 @@ export function buildGiantMaterialPlaceholderIntake({ giantMaterialId, material,
 
 // 多本占位登记：一次解析出的 N 条素材合成一个 intake（books 数组），
 // createBatchFromIntake 一次性建出含 N 本占位书的批量。
-export function buildGiantMaterialPlaceholderIntakes(entries, { contentRangeLines = 5, importedAt = new Date().toISOString(), originalReadStrategy: requestedStrategy } = {}) {
+export function buildGiantMaterialPlaceholderIntakes(entries, { contentRangeLines = 5, contentCaptureCharacters = 4000, importedAt = new Date().toISOString(), originalReadStrategy: requestedStrategy } = {}) {
   const list = (Array.isArray(entries) ? entries : []).filter(Boolean);
   if (!list.length) throw new Error('GIANT_MATERIAL_INTAKE_EMPTY');
   const books = list.map(entry => buildGiantMaterialPlaceholderIntake({
@@ -173,6 +175,7 @@ export function buildGiantMaterialPlaceholderIntakes(entries, { contentRangeLine
     material: entry.material,
     book: entry.book,
     contentRangeLines,
+    contentCaptureCharacters,
     importedAt,
     originalReadStrategy: requestedStrategy
   }).books[0]);
@@ -183,6 +186,7 @@ export function buildGiantMaterialPlaceholderIntakes(entries, { contentRangeLine
       sourceLabel: `巨量素材 · ${books.length} 本`,
       contentPending: true,
       contentRangeLines: Math.min(500, Math.max(1, Number(contentRangeLines) || 5)),
+      contentCaptureCharacters,
       sourceImportedAt: importedAt
     }
   };

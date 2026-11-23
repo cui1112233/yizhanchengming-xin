@@ -28,7 +28,7 @@ test('keeps direct original fetch available while OCR executor is offline', () =
   assert.match(source, /OCR 执行器当前未在线；可直接重试书城获取正文/);
   assert.match(source, /onClick=\{\(\) => refetchOriginal\(false\)\}>获取正文/);
   assert.match(source, /listGiantMaterialExecutors\(\)/);
-  assert.match(source, /await fetchBookOriginalWithRetry\(batchId, latestBook\.id\)/);
+  assert.match(source, /await fetchBookOriginalWithRetry\(batchId, latestBook\)/);
 });
 
 test('automatically retries book-city reads for previously failed direct-first books', () => {
@@ -40,8 +40,23 @@ test('automatically retries book-city reads for previously failed direct-first b
 
 test('retries a transient direct-fetch network failure once before recording a failed book read', () => {
   const directRead = source.match(/async function refetchOriginal\([\s\S]*?\n  async function startOcrFallback/)?.[0] || '';
-  assert.match(directRead, /fetchBookOriginalWithRetry\(batchId, latestBook\.id\)/);
+  assert.match(directRead, /fetchBookOriginalWithRetry\(batchId, latestBook\)/);
   assert.match(source, /async function fetchBookOriginalWithRetry\(/);
+});
+
+test('reuses the stored 8000-character limit on both network attempts', async () => {
+  const definition = source.match(/^  async function fetchBookOriginalWithRetry\([^\n]*[\s\S]*?^  \}/m)[0];
+  const calls = [];
+  const retry = new Function('fetchBookOriginal', definition + '\nreturn fetchBookOriginalWithRetry;')(async (...args) => {
+    calls.push(args);
+    if (calls.length === 1) throw new Error('networkerror');
+    return 'ok';
+  });
+  assert.equal(await retry('batch', { id: 'book', sourceMetadata: { contentCaptureCharacters: 8000 } }), 'ok');
+  assert.deepEqual(calls, [
+    ['batch', 'book', { maxTxt: 8000 }],
+    ['batch', 'book', { maxTxt: 8000 }]
+  ]);
 });
 
 test('starts a saved giant automation plan after a legacy direct read succeeds', () => {

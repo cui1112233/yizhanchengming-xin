@@ -382,7 +382,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       const importedAt = new Date().toISOString();
       const intakePayload = buildGiantMaterialPlaceholderIntakes(
         selected.map(entry => ({ giantMaterialId: entry.item.id, material: entry.item.material, book: entry.book })),
-        { contentRangeLines, importedAt, originalReadStrategy: giantOriginalReadStrategy }
+        { contentRangeLines, contentCaptureCharacters, importedAt, originalReadStrategy: giantOriginalReadStrategy }
       );
       const intakeResponse = await createNovelFetchIntake(intakePayload);
       const intake = intakeResponse?.intake || intakeResponse;
@@ -439,7 +439,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
               expectedRevision: Number(book.revision || 0)
             });
             try {
-              await fetchBookOriginal(batchId, book.id);
+              await fetchBookOriginal(batchId, book.id, { maxTxt: contentCaptureCharacters });
               // 书城直取成功后，结束巨量素材的占位读取状态；否则列表会一直
               // 把已经拿到正文的书当成“等待 OCR”，自动生产也无法正确判断就绪。
               const refreshedResponse = await getBatch(batchId);
