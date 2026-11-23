@@ -25,6 +25,13 @@ func TestPaginateParagraphsAndSentences(t *testing.T) {
 	}{
 		{"完整段落优先于剩余空间", "第一。\n甲。乙。", 150, 6, []string{"第一。\n", "甲。乙。"}},
 		{"引号复合标点和省略号", "“走吧！？”她沉默……然后点头。", 150, 6, []string{"“走吧！？”", "她沉默……", "然后点头。"}},
+		{"句号后新开半角引号", `过了一会儿。"别走。"`, 150, 6, []string{"过了一会儿。", `"别走。"`}},
+		{"相邻半角对白", `"行。""别走。"`, 150, 5, []string{`"行。"`, `"别走。"`}},
+		{"保留英文缩写撇号", `Don't.'Go!'`, 150, 6, []string{"Don't.", "'Go!'"}},
+		{"英文所有格撇号", `James' cat.'Go!'`, 150, 11, []string{"James' cat.", "'Go!'"}},
+		{"中英文引号嵌套", `“她说'好！'”"走。"`, 150, 8, []string{"“她说'好！'”", `"走。"`}},
+		{"未闭合对白", `说完了。"请等。`, 150, 4, []string{"说完了。", `"请等。`}},
+		{"从上一段延续的对白", "\"走。\n再见。\"她回家了。", 150, 5, []string{"\"走。\n", "再见。\"", "她回家了。"}},
 		{"英语句号和小数", "It is 3.14. OK! Go?", 150, 12, []string{"It is 3.14. ", "OK! Go?"}},
 		{"分号和多个右引号", "「他说『来！』」好；再见;", 150, 8, []string{"「他说『来！』」", "好；再见;"}},
 		{"无结尾标点的尾段", "他答应了。后来", 150, 5, []string{"他答应了。", "后来"}},
@@ -87,6 +94,12 @@ func TestPaginateUsesDefaultDensityAndActualMeasurement(t *testing.T) {
 }
 
 func TestPaginateOverflowReportsWholeSentenceAndNoPartialResult(t *testing.T) {
+	// A stray trailing quote has no following words and must not become a page on its own.
+	pages, err := Paginate(context.Background(), PaginationInput{Text: `她走了。"`}, runeCapacity(4))
+	var dangling *SentenceOverflowError
+	if pages != nil || !errors.As(err, &dangling) || dangling.EndOffset != 5 {
+		t.Fatalf("dangling quote: %+v, %v", pages, err)
+	}
 	for _, sentence := range []string{"一整句没有中间句号。", "Mr. Black came.", "数值3.14159。", "mail.example.com。", "E.g. Bob came.", "J. Doe ran."} {
 		in := PaginationInput{Text: "🙂。\r\n" + sentence}
 		pages, err := Paginate(context.Background(), in, runeCapacity(6))

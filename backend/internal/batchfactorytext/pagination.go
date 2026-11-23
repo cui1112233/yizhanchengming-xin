@@ -53,15 +53,20 @@ func Paginate(ctx context.Context, input PaginationInput, measure MeasureFunc) (
 		input.Layout.TargetCharacters = DefaultTargetCharacters
 	}
 	p := pagePacker{ctx: ctx, runes: []rune(NormalizeLineEndings(input.Text)), layout: input.Layout, measure: measure}
+	var quotes straightQuotes
 	for start := 0; start < len(p.runes); {
 		end := paragraphEnd(p.runes, start)
 		fits, _, err := p.accept(end)
 		if err != nil {
 			return nil, err
 		}
-		if !fits {
+		if fits {
+			for i := start; i < end; i++ {
+				quotes.observe(p.runes, i)
+			}
+		} else {
 			for i := start; i < end; {
-				next := sentenceEnd(p.runes[:end], i)
+				next := quotes.sentenceEnd(p.runes, i, end)
 				fits, height, err := p.accept(next)
 				if err != nil {
 					return nil, err
@@ -187,23 +192,71 @@ func paragraphEnd(text []rune, start int) int {
 	return end
 }
 
-func sentenceEnd(text []rune, start int) int {
-	for i := start; i < len(text); i++ {
+// Straight quotes use the same character on both sides. Follow their state
+// across sentences and paragraphs, ignoring apostrophes inside English words.
+type straightQuotes struct{ single, double bool }
+
+func (q *straightQuotes) state(text []rune, i int) *bool {
+	switch text[i] {
+	case '"':
+		return &q.double
+	case '\'':
+		if i > 0 && unicode.In(text[i-1], unicode.Latin) {
+			if i+1 < len(text) && unicode.In(text[i+1], unicode.Latin) {
+				return nil // don't, O'Neil
+			}
+			if !q.single && (text[i-1] == 's' || text[i-1] == 'S') {
+				return nil // James' cat outside quoted speech
+			}
+		}
+		return &q.single
+	default:
+		return nil
+	}
+}
+
+func (q *straightQuotes) observe(text []rune, i int) {
+	if open := q.state(text, i); open != nil {
+		*open = !*open
+	}
+}
+
+func (quotes *straightQuotes) sentenceEnd(text []rune, start, end int) int {
+	for i := start; i < end; i++ {
+		quotes.observe(text, i)
 		if !strings.ContainsRune("。！？!?；;…", text[i]) && !(text[i] == '.' && isFinalPeriod(text, i)) {
 			continue
 		}
 		i++
 		// Repeated punctuation plus any closing quotes/brackets belong to
 		// the sentence that just ended, as does the space between sentences.
-		for i < len(text) && strings.ContainsRune("。.!?！？；;…’”」』）)]】》〉\"'", text[i]) {
+		for i < end {
+			if strings.ContainsRune("。.!?！？；;…’”」』）)]】》〉", text[i]) {
+				i++
+				continue
+			}
+			open := quotes.state(text, i)
+			if open == nil || (!*open && hasFollowingContent(text[i+1:])) {
+				break // A new opening quote belongs to the next sentence.
+			}
+			*open = false
 			i++
 		}
-		for i < len(text) && unicode.IsSpace(text[i]) {
+		for i < end && unicode.IsSpace(text[i]) {
 			i++
 		}
 		return i
 	}
-	return len(text)
+	return end
+}
+
+func hasFollowingContent(text []rune) bool {
+	for _, ch := range text {
+		if !unicode.IsSpace(ch) {
+			return true
+		}
+	}
+	return false
 }
 
 func isFinalPeriod(text []rune, i int) bool {
