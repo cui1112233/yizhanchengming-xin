@@ -1,0 +1,21 @@
+import Taro,{useLoad} from '@tarojs/taro';
+import {Button,Text,View} from '@tarojs/components';
+import {useState} from 'react';
+import BrandHeader from '../../../components/BrandHeader';
+import AppIcon,{type AppIconName} from '../../../components/AppIcon';
+import {ThemedPage} from '../../../theme';
+import {PLUGINS,mobilePluginKind} from '../../../services/plugins';
+import {WaterField,WaterSelect} from '../../../pages/module-detail/WaterEditor';
+import PluginTextLocal from './PluginTextLocal';
+import PluginImage from './PluginImage';
+import PluginVideo from './PluginVideo';
+import PluginDraft from './PluginDraft';
+import '../../../pages/module-detail/water-studio.scss';
+const icons:Record<string,AppIconName>={'asset-reference':'camera','ai-segment':'sliders','ai-subtitle':'file-pen-line','ai-filler':'file-pen-line','ai-bilingual-subtitle':'book-open','ai-cut-plugin':'clapperboard','ai-bgm':'volume','ai-shot':'camera','ai-upscale':'sparkles','ai-split':'sliders','novel-to-drama':'book-open','ai-rewrite':'file-pen-line','storyboard-master':'notebook-tabs','storyboard-organizer':'notebook-tabs','viral-opening':'sparkles','subtitle-alignment':'timer','text-format':'file-pen-line','character-edit':'users-round','voice-clone':'volume','subtitle-merge':'notebook-tabs','document-merge':'book-open','cover-generation':'camera','character-turnaround':'user-round','voice-design':'volume','draft-merge':'folder-clock','jianying-keyframe':'sliders'};
+export default function PluginsPage(){
+ const [id,setId]=useState(''),[query,setQuery]=useState(''),[filter,setFilter]=useState('all');
+ useLoad(params=>setId(String(params?.tool||'')));
+ const plugin=PLUGINS.find(p=>p.id===id),kind=mobilePluginKind(id);
+ const label=(v:string)=>({text:'AI文字',local:'本地处理',image:'图片创作',segment:'视频分段',upscale:'视频超分',aicut:'剪辑',draft:'草稿处理',desktop:'使用条件'} as Record<string,string>)[v]||'插件';
+ return <ThemedPage className="mp-page water-studio"><BrandHeader title={plugin?.name||'插件'} showBack/><View className="water-content">{!id?<><View className="water-heading"><Text className="water-title">创作插件</Text><Text className="water-note">{PLUGINS.length} 项</Text></View><Text className="water-note">与网页相同目录，按每项实际能力打开。</Text><WaterField id="plugins-search" label="搜索名称或功能" value={query} onChange={setQuery}/><WaterSelect id="plugins-filter" label="插件类型" items={[{id:'all',name:'全部插件'},...['text','local','image','segment','upscale','draft','desktop'].map(v=>({id:v,name:label(v)}))]} value={filter} onChange={setFilter}/>{PLUGINS.filter(p=>`${p.name} ${p.summary}`.toLowerCase().includes(query.toLowerCase())&&(filter==='all'||mobilePluginKind(p.id)===filter)).map(p=><Button id={`plugin-open-${p.id}`} className="water-work" key={p.id} onClick={()=>{if(mobilePluginKind(p.id)==='aicut')void Taro.navigateTo({url:'/comic/pages/aicut/index'});else void Taro.navigateTo({url:`/comic/pages/plugins/index?tool=${encodeURIComponent(p.id)}`});}}><View className="water-work-icon" style={{background:`${p.color}22`}}><AppIcon name={icons[p.id]||'settings'} size={24}/></View><View className="water-work-copy"><Text>{p.name}</Text><Text className="water-note">{p.summary}</Text><Text className="water-note">{label(mobilePluginKind(p.id))}{p.launch.kind==='unavailable'?' · 线上未接入':''}</Text></View><AppIcon name="chevron-right" size={16}/></Button>)}</>:plugin?<><Text className="water-title">{plugin.name}</Text><Text className="water-note">{plugin.summary}</Text>{kind==='text'||kind==='local'?<PluginTextLocal key={id} id={id} local={kind==='local'}/>:kind==='image'?<PluginImage key={id} id={id} name={plugin.name}/>:kind==='segment'||kind==='upscale'?<PluginVideo key={id} id={id}/>:kind==='draft'?<PluginDraft key={id} id={id}/>:kind==='aicut'?<Button className="water-primary water-wide" onClick={()=>void Taro.navigateTo({url:'/comic/pages/aicut/index'})}>打开AI-CUT</Button>:<View className="water-card"><Text className="water-subtitle">{plugin.launch.kind==='unavailable'?'线上尚未接入':'需要桌面工作环境'}</Text><Text className="water-prose">{plugin.launch.reason||`此功能需要${plugin.launch.environment||'电脑版剪映与本地媒体执行器'}。手机无法直接读写电脑上的草稿目录，请使用同账号网页版在电脑操作。`}</Text><Text className="water-note">这里保留真实功能说明，不会创建没有执行结果的任务。</Text></View>}</>:<View className="water-empty"><Text>插件入口无效，请从目录重新打开。</Text></View>}</View></ThemedPage>;
+}

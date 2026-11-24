@@ -37,7 +37,8 @@ export function isModuleKey(key: string): key is ModuleKey {
 
 export function moduleRoute(key: ModuleKey) {
   if (key === 'novel') return '/comic/pages/novel/index';
-  if (key === "toolkit" || key === "plugins") return "/comic/pages/index/index";
+  if (key === "plugins") return "/comic/pages/plugins/index";
+  if (key === "toolkit") return "/comic/pages/index/index";
   if (key === "voice") return "/comic/pages/tts/index";
   if (key === "aicut") return "/comic/pages/aicut/index";
   if (key === "comic") return "/comic/pages/comic-new/index";

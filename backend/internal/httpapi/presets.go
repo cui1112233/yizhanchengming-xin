@@ -10,6 +10,7 @@ import (
 )
 
 func registerPresetRoutes(root *http.ServeMux, auth BridgeAuth, catalog *prompt.Catalog, files *localartifact.Store) {
+	registerCharacterSheetPrompt(root, auth, catalog)
 	handler := auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/presets" {
 			if r.Method != http.MethodGet {

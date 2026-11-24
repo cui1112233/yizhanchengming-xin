@@ -24,6 +24,7 @@ export default {
         "pages/index/index",
         "pages/aicut/index",
         "pages/novel/index",
+        "pages/plugins/index",
         "pages/member-center/index",
         "pages/usage-stats/index",
         "pages/tts/index",

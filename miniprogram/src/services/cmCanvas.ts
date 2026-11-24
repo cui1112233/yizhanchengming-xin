@@ -15,7 +15,7 @@ export function createCmClient(request:Request){return{
  chat:(id:string,prompt:string,skillIds:string[]=[])=>request('/api/agent/chat',{method:'POST',data:{taskId:required(id),prompt:required(prompt),context:{page:'CM 画布'},skillIds},timeout:180000}),
  rename:(id:string,title:string)=>request(path(id),{method:'PATCH',data:{title:required(title)}}),
  remove:(id:string)=>request(path(id),{method:'DELETE'}),
- generate:(id:string,kind:string,data:CmRow)=>{const endpoint=({text:'text-generations',image:'image-generations',audio:'audio-generations',video:'video-jobs'} as CmRow)[kind];if(!endpoint)throw Error('此节点类型不支持媒体生成');return request(`${path(id)}/${endpoint}`,{method:'POST',data,timeout:180000});},
+ generate:async(id:string,kind:string,data:CmRow)=>{const endpoint=({text:'text-generations',image:'image-generations',audio:'audio-generations',video:'video-jobs'} as CmRow)[kind];if(!endpoint)throw Error('此节点类型不支持媒体生成');const result=await request(`${path(id)}/${endpoint}`,{method:'POST',data,timeout:180000});if(!result?.generation?.id&&!result?.execution?.id&&!result?.job?.id&&!result?.task?.id)throw Error('生成提交结果未确认，请刷新任务核对，勿重复提交');return result;},
  action:(id:string,generation:string,action:'retry'|'cancel'|'confirm'|'activate',video=false,data:CmRow={})=>request(`${path(id)}/${video?'video-jobs':'generations'}/${encodeURIComponent(required(generation))}/${action}`,{method:'POST',data}),
 };}
 export function patchCmNode(node:CmRow,edit:CmRow):CmRow{return{...node,title:String(edit.title??node.title),version:Number(node.version||1)+1,config:{...node.config,...(edit.config||{}),...(edit.prompt!==undefined?{prompt:edit.prompt}:{}),...(edit.sourceText!==undefined?{sourceText:edit.sourceText}:{})}};}

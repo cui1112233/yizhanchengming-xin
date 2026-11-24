@@ -1,0 +1,14 @@
+import {beforeEach,expect,test,vi} from 'vitest';
+const h=vi.hoisted(()=>({upload:vi.fn(),write:vi.fn(),unlink:vi.fn(),api:vi.fn(),info:vi.fn(),read:vi.fn()}));
+vi.mock('@tarojs/taro',()=>({default:{env:{USER_DATA_PATH:'/cache'},uploadFile:h.upload,getFileInfo:h.info,getFileSystemManager:()=>({writeFile:h.write,unlink:h.unlink,readFile:h.read})}}));
+vi.mock('./session',()=>({getBusinessToken:()=>'',getSessionCookie:()=>''}));
+vi.mock('./api',()=>({apiRequest:h.api}));
+vi.mock('../config/runtime',()=>({requireApiOrigin:()=>{},apiUrl:(p:string)=>`https://app.test${p}`}));
+import {segmentMultipart,savePluginFile,uploadPluginMedia,exportSegmentVideo} from './pluginMedia';
+import {invalidateSessionResources} from './sessionBoundary';
+beforeEach(()=>{invalidateSessionResources();vi.clearAllMocks();h.write.mockImplementation(o=>o.success());h.info.mockResolvedValue({size:16});h.read.mockImplementation(o=>o.success({data:new Uint8Array([1,2,3]).buffer}));});
+test('multipart preserves video bytes and contains typed episode metadata',()=>{const p=segmentMultipart(new Uint8Array([1,2,3]).buffer,[{startSeconds:0,endSeconds:2,reason:'分段'}],'',30);const text=new TextDecoder().decode(p.body);expect(p.contentType).toContain('boundary=');expect(text).toContain('name="video"');expect(text).toContain('"endSeconds":2');expect(new Uint8Array(p.body)).toContain(3);expect(text).toContain('分段');});
+test('a file completing after account switch is removed rather than shared',async()=>{let finish!:()=>void;h.write.mockImplementation(o=>{finish=o.success;});const pending=savePluginFile('私人稿','txt');invalidateSessionResources();finish();await expect(pending).rejects.toThrow('账号已切换');expect(h.unlink).toHaveBeenCalledWith(expect.objectContaining({filePath:expect.stringMatching(/^\/cache\/plugin-/)}));});
+test('uploads reject arbitrary destinations',async()=>{await expect(uploadPluginMedia('/api/config','/tmp/a')).rejects.toThrow('上传目标无效');expect(h.upload).not.toHaveBeenCalled();});
+test('account changes discard late upload receipts',async()=>{let finish!:(v:any)=>void;h.upload.mockReturnValue(new Promise(r=>{finish=r;}));const pending=uploadPluginMedia('/api/agent/tasks/p/assets','/tmp/a');invalidateSessionResources();finish({statusCode:200,data:JSON.stringify({asset:{id:'old'}})});await expect(pending).rejects.toThrow('账号已切换');});
+test('segment export accepts a ZIP receipt and never stores an error page as output',async()=>{h.api.mockResolvedValue(new Uint8Array([80,75,3,4]).buffer);await expect(exportSegmentVideo('/tmp/video',[{startSeconds:0,endSeconds:2}])).resolves.toMatch(/\.zip$/);expect(h.api).toHaveBeenCalledWith('/api/plugins/ai-segment/export',expect.objectContaining({method:'POST',responseType:'arraybuffer',header:{'content-type':expect.stringContaining('multipart/form-data')}}));h.api.mockResolvedValue(new TextEncoder().encode('error page').buffer);await expect(exportSegmentVideo('/tmp/video',[{}])).rejects.toThrow('有效导出文件');});

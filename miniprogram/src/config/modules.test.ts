@@ -58,6 +58,6 @@ describe("小程序功能目录", () => {
     expect(moduleRoute("comic")).toBe("/comic/pages/comic-new/index");
     expect(moduleRoute("batch")).toBe("/pages/batch/index");
     expect(moduleRoute("voice")).toBe("/comic/pages/tts/index");
-    expect(moduleRoute("plugins")).toBe("/comic/pages/index/index");
+    expect(moduleRoute("plugins")).toBe("/comic/pages/plugins/index");
   });
 });
