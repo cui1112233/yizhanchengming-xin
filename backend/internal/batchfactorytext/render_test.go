@@ -38,7 +38,7 @@ func renderCard(t *testing.T, renderer Renderer, in RenderInput) (*image.RGBA, [
 
 func TestRenderFontsIncludeChineseFallback(t *testing.T) {
 	catalog := renderfont.Catalog()
-	if len(catalog) != 2 || !catalog[1].Available || catalog[1].Coverage == "" || catalog[0].Name != "Noto Sans SC" || catalog[1].Name != "Ma Shan Zheng" {
+	if len(catalog) != 6 || !catalog[1].Available || catalog[1].Coverage == "" || catalog[0].Name != "Noto Sans SC" || catalog[1].Name != "Ma Shan Zheng" {
 		t.Fatal(catalog)
 	}
 	a, err := renderfont.Open("noto-sans-sc", 44)

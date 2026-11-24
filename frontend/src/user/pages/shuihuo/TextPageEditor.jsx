@@ -60,7 +60,7 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     {!cover && <label>页面正文<textarea aria-label="页面正文" rows={6} value={draft.text} onChange={e=>{const text=e.target.value;onDraft(old=>({...old,text}));}}/></label>}
     <div className="text-layout-fields">{pageControls.filter(f=>!cover || ['fontId','fontSize','fontWeight','align','textColor'].includes(layoutFields[f.key])).map(f=>{
       const key=layoutFields[f.key], value=draft.layout[key];
-      const opts=key==='fontId' && fonts?.length ? fonts.filter(v=>v.available!==false).map(v=>({value:v.id,label:v.name})) : f.options;
+      const opts=key==='fontId' && fonts?.length ? fonts.filter(v=>v.available!==false).map(v=>({value:v.id,label:f.options?.find(option=>option.value===v.id)?.label || v.name})) : f.options;
       return <label key={key}>{f.label}{opts ? <Select aria-label={f.label} disabled={busy || fileBusy} value={value} options={opts} getPopupContainer={trigger=>trigger.parentElement} onChange={next=>setLayout(key,typeof f.initial==='number'?Number(next):next)}/>
         : <input type={f.type==='color'?'color':'number'} min={f.min} max={f.max} step={f.step || 1} value={f.type==='percent'?Math.round(value*100):value}
             onChange={e=>setLayout(key,f.type==='color'?e.target.value:Number(e.target.value)/(f.type==='percent'?100:1))}/>}</label>;

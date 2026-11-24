@@ -2,7 +2,7 @@
 package renderfont
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
 	"image"
 	"sync"
@@ -72,7 +72,31 @@ var ma = sync.OnceValue(func() entry {
 	return loadEntry(MaShanZheng, "Ma Shan Zheng", "7,015 个字符，缺字时使用 Noto Sans SC，仍缺字时显示方框", "https://github.com/google/fonts/blob/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/mashanzheng/MaShanZheng-Regular.ttf", maLicense, maBytes)
 })
 
-func Catalog() []FontInfo { return []FontInfo{noto().info, ma().info} }
+//go:embed fonts/*.ttf fonts/*OFL.txt
+var extraFiles embed.FS
+
+var extraFonts = sync.OnceValue(func() map[string]entry {
+	result := map[string]entry{}
+	for _, item := range []struct{ id, family, file, license, source string }{
+		{"lxgw-wenkai", "霞鶩文楷", "LXGWWenKai-Regular.ttf", "LXGWWenKai-OFL.txt", "https://github.com/lxgw/LxgwWenKai"},
+		{"long-cang", "Long Cang", "LongCang-Regular.ttf", "longcang-OFL.txt", "https://github.com/google/fonts/tree/main/ofl/longcang"},
+		{"zhi-mang-xing", "Zhi Mang Xing", "ZhiMangXing-Regular.ttf", "zhimangxing-OFL.txt", "https://github.com/google/fonts/tree/main/ofl/zhimangxing"},
+		{"zcool-kuaile", "ZCOOL KuaiLe", "ZCOOLKuaiLe-Regular.ttf", "zcoolkuaile-OFL.txt", "https://github.com/google/fonts/tree/main/ofl/zcoolkuaile"},
+	} {
+		data, _ := extraFiles.ReadFile("fonts/" + item.file)
+		license, _ := extraFiles.ReadFile("fonts/" + item.license)
+		result[item.id] = loadEntry(item.id, item.family, "缺字时使用 Noto Sans SC", item.source, string(license), data)
+	}
+	return result
+})
+
+func Catalog() []FontInfo {
+	result := []FontInfo{noto().info, ma().info}
+	for _, id := range []string{"lxgw-wenkai", "long-cang", "zhi-mang-xing", "zcool-kuaile"} {
+		result = append(result, extraFonts()[id].info)
+	}
+	return result
+}
 
 type familyFace struct {
 	font.Face
@@ -90,7 +114,8 @@ func Open(id string, size float64) (font.Face, error) {
 	if !(size > 0 && size <= 256) {
 		return nil, fmt.Errorf("字号须在 0 到 256 像素之间")
 	}
-	if id != Noto && id != MaShanZheng {
+	extra, hasExtra := extraFonts()[id]
+	if id != Noto && id != MaShanZheng && !hasExtra {
 		return nil, fmt.Errorf("找不到字体 %q，请重新选择", id)
 	}
 	n, err := open(noto(), size)
@@ -100,6 +125,13 @@ func Open(id string, size float64) (font.Face, error) {
 	f := &mixedFace{familyFace: n, base: n}
 	if id == MaShanZheng {
 		f.familyFace, err = open(ma(), size)
+		if err != nil {
+			n.Close()
+			return nil, err
+		}
+	}
+	if hasExtra {
+		f.familyFace, err = open(extra, size)
 		if err != nil {
 			n.Close()
 			return nil, err

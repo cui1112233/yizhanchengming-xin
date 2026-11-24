@@ -1,7 +1,14 @@
 import { normalizeSensitiveMode, SENSITIVE_MODE_OPTIONS } from './batchFactoryBookConfigRegions.js';
 import { reconcileSyncedWebsiteProfiles, websiteProfileOrganization } from './batchFactoryWebsiteProfiles.js';
 
-const fonts = [{ value: 'noto-sans-sc', label: 'Noto Sans SC · 黑体' }, { value: 'ma-shan-zheng', label: 'Ma Shan Zheng · 手写体' }];
+const fonts = [
+  {value:'noto-sans-sc',label:'思源黑体 · 清晰黑体'},
+  {value:'ma-shan-zheng',label:'马善政 · 毛笔手写'},
+  {value:'lxgw-wenkai',label:'霞鹜文楷 · 楷书 / 钢笔'},
+  {value:'long-cang',label:'龙藏体 · 自然手写'},
+  {value:'zhi-mang-xing',label:'志莽行书 · 连笔手写'},
+  {value:'zcool-kuaile',label:'站酷快乐体 · 圆润活泼'}
+];
 const options = values => values.map(value => ({ value, label: String(value) }));
 const align = [{ value: 'left', label: '左对齐' }, { value: 'center', label: '居中' }, { value: 'right', label: '右对齐' }];
 const field = (key, label, type, initial, extra = {}) => ({key, label, type, initial, ...extra});
