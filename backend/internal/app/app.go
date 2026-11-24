@@ -45,6 +45,7 @@ import (
 	"qiantie/backend/internal/storage"
 	"qiantie/backend/internal/upscale"
 	"qiantie/backend/internal/videomanagementconnector"
+	"qiantie/backend/internal/yzcmusage"
 )
 
 // novelFetchClassificationTimeout caps each classification LLM call (男女频/
@@ -343,6 +344,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 				}
 			}
 		}
+		if provider != nil {
+			provider.UsageOwner = owner
+		}
 		return provider, nil
 	}
 	resolveCatalogTextProvider := func(ctx context.Context, owner string) (*batchfactoryv11.OpenAICompatibleProvider, error) {
@@ -376,7 +380,10 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		}
 		novelCreationRuntime = novelcreation.NewRedisRuntime("qiantie:novel-creation", novelcreation.RedisDoFunc(redisTransport.Do))
 	}
+	usageStore := yzcmusage.Store{DB: db}
 	memberProfiles := httpapi.NewMemberProfileStore(cfg.MemberSystemDir)
+	memberProfiles.UsageReader = usageStore.ReadSummary
+	memberProfiles.TeamTokenReader = usageStore.TeamMonthTokens
 	novelCreationService := novelcreation.NewService(novelCreationStore, novelCreationRuntime, novelcreation.NewPipeline(novelcreation.ProviderResolver(httpapi.NovelCreationTextResolver(authStore, memberProfiles, textProviderForModel))))
 	novelCreationService.ConfigureSystemPrompts(prompt.NewCatalog(cfg.PresetPath))
 	if cfg.AgentAssetTOSBucket != "" {
@@ -443,9 +450,14 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		imageCapacityRedis = transport.Do
 	}
 	imageCapacityController := imagecapacity.NewController(imageCapacityPolicies, imageCapacityRedis, "qiantie:imagecapacity")
-	safehttp.SetManagedOutboundDecorator(imageCapacityController.WrapTransportWithTimeout)
+	usageTracker := &yzcmusage.Tracker{Store: usageStore, Client: yzcmusage.Client{HTTP: safehttp.NewClientWithTimeout(12 * time.Second)}}
+	safehttp.SetManagedOutboundDecorator(func(base http.RoundTripper, timeout time.Duration) http.RoundTripper {
+		return imageCapacityController.WrapTransportWithTimeout(usageTracker.Wrap(base), timeout)
+	})
 	imagecapacity.SetEnabled(true)
 	userConfigStore = httpapi.NewUserConfigStore(cfg.ScriptHistoryDir)
+	usageTracker.ResolveCredential = httpapi.YZCMUsageCredentialResolver(userConfigStore, memberProfiles, authStore, novelFetchStore.GetConfig)
+
 	var aiCutASRService *aicut.ASRService
 	if strings.TrimSpace(cfg.RedisURL) != "" && agentAssetObjects != nil {
 		redisTransport, redisErr := mergeworker.NewRedisStore(cfg.RedisURL, "qiantie:aicut:asr")
@@ -783,6 +795,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}()
 	// Build's ctx is a startup timeout, not the server lifetime. Start only
 	// after every execution dependency and all fallible preparation are ready.
+	usageTracker.Run(context.Background())
 	novelStartup.Start(context.Background())
 	return router, nil
 }

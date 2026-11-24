@@ -96,10 +96,15 @@ func RegisterMemberTeamReadCompat(root *http.ServeMux, middleware BridgeAuth, ac
 				// The old page reads the full quota and usage objects, not only used/limit.
 				member["presence"] = map[string]any{"online": account.Username == toString(identity.Username)}
 				member["archive"] = nil
-				member["quota"] = memberQuota(member["monthlyTokenLimit"], 0)
-				usage := emptyMemberUsage()
+
+				usage, usageErr := profiles.usage(req.Context(), toString(member["username"]))
+				if usageErr != nil {
+					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "成员用量读取失败"})
+					return
+				}
 				member["usage"] = map[string]any{"day": usage["day"], "month": usage["month"]}
-				member["memberQuota"] = memberQuota(member["monthlyTokenLimit"], 0)
+				member["quota"] = memberQuota(member["monthlyTokenLimit"], usageMonthTokens(usage))
+				member["memberQuota"] = member["quota"]
 				member["teamGovernance"] = memberTeamGovernance(owner)
 				members = append(members, member)
 			}
@@ -135,12 +140,16 @@ func RegisterMemberTeamReadCompat(root *http.ServeMux, middleware BridgeAuth, ac
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "成员不存在"})
 			return
 		}
-		if toString(self["role"]) == "manager" && toString(target["boundTo"]) != toString(self["username"]) && toString(target["username"]) != toString(self["username"]) {
+		if toString(self["role"]) != "dev" && toString(target["username"]) != toString(self["username"]) && (toString(self["role"]) != "manager" || toString(target["boundTo"]) != toString(self["username"])) {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权查看该成员用量"})
 			return
 		}
-		usage := emptyMemberUsage()
-		writeJSON(w, http.StatusOK, map[string]any{"day": usage["day"], "month": usage["month"], "quota": memberQuota(target["monthlyTokenLimit"], 0), "recent": []any{}})
+		usage, usageErr := profiles.usage(req.Context(), toString(target["username"]))
+		if usageErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "成员用量读取失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"day": usage["day"], "month": usage["month"], "quota": memberQuota(target["monthlyTokenLimit"], usageMonthTokens(usage)), "recent": usage["recent"]})
 	})))
 	root.Handle("GET /api/member/team/invites", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())

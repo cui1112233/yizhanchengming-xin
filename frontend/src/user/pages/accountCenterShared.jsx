@@ -8,6 +8,14 @@ export const ROLE_META = {
 };
 
 export const FEATURE_LABELS = {
+  model: '模型调用',
+  audio: '配音与音频',
+  canvas: 'CM 画布',
+  comic: '漫剧制作',
+  'novel-creation': '小说创作',
+  'novel-fetch': '批量测书',
+  'shuihuo-production': '批量制作',
+  aicut: 'AI-CUT',
   agent: 'CM 画布',
   chat: '对话生成',
   script: '私人定制',

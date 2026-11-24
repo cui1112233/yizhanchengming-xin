@@ -20,8 +20,10 @@ import (
 )
 
 type MemberProfileStore struct {
-	SystemDir string
-	mu        sync.Mutex
+	SystemDir       string
+	mu              sync.Mutex
+	UsageReader     func(context.Context, string) (map[string]any, error)
+	TeamTokenReader func(context.Context, []string) (int, error)
 }
 
 func (s *MemberProfileStore) mfaStatus(username string) map[string]any {
@@ -666,10 +668,19 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 				unread++
 			}
 		}
-		usage := emptyMemberUsage()
+		usage, usageErr := profiles.usage(req.Context(), identity.Username)
+		if usageErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "用量账单读取失败，请稍后重试"})
+			return
+		}
 		governanceManager := member
 		if manager != nil {
 			governanceManager = manager
+		}
+		governance, governanceErr := profiles.usageGovernance(req.Context(), governanceManager)
+		if governanceErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "团队用量读取失败"})
+			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"member":              member,
@@ -677,8 +688,8 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			"manager":             manager,
 			"team":                team,
 			"notificationSummary": map[string]any{"unread": unread, "recent": notifications},
-			"memberQuota":         memberQuota(member["monthlyTokenLimit"], 0),
-			"teamGovernance":      memberTeamGovernance(governanceManager),
+			"memberQuota":         memberQuota(member["monthlyTokenLimit"], usageMonthTokens(usage)),
+			"teamGovernance":      governance,
 			"usage":               usage,
 		})
 	})))

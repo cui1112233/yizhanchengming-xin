@@ -15,6 +15,7 @@ import (
 
 	_ "golang.org/x/image/webp"
 	"qiantie/backend/internal/imagecapacity"
+	"qiantie/backend/internal/yzcmusage"
 )
 
 const imageCapacityQueueHint = "所有用户和书籍共享全站出图额度，名额不足时排队，图片完整取回后归还"
@@ -63,7 +64,7 @@ func beginImageRequestOperation(ctx context.Context) (context.Context, func(erro
 	return imagecapacity.BeginOperation(ctx)
 }
 func imageRequestIdentity(ctx context.Context, owner, book string) context.Context {
-	return imagecapacity.WithIdentity(ctx, owner, book)
+	return imagecapacity.WithIdentity(yzcmusage.WithIdentity(ctx, owner, ""), owner, book)
 }
 func imageRequestWorkerCount(legacy int) int {
 	if imagecapacity.Enabled() {

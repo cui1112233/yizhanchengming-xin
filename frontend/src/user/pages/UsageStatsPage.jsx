@@ -1,7 +1,7 @@
-import { Alert, Button, Progress, Skeleton, Tag, message } from 'antd';
+import { Alert, Button, Progress, Skeleton, Tag } from 'antd';
 import { Activity, Coins, Layers3, Sparkles, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { getMemberCenter, getTeamMembers } from '../../shared/api/member';
+import { getMemberUsage, getTeamMembers } from '../../shared/api/member';
 import {
   FeatureBars,
   MemberIdentity,
@@ -30,24 +30,29 @@ export default function UsageStatsPage() {
   const [center, setCenter] = useState(null);
   const [team, setTeam] = useState([]);
   const [teamError, setTeamError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setTeamError('');
-    Promise.all([getMemberCenter(), getTeamMembers().then(data => ({ data })).catch(error => ({ error }))])
-      .then(([nextCenter, teamResult]) => {
-        if (!alive) return;
-        setCenter(nextCenter);
-        if (teamResult.error) {
-          // 团队数据读取失败不能当成“没有组员”，否则页面会显示 0 和「暂无团队用量」。
-          setTeamError(teamResult.error.message || '团队成员用量读取失败');
-        } else {
-          setTeam(teamResult.data?.members || []);
+    setLoadError('');
+    (async () => {
+      const nextCenter = await getMemberUsage();
+      if (!alive) return;
+      setCenter(nextCenter);
+      setTeam([]);
+      if (['dev', 'manager'].includes(nextCenter?.member?.role)) {
+        try {
+          const result = await getTeamMembers();
+          if (alive) setTeam(result?.members || []);
+        } catch (error) {
+          if (alive) setTeamError(error.message || '团队成员用量读取失败');
         }
-      })
-      .catch(error => message.error(error.message || '用量统计加载失败'))
+      }
+    })()
+      .catch(error => { if (alive) { setLoadError(error.message || '用量账单加载失败'); setCenter(null); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [reloadKey]);
@@ -71,14 +76,16 @@ export default function UsageStatsPage() {
   if (!self) return <div className="account-center-page"><div className="ac-empty">无法读取用量</div></div>;
 
   return <div className="account-center-page usage-page">
-    <PageHeader title="用量与制作" subtitle="查看 Token、调用次数、费用估算、功能构成与内容制作调用" />
+    <PageHeader title="用量与制作" subtitle="查看 Token、调用次数、实际扣费、功能构成与内容制作调用" />
 
+    {center?.usage?.historyCoverage === 'tracked_requests' ? <Alert type="info" showIcon style={{ marginBottom: 16 }} message="YZCM API 真实账单" description="仅统计接入后能关联到当前成员的文本、图片和音频请求。费用来自实际扣费记录；未匹配到账单显示待核账。历史共享 Key 账单及异步视频结算暂不计入。" /> : null}
+    <Button onClick={() => setReloadKey(key => key + 1)} style={{ marginBottom: 16 }}>刷新账单</Button>
     <div className="ac-metrics-grid five">
       <MetricCard label="今日消耗" value={formatTokens(day.totalTokens)} suffix="Tokens" icon={Zap} accent="coral" hint={`${day.calls || 0} 次调用`} />
       <MetricCard label="本月消耗" value={formatTokens(month.totalTokens)} suffix="Tokens" icon={Sparkles} accent="blue" hint={`${month.calls || 0} 次调用`} />
       <MetricCard label="输入 Tokens" value={formatTokens(month.inputTokens)} suffix="Tokens" icon={Layers3} accent="violet" hint="本月输入" />
       <MetricCard label="输出 Tokens" value={formatTokens(month.outputTokens)} suffix="Tokens" icon={Activity} accent="green" hint="本月输出" />
-      <MetricCard label="估算费用" value={month.costCurrency ? Number(month.estimatedCost || 0).toFixed(4) : '—'} suffix={month.costCurrency || ''} icon={Coins} accent="gold" hint={`${month.pricedCalls || 0}/${month.billableCalls || 0} 次调用有价格快照`} />
+      <MetricCard label="实际扣费" value={month.costCurrency ? (month.actualCost == null ? '—' : Number(month.actualCost).toFixed(4)) : '—'} suffix={month.costCurrency || ''} icon={Coins} accent="gold" hint={`${month.pricedCalls || 0}/${month.billableCalls || 0} 次调用已核账`} />
     </div>
 
     {center?.memberQuota?.level && center.memberQuota.level !== 'unlimited' ? <div className={`ac-quota-alert is-${center.memberQuota.level}`}>
@@ -145,7 +152,7 @@ export default function UsageStatsPage() {
           <span>{formatTokens(item.inputTokens)}</span>
           <span>{formatTokens(item.outputTokens)}</span>
           <b>{formatTokens(item.totalTokens)}</b>
-          <span className="ac-usage-cost-cell"><Tag color={item.metadata?.usageEstimated ? 'gold' : item.usageKnown ? 'green' : 'default'}>{item.metadata?.usageEstimated ? '估算 usage' : item.usageKnown ? '真实 usage' : '调用记录'}</Tag><small>{item.costKnown ? `${item.costCurrency} ${Number(item.estimatedCost).toFixed(6)}` : '未配置价格'}</small></span>
+          <span className="ac-usage-cost-cell"><Tag color={item.metadata?.usageEstimated ? 'gold' : item.usageKnown ? 'green' : 'default'}>{item.source === 'yzcm_billing_log' ? (item.costKnown ? '已核账' : '待核账') : item.metadata?.usageEstimated ? '估算用量' : item.usageKnown ? '真实 usage' : '调用记录'}</Tag><small>{item.costKnown ? `${item.costCurrency} ${Number(item.estimatedCost).toFixed(6)}` : '待核账'}</small></span>
         </div>)}
         {!recent.length ? <div className="ac-empty">暂无用量明细</div> : null}
       </div>

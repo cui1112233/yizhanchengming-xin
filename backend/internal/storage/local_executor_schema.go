@@ -128,5 +128,6 @@ func AppMigrations() []Migration {
 	out = append(out, NovelCreationMigrations()...)
 	out = append(out, ProjectRetentionMigrations()...)
 	out = append(out, ImageCapacityMigrations()...)
+	out = append(out, YZCMUsageMigrations()...)
 	return out
 }

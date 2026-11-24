@@ -10,6 +10,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"qiantie/backend/internal/yzcmusage"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,7 +44,7 @@ func WithIdentity(ctx context.Context, owner, book string) context.Context {
 			book = previous.Book
 		}
 	}
-	return context.WithValue(ctx, identityKey{}, imageIdentity{owner, book})
+	return context.WithValue(yzcmusage.WithIdentity(ctx, owner, ""), identityKey{}, imageIdentity{owner, book})
 }
 
 type waitHeartbeatKey struct{}

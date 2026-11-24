@@ -17,6 +17,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/imagecapacity"
 	"qiantie/backend/internal/safehttp"
+	"qiantie/backend/internal/yzcmusage"
 )
 
 // 模型下拉里的渠道候选项使用固定前缀：channel:<预置渠道> / custom:<自定义渠道>。
@@ -208,15 +209,17 @@ func resolveLegacyIntegrationImageCatalogEntry(ctx context.Context, userConfig *
 // 与目录模型不同，渠道允许 http 地址（本地 Grok / 大香蕉等），因此不复用
 // batchfactoryv11.OpenAICompatibleProvider 的 https 强校验。
 type integrationTextProvider struct {
-	Metadata batchfactoryv11.TextModelMetadata
-	Label    string
-	Endpoint string
-	APIKey   string
-	Model    string
-	Client   *http.Client
+	UsageOwner string
+	Metadata   batchfactoryv11.TextModelMetadata
+	Label      string
+	Endpoint   string
+	APIKey     string
+	Model      string
+	Client     *http.Client
 }
 
 func (p *integrationTextProvider) Complete(ctx context.Context, input batchfactoryv11.TextCompletionRequest) (string, error) {
+	ctx = yzcmusage.WithIdentity(ctx, p.UsageOwner, "")
 	payload := map[string]any{
 		"model":       p.Model,
 		"messages":    input.CompletionMessages(),
@@ -303,7 +306,8 @@ func ResolveIntegrationTextProvider(ctx context.Context, userConfig *UserConfigS
 		return nil, true, fmt.Errorf("渠道「%s」的接口地址格式不正确", target.Label)
 	}
 	return &integrationTextProvider{
-		Metadata: target.Metadata, Label: target.Label, Endpoint: endpoint, APIKey: target.Credential, Model: target.ModelID,
+		UsageOwner: owner,
+		Metadata:   target.Metadata, Label: target.Label, Endpoint: endpoint, APIKey: target.Credential, Model: target.ModelID,
 	}, true, nil
 }
 

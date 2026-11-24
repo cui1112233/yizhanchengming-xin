@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/safehttp"
+	"qiantie/backend/internal/yzcmusage"
 )
 
 // DirectorHTTPError keeps the upstream response body so a 400/403 is never
@@ -180,11 +181,12 @@ type DirectorProvider interface {
 }
 
 type OpenAICompatibleProvider struct {
-	Metadata TextModelMetadata
-	Endpoint string
-	APIKey   string
-	Model    string
-	Client   *http.Client
+	UsageOwner string
+	Metadata   TextModelMetadata
+	Endpoint   string
+	APIKey     string
+	Model      string
+	Client     *http.Client
 	// retryClient 用于协议不匹配时的一次性 HTTP/2 重试；生产为 nil，按 Endpoint 自动构造。
 	retryClient *http.Client
 }
@@ -238,6 +240,9 @@ func director400LooksLikeParameterRejection(raw []byte) bool {
 }
 
 func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompletionRequest) (string, error) {
+	if p != nil && p.UsageOwner != "" {
+		ctx = yzcmusage.WithIdentity(ctx, p.UsageOwner, "")
+	}
 	if err := p.Validate(); err != nil {
 		return "", err
 	}

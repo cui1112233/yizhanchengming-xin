@@ -63,3 +63,6 @@ export function getTeamAudit(limit = 100) { return apiRequest(`/api/member/team/
 
 export function inspectTeamInvite(token) { return apiRequest(`/api/login/invite/${encodeURIComponent(token)}`, { suppressGlobalError: true }); }
 export function redeemTeamInvite(token, payload) { return apiRequest(`/api/login/invite/${encodeURIComponent(token)}`, { method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true }); }
+
+// Usage does not need the security view or the 5000-entry notification list.
+export function getMemberUsage() { return apiRequest('/api/member/me'); }
