@@ -32,9 +32,9 @@
   .profile-space-welcome { display: block; margin-top: 3PX; color: rgba(239,244,255,.78); font-size: 12PX; line-height: 18PX; }
   .profile-space-team { display: block; max-width: 210PX; margin-top: 1PX; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(197,219,236,.62); font-size: 10PX; line-height: 16PX; }
   .profile-space-metrics { display: flex; align-items: center; margin-top: 8PX; color: rgba(235,244,255,.82); font-size: 11PX; }
-  .profile-space-metrics > view { display: flex; align-items: center; gap: 5PX; }
-  .profile-space-metric-value { margin-left: 2PX; color: #fff; font-size: 20PX; line-height: 24PX; font-weight: 760; }
-  .profile-space-metric-divider { width: 1PX; height: 23PX; margin: 0 14PX; background: rgba(214,230,244,.36); }
+  .profile-space-metrics > view { display: flex; flex-shrink: 0; align-items: center; gap: 4PX; white-space: nowrap; }
+  .profile-space-metric-value { margin-left: 1PX; color: #fff; font-size: 18PX; line-height: 22PX; font-weight: 760; }
+  .profile-space-metric-divider { width: 1PX; height: 23PX; margin: 0 8PX; background: rgba(214,230,244,.36); }
   .profile-space-identity.is-reduced-motion { background: rgba(25, 45, 78, .94); }
   .profile-space-identity.is-reduced-motion .profile-space-petal { animation: none; opacity: .38; }
   .profile-space-identity.is-reduced-motion .profile-space-avatar { animation: none; }

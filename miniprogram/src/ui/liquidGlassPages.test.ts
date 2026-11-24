@@ -57,6 +57,8 @@ test('profile applies glass to grouped surfaces rather than every setting row', 
   expect(style).toContain('@keyframes profile-petal-drift-c');
   expect(style).toContain('.profile-space-identity.is-reduced-motion .profile-space-petal');
   expect(style).toContain('@media (prefers-reduced-motion: reduce)');
+  expect(style).toMatch(/\.profile-space-metrics\s*>\s*view\s*\{[^}]*white-space:\s*nowrap/);
+  expect(style).toMatch(/\.profile-space-metric-value\s*\{[^}]*font-size:\s*18PX/);
 });
 
 test('profile detail opts summary cards into secondary glass explicitly', () => {
