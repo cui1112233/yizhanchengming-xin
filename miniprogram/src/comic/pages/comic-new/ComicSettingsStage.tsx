@@ -1,6 +1,7 @@
 import { Button, Image, ScrollView, Text, Textarea, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
+import { COMIC_EXAMPLE_SOURCE } from "./comicJourney";
 import { createSheetDismissal } from "./sheetMotion";
 import AppIcon from "../../../components/AppIcon";
 import {
@@ -46,6 +47,7 @@ export type ComicSettingsStageProps = {
   continueDisabled?: boolean;
   continueLoading?: boolean;
   continueHint?: string;
+  configurationHint?: string;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -80,7 +82,7 @@ export default function ComicSettingsStage({
   source, styleId, aspectRatio, referencePath, styles, preset, presets, selectedPresetId, advancedOpen, settingPicker, settingCatalog, models, settingSelections, thumbs, thumbFailed, setupLoading, error,
   onSourceChange, onPasteSource, onChooseExisting, onStyleChange, onAspectChange, onPresetChange, onToggleAdvanced, onOpenReference, onRetryThumb, onContinue,
   onOpenSettingPicker, onCloseSettingPicker, onSettingSelectionChange, onConfirmSettingSelections,
-  continueDisabled = false, continueLoading = false, continueHint = "",
+  continueDisabled = false, continueLoading = false, continueHint = "", configurationHint = "",
 }: ComicSettingsStageProps) {
   const [tool, setTool] = useState<"" | "style" | "ratio">("");
   const [draft, setDraft] = useState<ComicSettingSelections>({});
@@ -116,7 +118,7 @@ export default function ComicSettingsStage({
   const baseSummary = presetSummary(preset);
   const pickerTitle = settingPicker ? {
     prompt: "选择漫画提示词",
-    derivation: "选择图片描述词推导",
+    derivation: "选择图片描述",
     model: "选择模型配置",
     constraints: "选择画质与约束",
   }[settingPicker] : "";
@@ -131,8 +133,8 @@ export default function ComicSettingsStage({
   const currentConstraintId = (category: string) => (Array.isArray(comic.constraints) ? comic.constraints : [])
     .map(asRecord).find((item) => text(item.constraintCategory) === category)?.presetId as string || "";
   const choice = (id: string, name: string, caption: string, active: boolean, onClick: () => void) => <View key={id} className={`comic-preset-choice ce-option-row${active ? " is-active" : ""}`} hoverClass="ce-row-press" hoverStartTime={0} hoverStayTime={70} onClick={() => {if (!closing) onClick();}}>
-    <View className="comic-preset-copy"><Text className="comic-preset-name">{name}</Text><Text className="comic-caption">{caption}</Text>{detail === id ? <Text className="ce-option-detail">完整名称：{name}。{caption}</Text> : null}</View>
-    <View className="ce-option-side"><View className={`ce-option-radio${active ? " is-checked" : ""}`}>{active ? <Text className="ce-check-glyph">✓</Text> : null}</View><Button className="ce-option-detail-button" onClick={event => {event.stopPropagation();setDetail(detail === id ? "" : id);}}>{detail === id ? "收起" : "详情"}</Button></View>
+    <View className="comic-preset-copy"><Text className="comic-preset-name">{name}</Text><Text className="comic-caption">{caption}</Text>{detail === id ? <Text className="ce-option-detail">完整名称：{name}</Text> : null}</View>
+    <View className="ce-option-side"><View className={`ce-option-radio${active ? " is-checked" : ""}`}>{active ? <Text className="ce-check-glyph">✓</Text> : null}</View><Button className="ce-option-detail-button" onClick={event => {event.stopPropagation();setDetail(detail === id ? "" : id);}}>{detail === id ? "收起" : "完整名称"}</Button></View>
   </View>;
   const presetChoice = (key: keyof ComicSettingSelections, option: ComicCatalogPreset, current: string, caption: string) => choice(`${key}:${option.id}`, option.name, `${caption} · v${option.version}`, selected(key, current) === option.id, () => choose(key, option.id));
   const hint = continueHint || (setupLoading ? "正在读取画风和预设…" : !styleId ? "还没有可用画风，稍后再试" : !length ? "先粘贴小说正文" : remaining > 0 ? `还需 ${remaining} 字` : "先创建项目并提取资产，下一步再确认分镜");
@@ -140,9 +142,11 @@ export default function ComicSettingsStage({
     {error ? <Text className="mp-error comic-error">{error}</Text> : null}
 
 
-    <View className={`ce-source-card${tooLong || setupLoading ? " has-notice" : ""}`}>
-    <View className="ce-source-head"><Text>故事正文</Text><View><Button onClick={onPasteSource}>粘贴内容</Button><Button onClick={onChooseExisting}>选择已有书籍</Button></View></View>
-    <Textarea className="ce-source-input" value={source} maxlength={-1} placeholder="粘贴要生成漫画的正文…" onInput={event => onSourceChange(String(event.detail.value))} />
+    <View className={`ce-config-readiness${configurationHint ? " needs-setup" : ""}`}><Text>{setupLoading ? "正在读取创作配置" : configurationHint ? "创作配置待完善" : "创作配置已齐全"}</Text><Text className="ce-muted">{setupLoading ? "稍候即可查看当前画风、模型与提示词" : configurationHint || "已配置画风、模型与提示词，可按当前设置继续"}</Text></View>
+    <View className={`ce-source-card${!length ? " is-empty" : ""}${tooLong || setupLoading ? " has-notice" : ""}`}>
+    <View className="ce-source-head"><Text>故事正文</Text>{length > 0 ? <View><Button onClick={onPasteSource}>粘贴内容</Button><Button onClick={onChooseExisting}>选择已有书籍</Button></View> : <Text className="ce-muted">粘贴或直接输入</Text>}</View>
+    {!length ? <View className="ce-source-start"><Text className="ce-start-title">从一段故事开始</Text><Text className="ce-start-copy">先放入正文，再检查人物与场景，最后确认生成漫画。</Text><View className="ce-start-actions"><Button onClick={onPasteSource}>粘贴内容</Button><Button id="comic-use-example" onClick={() => onSourceChange(COMIC_EXAMPLE_SOURCE)}>使用示例</Button><Button onClick={onChooseExisting}>选择已有书籍</Button></View></View> : null}
+    <Textarea className="ce-source-input" value={source} maxlength={-1} placeholder={length ? "粘贴要生成漫画的正文…" : "也可以在这里直接输入故事正文…"} onInput={event => onSourceChange(String(event.detail.value))} />
     <View className="ce-source-count"><Text>{length.toLocaleString()} 字</Text><Button onClick={() => onSourceChange("")}>清空</Button></View>
     {tooLong ? <Text className="comic-hint">内容较长，一次最多生成 35 页，请确认处理范围。</Text> : null}
     {setupLoading ? <Text className="comic-hint">正在读取画风和生成设置…</Text> : null}
@@ -150,7 +154,7 @@ export default function ComicSettingsStage({
     <View className="ce-tools ce-source-tools">
       <Button id="comic-tool-style" className={tool === "style" ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openTool("style")}><AppIcon name="sparkles" size={23} /><Text>画风</Text><Text className="ce-tool-value">{selectedStyle}</Text></Button>
       <Button id="comic-tool-ratio" className={tool === "ratio" ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openTool("ratio")}><AppIcon name="camera" size={23} /><Text>画幅</Text><Text className="ce-tool-value">{aspectRatio}</Text></Button>
-      <Button id="comic-tool-model" className={settingPicker === "model" ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openPicker("model")}><AppIcon name="bot" size={23} /><Text>模型</Text><Text className="ce-tool-value">{summary.model}</Text></Button>
+      <Button id="comic-tool-model" className={settingPicker === "model" ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openPicker("model")}><AppIcon name="bot" size={23} /><Text>模型</Text><Text className="ce-tool-value">{text(config.textModelId) && text(config.imageModelId) ? "已配置" : "待配置"}</Text></Button>
       <Button id="comic-tool-prompt" className={Boolean(settingPicker && settingPicker !== "model") ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openPicker("prompt")}><AppIcon name="file-pen-line" size={23} /><Text>提示词</Text></Button>
       <Button id="comic-tool-reference" hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={onOpenReference}><AppIcon name="book-open" size={23} /><Text>参考图</Text></Button>
     </View>
@@ -169,11 +173,11 @@ export default function ComicSettingsStage({
       <View className={`comic-sheet comic-setting-sheet ce-catalog-sheet ce-motion-sheet${motionClass}`}>
         <View className="comic-sheet-handle" />
         <View className="comic-setting-sheet-head"><Text className="comic-head-title">{pickerTitle}</Text><Button className="comic-sheet-cancel" onClick={closePicker}>取消</Button></View>
-        <Text className="ce-sheet-subtitle">{settingPicker === "model" ? "分别选择文本和图片使用的模型" : "选择适合这次创作的提示词配置"}</Text>
-        {settingPicker !== "model" ? <View className="ce-prompt-categories"><View className="ce-category-slider" style={{transform: `translateX(${settingPicker === "constraints" ? 200 : settingPicker === "derivation" ? 100 : 0}%)`}} />{([["prompt", "漫画分页"], ["derivation", "图片描述词推导"], ["constraints", "画质与约束"]] as const).map(([value, label]) => <Button key={value} id={`comic-category-${value}`} disabled={closing} className={settingPicker === value ? "is-active" : ""} onClick={() => {beginOpen();setDetail("");onOpenSettingPicker(value);}}>{label}</Button>)}</View> : null}
+        <Text className="ce-sheet-subtitle">{settingPicker === "model" ? "文本模型处理正文，图片模型负责出图" : settingPicker === "prompt" ? "决定故事如何划分成漫画页" : settingPicker === "derivation" ? "决定每页画面描述的生成方式" : "分别设置画质、画面限制与负面提示词"}</Text>
+        {settingPicker !== "model" ? <View className="ce-prompt-categories"><View className="ce-category-slider" style={{transform: `translateX(${settingPicker === "constraints" ? 200 : settingPicker === "derivation" ? 100 : 0}%)`}} />{([["prompt", "漫画分页"], ["derivation", "图片描述"], ["constraints", "画质与约束"]] as const).map(([value, label]) => <Button key={value} id={`comic-category-${value}`} disabled={closing} className={settingPicker === value ? "is-active" : ""} onClick={() => {beginOpen();setDetail("");onOpenSettingPicker(value);}}>{label}</Button>)}</View> : null}
         <ScrollView key={settingPicker} scrollY className="comic-setting-sheet-list ce-category-content">
           {settingPicker === "prompt" ? <View className="comic-setting-group">{settingCatalog.pagePrompts.map(option => presetChoice("pagePromptId",option,currentPromptId,"漫画分页规则"))}{!settingCatalog.pagePrompts.length ? <Text className="ce-sheet-empty">暂无可用漫画分页提示词</Text> : null}</View> : null}
-          {settingPicker === "derivation" ? <View className="comic-setting-group">{settingCatalog.imageDerivations.map(option => presetChoice("imageDerivationId",option,currentDerivationId,"图片描述词推导"))}{!settingCatalog.imageDerivations.length ? <Text className="ce-sheet-empty">暂无可用图片描述词</Text> : null}</View> : null}
+          {settingPicker === "derivation" ? <View className="comic-setting-group">{settingCatalog.imageDerivations.map(option => presetChoice("imageDerivationId",option,currentDerivationId,"图片描述"))}{!settingCatalog.imageDerivations.length ? <Text className="ce-sheet-empty">暂无可用图片描述词</Text> : null}</View> : null}
           {settingPicker === "model" ? <>{(["text", "image"] as const).map(kind => <View key={kind} className="comic-setting-group"><Text className="comic-setting-group-title">{kind === "text" ? "文本模型" : "图片模型"}</Text>{models.filter(model => model.kind === kind).map(model => {const key = kind === "text" ? "textModelId" : "imageModelId";return choice(`${key}:${model.id}`,model.name,kind === "text" ? "文本模型" : model.provider || "图片模型",selected(key,text(config[key])) === model.id,() => choose(key,model.id));})}{!models.some(model => model.kind === kind) ? <Text className="ce-sheet-empty">暂无可用{kind === "text" ? "文本" : "图片"}模型</Text> : null}</View>)}</> : null}
           {settingPicker === "constraints" ? <>{([
             ["画质约束", "qualityId", "comic_quality", settingCatalog.constraints.quality],
@@ -185,11 +189,12 @@ export default function ComicSettingsStage({
       </View>
     </> : null}
 
+
     <View className="comic-dock">
       <View className="comic-dock-copy">
         <Text className="comic-dock-line">{countText}</Text>
-        {estimate ? <Text className="comic-dock-caption">{estimate}</Text> : null}
-        <Text className="comic-dock-caption">{hint}</Text>
+        {estimate ? <Text className="comic-dock-caption">{estimate}</Text> : <Text className="comic-dock-caption">{hint}</Text>}
+        <Text className="comic-dock-next">先识别人物场景，确认后再分页出图</Text>
       </View>
       <Button className="mp-primary" loading={continueLoading} disabled={!action.enabled} onClick={() => { if (action.enabled) onContinue(); }}>
         {continueLoading ? "正在创建项目…" : "提取人物场景"}

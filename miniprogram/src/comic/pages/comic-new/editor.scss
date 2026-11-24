@@ -44,7 +44,6 @@
   .comic-dock-copy { min-width: 0; flex: 1; }
   .comic-dock-line { font-size: 12PX; line-height: 19PX; font-weight: 400; }
   .comic-dock-caption { font-size: 10PX; line-height: 16PX; }
-  .comic-dock-copy > text + text + text { display: none; }
   .comic-dock .mp-primary { flex: 0 0 auto; min-height: 44PX; max-width: 55%; padding: 0 14PX; font-size: 13PX; border-radius: 10PX; background: #28c9b9; color: var(--comic-on-button); box-shadow: none; }
   .comic-dock .mp-primary[disabled] { background: #28c9b9; color: var(--comic-on-button); opacity: .4; }
   .comic-sticky-row { width: 100%; gap: 8PX; }
@@ -210,4 +209,35 @@
   .is-motion-reduced .comic-aspect-choice, .is-motion-reduced .ce-style-grid button, .is-motion-reduced .ce-tools button,
   .is-motion-reduced .ce-sheet-confirm, .is-motion-reduced .ce-prompt-categories button { transition: none; }
   .is-motion-reduced .ce-tool-press, .is-motion-reduced .ce-confirm-press { transform: none; }
+}
+.mp-page.comic-new.comic-editor {
+  .ce-config-readiness { display: flex; flex-direction: column; gap: 3PX; margin-bottom: 12PX; padding: 9PX 12PX; border-radius: 10PX; background: var(--comic-soft); color: var(--comic-accent); font-size: 12PX; line-height: 18PX; }
+  .ce-config-readiness.needs-setup { background: var(--ce-raised); color: var(--comic-ink); }
+  .ce-config-readiness .ce-muted { font-size: 11PX; line-height: 17PX; }
+  .ce-source-input { height: max(140PX, calc(100vh - 600PX - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+  .ce-source-card.has-notice .ce-source-input { height: max(110PX, calc(100vh - 640PX - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+  .ce-source-start { padding: 18PX 0 8PX; }
+  .ce-start-title { display: block; color: var(--comic-ink); font-size: 15PX; font-weight: 600; line-height: 24PX; }
+  .ce-start-copy { display: block; margin-top: 5PX; color: var(--comic-muted); font-size: 12PX; line-height: 20PX; }
+  .ce-start-actions { display: flex; flex-wrap: wrap; gap: 8PX; margin-top: 12PX; }
+  .ce-start-actions button { display: flex; align-items: center; justify-content: center; min-height: 44PX; padding: 0 10PX; border: 1PX solid var(--comic-line); border-radius: 10PX; background: var(--ce-raised); font-size: 12PX; }
+  .ce-source-card.is-empty .ce-source-input { height: max(90PX, calc(100vh - 740PX - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+  .ce-source-card.is-empty.has-notice .ce-source-input { height: max(70PX, calc(100vh - 780PX - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+  .ce-option-side { width: 52PX; }
+  .ce-option-detail-button { min-height: 44PX; height: 44PX; padding: 0 4PX; font-size: 11PX; }
+  .ce-sheet-title button, .comic-setting-sheet-head button { min-width: 44PX; }
+  .comic-dock-next { display: block; font-size: 10PX; line-height: 16PX; color: var(--comic-muted); }
+  .ce-generation-scope { display: flex; flex-direction: column; gap: 5PX; margin: 14PX 0; padding: 12PX; border-radius: 12PX; background: var(--comic-soft); color: var(--comic-ink); font-size: 13PX; line-height: 20PX; }
+  .ce-generation-scope > text + text + text { color: var(--comic-muted); font-size: 11PX; }
+  .comic-config-summary-row { padding: 10PX 0; font-size: 13PX; line-height: 21PX; }
+  .comic-config-summary-row > text { min-width: 0; }
+  .comic-config-summary-row > text + text { max-width: 72%; word-break: break-all; text-align: right; }
+  .comic-config-asset-item { font-size: 12PX; line-height: 20PX; }
+  .ce-result-summary { margin-bottom: 12PX; padding: 10PX 12PX; border-radius: 12PX; background: var(--comic-paper); border: 1PX solid var(--comic-line); }
+  .ce-result-summary-head { display: flex; align-items: center; justify-content: space-between; gap: 10PX; font-size: 14PX; font-weight: 600; }
+  .ce-result-summary-head button, .ce-failed-page-link { display: flex; align-items: center; justify-content: center; min-height: 44PX; padding: 0 8PX; color: var(--comic-accent); font-size: 12PX; }
+  .ce-result-summary .ce-muted { font-size: 11PX; line-height: 18PX; }
+  .ce-page-preview { height: max(140PX, calc(100vh - 720PX)); }
+  .ce-page-tools { height: 110PX; padding-top: 27PX; }
+  .ce-page-scope-note { position: absolute; top: 6PX; left: 12PX; right: 12PX; font-size: 10PX; line-height: 15PX; color: var(--comic-muted); text-align: center; }
 }

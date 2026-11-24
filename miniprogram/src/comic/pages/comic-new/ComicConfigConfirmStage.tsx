@@ -6,6 +6,8 @@ export type ComicConfigConfirmStageProps = {
   sourceLength: number;
   styleName: string;
   aspectRatio: string;
+  textModelName?: string;
+  imageModelName?: string;
   referenceReady: boolean;
   assets: ComicAssetItem[];
   submitting: boolean;
@@ -23,10 +25,13 @@ export default function ComicConfigConfirmStage(props: ComicConfigConfirmStagePr
   return <View className="comic-config-confirm-stage">
     <View className="mp-card comic-stage-gate">
       <Text className="mp-row-title">生成配置确认</Text>
+      <View className="ce-generation-scope"><Text>本次会执行</Text><Text>自动划分漫画页，并为每页生成图片</Text><Text>实际页数与耗时以生成结果为准，下面仅为估算。</Text></View>
       <Text className="mp-row-description">核对正文、画风与资产。确认后将按这些配置自动分页并生成漫画图片。</Text>
       <View className="comic-config-summary">
         <View className="comic-config-summary-row"><Text>故事来源</Text><Text>正文 {props.sourceLength} 字</Text></View>
         <View className="comic-config-summary-row"><Text>画风</Text><Text>{props.styleName || "未选择画风"}</Text></View>
+        <View className="comic-config-summary-row"><Text>文本模型</Text><Text>{props.textModelName || "查看项目配置"}</Text></View>
+        <View className="comic-config-summary-row"><Text>图片模型</Text><Text>{props.imageModelName || "查看项目配置"}</Text></View>
         <View className="comic-config-summary-row"><Text>图片画幅</Text><Text>{props.aspectRatio}</Text></View>
         <View className="comic-config-summary-row"><Text>参考图</Text><Text>{props.referenceReady ? "参考图已上传" : "未使用参考图"}</Text></View>
         <View className="comic-config-summary-row"><Text>预计页数</Text><Text>{pages ? `预计 ${pages} 页` : "待正文确定"}</Text></View>
@@ -39,7 +44,7 @@ export default function ComicConfigConfirmStage(props: ComicConfigConfirmStagePr
       <View className="comic-config-asset-list">
         {props.assets.map((asset) => <Text key={asset.id} className="comic-config-asset-item">{COMIC_ASSET_KIND_LABELS[asset.kind] || "资产"} · {asset.name || asset.formalName || "未命名资产"}</Text>)}
       </View>
-      {!props.assets.length ? <Text className="comic-hint">资产还在提取中，不影响继续生成；需要调整时再回资产工作台。</Text> : null}
+      {!props.assets.length ? <Text className="comic-hint">当前未读取到人物或场景。可以返回刷新检查，也可继续提交，由服务端处理。</Text> : null}
       <Text className="comic-hint">确认后自动分页出图。生成后可在“漫画页图”中逐页编辑提示词；如需调整资产，请先返回人物场景。</Text>
       {props.error ? <Text className="mp-error">{props.error}</Text> : null}
     </View>
@@ -48,7 +53,7 @@ export default function ComicConfigConfirmStage(props: ComicConfigConfirmStagePr
       <View className="comic-sticky-row">
         <Button className="mp-secondary" disabled={props.submitting} onClick={() => { if (!props.submitting) props.onBack(); }}>返回资产工作台</Button>
         <Button className="mp-primary" loading={props.submitting} disabled={props.submitting}
-          onClick={() => { if (!props.submitting) props.onConfirm(); }}>{props.submitted ? "查看生成进度" : "确认配置，开始分页出图"}</Button>
+          onClick={() => { if (!props.submitting) props.onConfirm(); }}>{props.submitted ? "查看生成进度" : "开始生成漫画"}</Button>
       </View>
     </View>
   </View>;

@@ -481,6 +481,8 @@ export default function ComicPrivatePage() {
     : effectivePreset;
   // 默认用第一条「模型齐 + 漫画提示词已选」的预设；引用交给后端 hydrate，不在前端兜底。
   const presetConfigHint = effectivePreset ? comicPresetComicReason(effectivePreset.preset) : "";
+  const configurationHint = state.setupLoading ? "正在读取画风和预设…"
+    : state.setupError || (!state.styles.length ? "还没有可用画风，稍后再试" : !state.styleId ? "请选择漫画画风" : presetHint || presetConfigHint || "");
   const blockReason = state.submitting ? "正在提交…"
     : running ? "上一次还在生成，先去「结果」看进度"
       : state.setupLoading ? "正在读取画风和预设…"
@@ -686,7 +688,7 @@ export default function ComicPrivatePage() {
   const current = state.pages[state.pageIndex];
   const primaryImage = current?.images.find((image) => image.id === current.primaryImageId);
   const stagePath = primaryImage ? state.paths[primaryImage.id] : "";
-  const downloadable = state.pages.filter((page) => page.primaryImageId).length;
+  const downloadable = state.pages.filter(page => page.primaryImageId && page.images.some(image => image.id === page.primaryImageId)).length;
   const failedBook = state.status?.books?.find((book) => String(book.status || "").toLowerCase() === "failed");
 
   // ---- 资产只读展示（结果 tab 顶部）----
@@ -885,7 +887,7 @@ export default function ComicPrivatePage() {
 
   const downloadZip = async () => {
     if (state.busy) return;
-    const videoIds = state.pages.filter((page) => page.primaryImageId).map((page) => page.videoId);
+    const videoIds = state.pages.filter(page => page.primaryImageId && page.images.some(image => image.id === page.primaryImageId)).map(page => page.videoId);
     if (!videoIds.length) { patch({ resultError: "还没有可以打包的图，等生成完成再来" }); return; }
     let kind: "images" | "prompts" | "douyin" = "images";
     try {
@@ -959,7 +961,7 @@ export default function ComicPrivatePage() {
         onOpenReference={() => patch({ referenceOpen: true })}
         onContinue={() => { void prepareProject(); }}
         continueDisabled={!canSubmit} continueLoading={state.submitting}
-        continueHint={blockReason}
+        continueHint={blockReason} configurationHint={configurationHint}
       /> : null}
 
 
@@ -980,6 +982,8 @@ export default function ComicPrivatePage() {
         {state.stage === "storyboard" && state.batchId && state.projectSnapshot ? <ComicConfigConfirmStage
           sourceLength={state.projectSnapshot.sourceLength} styleName={state.styles.find((style) => style.id === state.projectSnapshot?.styleId)?.name || ""}
           aspectRatio={state.projectSnapshot.aspectRatio} referenceReady={Boolean(state.projectSnapshot.reference)} assets={state.assets}
+          textModelName={state.models.find(model => model.kind === "text" && model.id === presetTextModelId)?.name || (presetTextModelId ? "已保存的文本模型" : "未配置")}
+          imageModelName={state.models.find(model => model.kind === "image" && model.id === presetImageModelId)?.name || (presetImageModelId ? "已保存的图片模型" : "未配置")}
           submitting={state.submitting} submitted={state.runSubmitted} error={state.error}
           onBack={() => { if (!runSubmitting.current) patch({ stage: "assets" }); }}
           onConfirm={() => { void confirmConfigAndStart(); }}
@@ -987,12 +991,12 @@ export default function ComicPrivatePage() {
 
 
         {state.stage === "render" || state.stage === "result" ? <>
-          <View className="ce-run-status"><Text>{finished ? progress.succeeded ? "本次生成已结束" : "生成未完成，请检查错误" : state.runSubmitted ? runView.label || "正在读取生成状态…" : "尚未提交生成"}</Text><Button disabled={Boolean(state.assetBusy)} onClick={() => { void runRetryStage(); }}>重试失败阶段</Button></View>
+          <View className="ce-run-status"><Text>{finished ? progress.succeeded ? "本次生成已结束" : "生成未完成，请检查错误" : state.runSubmitted ? runView.label || "正在读取生成状态…" : "尚未提交生成"}</Text>{progress.failed || progress.interrupted ? <Button disabled={Boolean(state.assetBusy)} onClick={() => { void runRetryStage(); }}>重试失败阶段</Button> : null}</View>
           {state.restored ? <Text className="comic-hint">已恢复上次进度，正在向服务端校准…</Text> : null}
           {progress.failed ? <Text className="mp-error">{failedBook?.error || "生成未完成，可重试失败阶段"}</Text> : null}
           {state.progressError || state.error ? <Text className="mp-error">{state.progressError || state.error}</Text> : null}
           {state.resultLoading ? <Text className="comic-hint">正在打开页图…</Text> : null}
-          <ComicPageWorkspace key={state.batchId + ":" + state.bookId} batchId={state.batchId} bookId={state.bookId} pages={state.pages} pageIndex={state.pageIndex} paths={state.paths} busy={state.busy} error={state.resultError}
+          <ComicPageWorkspace key={state.batchId + ":" + state.bookId} batchId={state.batchId} bookId={state.bookId} pages={state.pages} pageIndex={state.pageIndex} paths={state.paths} generating={running} busy={state.busy} error={state.resultError}
             onSelect={selectPage} onPreview={(id) => { void preview(id); }} onRegenerate={() => { void regenerateCurrentPage(); }}
             onPrimary={(id) => { void choosePrimaryImage(id); }} onSave={() => { void savePrimary(); }} onExport={() => { void downloadZip(); }} onReload={() => loadPages(state.batchId,state.bookId,true)} />
           {!state.pages.length ? <View className="ce-empty"><Text>{state.resultError || (running ? "漫画页图生成后会出现在这里，离开后可以返回查看。" : "暂时没有读取到页图")}</Text><Button onClick={() => { void loadPages(state.batchId,state.bookId,true); }}>重新读取页图</Button></View> : null}

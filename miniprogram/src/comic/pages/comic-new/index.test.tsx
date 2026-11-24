@@ -217,7 +217,7 @@ function findByText(node: any, label: string): any {
   return findByText(node.props?.children, label);
 }
 function findSetting(label:string) {
-  if((label==="图片描述词推导" || label==="画质与约束") && !findByText(render(),label)) findByText(render(),"提示词").props.onClick();
+  if((label==="图片描述" || label==="画质与约束") && !findByText(render(),label)) findByText(render(),"提示词").props.onClick();
   return findByText(render(), label === "模型配置" ? "模型" : label === "漫画提示词" ? "提示词" : label);
 }
 function primaryButton(tree: any) {
@@ -323,7 +323,7 @@ describe("私人定制漫画页", () => {
   test("编辑页图提示词使用当前页编号，保存后强制重新读取结果", async () => {
     h.savePrompts.mockResolvedValue({});
     render();runEffects();await flush();primaryButton(typeSource(SOURCE)).props.onClick();await flush();
-    findByText(render(),"继续：生成配置确认").props.onClick();findByText(render(),"确认配置，开始分页出图").props.onClick();await flush();
+    findByText(render(),"继续：生成配置确认").props.onClick();findByText(render(),"开始生成漫画").props.onClick();await flush();
     render();runEffects();await flush();
     findByText(render(),"编辑提示词").props.onClick();
     nodesOfType(render(),"Textarea")[0].props.onInput({detail:{value:"新的漫画分页描述"}});
@@ -345,7 +345,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     const titles = [
       ["漫画提示词", "选择漫画提示词"],
-      ["图片描述词推导", "选择图片描述词推导"],
+      ["图片描述", "选择图片描述"],
       ["模型配置", "选择模型配置"],
       ["画质与约束", "选择画质与约束"],
     ];
@@ -372,7 +372,7 @@ describe("私人定制漫画页", () => {
     expect(copy).not.toContain("双模型");
     findByText(render(), "取消").props.onClick();
 
-    copy = openCard("图片描述词推导");
+    copy = openCard("图片描述");
     expect(copy).toContain("电影感图片推导");
     expect(copy).not.toContain("现代条漫分页");
     findByText(render(), "取消").props.onClick();
@@ -422,6 +422,28 @@ describe("私人定制漫画页", () => {
     expect(h.assets).toHaveBeenCalledTimes(1);
     expect(h.assets).toHaveBeenCalledWith("batch-1", "book-1");
     expect(h.submit).not.toHaveBeenCalled();
+  });
+
+  test("空白正文提供示例但不自动创建或生成，配置完整性独立于字数", async () => {
+    render(); runEffects(); await flush();
+    let tree = render();
+    expect(textContent(tree)).toContain("从一段故事开始");
+    expect(textContent(tree)).toContain("创作配置已齐全");
+    findByText(tree, "使用示例").props.onClick();
+    tree = render();
+    expect(nodesOfType(tree, "Textarea")[0].props.value.length).toBeGreaterThanOrEqual(100);
+    expect(textContent(tree)).not.toContain("从一段故事开始");
+    expect(h.create).not.toHaveBeenCalled(); expect(h.submit).not.toHaveBeenCalled();
+    expect(primaryButton(tree).props.disabled).toBe(false);
+  });
+
+  test("配置缺失时示例仍能填入，但不会把缺配置误报成可生成", async () => {
+    h.setup.mockResolvedValue({styles: STYLES, presets: [], settingCatalog: SETTING_CATALOG, models: MODELS});
+    render(); runEffects(); await flush();
+    expect(textContent(render())).toContain("创作配置待完善");
+    findByText(render(), "使用示例").props.onClick();
+    expect(primaryButton(render()).props.disabled).toBe(true);
+    expect(h.create).not.toHaveBeenCalled();
   });
 
   test("手机正文入口可以读取剪贴板，也能进入已有书籍列表", async () => {
@@ -486,7 +508,7 @@ describe("私人定制漫画页", () => {
     findByText(render(), "取消").props.onClick();
     findSetting("漫画提示词").props.onClick();
     findByText(render(), "现代条漫分页").props.onClick();
-    findByText(render(), "图片描述词推导").props.onClick();
+    findByText(render(), "图片描述").props.onClick();
     findByText(render(), "电影感图片推导").props.onClick();
     findByText(render(), "使用此提示词").props.onClick();
     expect(nodesOfType(rawRender(), ComicSettingsStage)[0].props.settingSelections).toMatchObject({pagePromptId: "page-modern", imageDerivationId: "derive-cinema"});
@@ -503,7 +525,7 @@ describe("私人定制漫画页", () => {
     openSetting("漫画提示词");
     findByText(render(), "现代条漫分页").props.onClick();
     findByText(render(), "使用此提示词").props.onClick();
-    openSetting("图片描述词推导");
+    openSetting("图片描述");
     findByText(render(), "电影感图片推导").props.onClick();
     findByText(render(), "使用此提示词").props.onClick();
     openSetting("模型配置");
@@ -633,7 +655,7 @@ describe("私人定制漫画页", () => {
     expect(textContent(render())).toContain("林岚");
     findByText(render(), "继续：生成配置确认").props.onClick();
     await flush();
-    findByText(render(), "确认配置，开始分页出图").props.onClick();
+    findByText(render(), "开始生成漫画").props.onClick();
     await flush();
     expect(h.submit).toHaveBeenCalledWith(expect.objectContaining({
       batchId: "batch-1", bookIds: ["book-1"], presetId: "p2", runMode: "video_no_submit",
@@ -673,7 +695,7 @@ describe("私人定制漫画页", () => {
     findByText(render(), "完成").props.onClick();
     primaryButton(render()).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    const confirm = findByText(render(), "确认配置，开始分页出图");
+    const confirm = findByText(render(), "开始生成漫画");
     confirm.props.onClick(); confirm.props.onClick();
     await flush();
     expect(h.submit).toHaveBeenCalledTimes(1);
@@ -685,7 +707,7 @@ describe("私人定制漫画页", () => {
     expect(textContent(tree)).not.toContain("正在读取生成状态");
     expect(primaryButton(tree).props.disabled).toBe(true);
     findByText(tree, "返回资产工作台").props.onClick();
-    expect(textContent(render())).toContain("确认配置，开始分页出图");
+    expect(textContent(render())).toContain("开始生成漫画");
     resolveSubmit({}); await flush();
     expect(textContent(render())).toContain("正在读取生成状态");
     expect(h.create).toHaveBeenCalledTimes(1);
@@ -729,7 +751,7 @@ describe("私人定制漫画页", () => {
     expect(summary).not.toContain(`正文 ${sourceB.length} 字`);
     expect(summary).not.toContain("清新日漫");
     expect(summary).not.toContain("16:9");
-    findByText(tree, "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(tree, "开始生成漫画").props.onClick(); await flush();
     expect(h.submit).toHaveBeenCalledWith(expect.objectContaining({
       batchId: "batch-1", bookIds: ["book-1"], aspectRatio: "9:16", stylePresetId: "style-1",
       reference: withReference ? { assetId: "reference-a", url: "https://cdn/a.png", previewUrl: "https://cdn/a-preview.png" } : null,
@@ -759,7 +781,7 @@ describe("私人定制漫画页", () => {
     findByText(render(), "取消").props.onClick();
     nodesOfType(rawRender(), ComicStageHeader)[0].props.onSelectStage("assets");
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
 
     expect(h.submit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       config: expect.objectContaining({ imageModelId: "image-real", imageProvider: "doubao" }),
@@ -772,7 +794,7 @@ describe("私人定制漫画页", () => {
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
     expect(textContent(render())).toContain("未使用参考图");
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     let tree = render();
     expect(textContent(tree)).toContain("服务端暂时忙不过来，稍后再试一次");
     expect(textContent(tree)).not.toContain("正在读取生成状态");
@@ -882,17 +904,35 @@ describe("私人定制漫画页", () => {
     await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
     await flush();
-    findByText(render(), "确认配置，开始分页出图").props.onClick();
+    findByText(render(), "开始生成漫画").props.onClick();
     await flush();
     tree = render();
     runEffects();
     await flush();
     tree = render();
     expect(textContent(tree)).toContain("本次生成已结束");
+    expect(textContent(tree)).toContain("已读取 1 页");
+    expect(findByText(tree, "导出漫画")).toBeDefined();
     expect(textContent(tree)).toContain("保存到相册");
     expect(textContent(tree)).toContain("导出");
     expect(findByText(tree, "再做一本")).toBeDefined();
     expect(h.navigateTo).not.toHaveBeenCalled();
+  });
+
+  test("结果显示真实页图数量并能定位无图失败页", async () => {
+    h.pages.mockResolvedValue([
+      {pageId:"page-1",videoId:"video-1",ordinal:1,status:"completed",primaryImageId:"img-1",images:[{id:"img-1",isPrimary:true}]},
+      {pageId:"page-2",videoId:"video-2",ordinal:2,status:"failed",primaryImageId:"",images:[]},
+      {pageId:"page-3",videoId:"video-3",ordinal:3,status:"running",primaryImageId:"",images:[]},
+    ]);
+    render(); runEffects(); await flush();
+    primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
+    findByText(render(), "继续：生成配置确认").props.onClick();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
+    render(); runEffects(); await flush();
+    const tree=render(); expect(textContent(tree)).toContain("有主图 1 页 · 无图失败 1 页 · 待出图 1 页");
+    findByText(tree,"查看失败页").props.onClick(); await flush();
+    expect(h.slots[0].pageIndex).toBe(1);
   });
 
   test("手机端默认竖版画幅贯穿资产图与正式提交", async () => {
@@ -903,7 +943,7 @@ describe("私人定制漫画页", () => {
     findByText(render(), "补齐资产图").props.onClick(); await flush();
     expect(h.generateImages).toHaveBeenCalledWith(expect.objectContaining({ batchId: "batch-1", bookId: "book-1", imageAspectRatio: aspectRatio }));
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     expect(h.submit).toHaveBeenCalledTimes(1);
     expect(h.submit).toHaveBeenCalledWith(expect.objectContaining({ batchId: "batch-1", bookIds: ["book-1"], aspectRatio }), expect.anything());
   });
@@ -964,7 +1004,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     findByText(render(), "保存到相册").props.onClick(); await flush();
     expect(h.saveAlbum).toHaveBeenCalledWith("/tmp/page-1.jpg");
@@ -981,7 +1021,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     findByText(render(), "图片版本").props.onClick();
     findByText(render(), "设为主图").props.onClick({ stopPropagation: () => undefined });
@@ -999,7 +1039,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     let resolvePaths: (paths: any) => void = () => {};
     h.loadPaths.mockReturnValue(new Promise((resolve) => { resolvePaths = resolve; }));
@@ -1017,14 +1057,14 @@ describe("私人定制漫画页", () => {
     primaryButton(typeSource(SOURCE)).props.onClick();await flush();
     expect(nodesOfType(nav(),"Button").map(n=>n.props.disabled)).toEqual([false,false,true]);
     nodesOfType(rawRender(),ComicStageHeader)[0].props.onSelectStage("storyboard");
-    expect(textContent(render())).toContain("确认配置，开始分页出图");expect(h.submit).not.toHaveBeenCalled();
+    expect(textContent(render())).toContain("开始生成漫画");expect(h.submit).not.toHaveBeenCalled();
   });
 
   test("没有页图的终态禁用导出，完成后不会重启轮询", async () => {
     h.pages.mockResolvedValue([]);render();runEffects();await flush();
     primaryButton(typeSource(SOURCE)).props.onClick();await flush();
     findByText(render(),"继续：生成配置确认").props.onClick();
-    findByText(render(),"确认配置，开始分页出图").props.onClick();await flush();
+    findByText(render(),"开始生成漫画").props.onClick();await flush();
     render();runEffects();await flush();render();runEffects();await flush();
     expect(findByText(render(),"导出").props.disabled).toBe(true);
     expect(h.pollStarts).toBe(1);expect(h.pollStop).toHaveBeenCalled();expect(h.pages).toHaveBeenCalledWith("batch-1","book-1");
@@ -1035,7 +1075,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     expect(textContent(render())).toContain("页图暂未落库");
     findByText(render(), "重新读取页图").props.onClick(); await flush();
@@ -1051,7 +1091,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     findByText(render(), "再做一本").props.onClick();
     resolvePaths({ "img-1": "/tmp/stale-page.jpg" }); await flush();
@@ -1064,7 +1104,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     const publish = h.pollPublish;
     if (boundary === "stage") {
@@ -1104,9 +1144,9 @@ describe("私人定制漫画页", () => {
     next.props.onClick();
     tree = render();
     expect(textContent(tree)).toContain("生成配置确认");
-    expect(textContent(tree)).toContain("资产还在提取中，不影响继续生成");
+    expect(textContent(tree)).toContain("当前未读取到人物或场景");
     // 确认按钮也不再因资产为空而禁用：门禁在客户端被移除，改由服务端保证。
-    expect(findByText(tree, "确认配置，开始分页出图").props.disabled).toBe(false);
+    expect(findByText(tree, "开始生成漫画").props.disabled).toBe(false);
     findByText(tree, "返回资产工作台").props.onClick();
     const previousLoads = h.assets.mock.calls.length;
     findByText(render(), "刷新").props.onClick(); await flush();
@@ -1220,7 +1260,7 @@ describe("私人定制漫画页", () => {
     await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
     await flush();
-    findByText(render(), "确认配置，开始分页出图").props.onClick();
+    findByText(render(), "开始生成漫画").props.onClick();
     await flush();
     expect(h.submit).toHaveBeenCalledWith(expect.objectContaining({ presetId: "p1" }), expect.objectContaining({ id: "p1" }));
   });
@@ -1267,7 +1307,7 @@ describe("私人定制漫画页", () => {
     // 没有 state：readComicAutomation 返回 null，走「读不到状态」的兜底提示。
     h.readStatus.mockResolvedValue({ books: [{ id: "book-1", stage: "comic_assets" }] });
     h.showModal.mockResolvedValueOnce({ confirm: false, cancel: true });
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     expect(h.showModal).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining("建议等资产提取完成再提交"),
     }));
@@ -1276,7 +1316,7 @@ describe("私人定制漫画页", () => {
 
     // 只提示不拦：用户再次点击并选择「继续提交」，必须真的提交。
     h.showModal.mockResolvedValueOnce({ confirm: true, cancel: false });
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     expect(h.submit).toHaveBeenCalledTimes(1);
   });
 
@@ -1285,7 +1325,7 @@ describe("私人定制漫画页", () => {
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
     h.readStatus.mockResolvedValue({ state: "idle", books: [{ id: "book-1", stage: "comic_bootstrap" }] });
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     expect(h.showModal).not.toHaveBeenCalled();
     expect(h.submit).toHaveBeenCalledTimes(1);
   });
@@ -1295,7 +1335,7 @@ describe("私人定制漫画页", () => {
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
     h.readStatus.mockResolvedValue({ state: "running", books: [{ id: "book-1", stage: "comic_images" }] });
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     expect(h.showModal).toHaveBeenCalledWith(expect.objectContaining({
       title: "已有任务在跑",
       content: expect.stringContaining("生成中"),
@@ -1311,7 +1351,7 @@ describe("私人定制漫画页", () => {
     findByText(render(), "继续：生成配置确认").props.onClick();
     h.readStatus.mockResolvedValue({ state: "completed", books: [{ id: "book-1", stage: "ready_for_upload" }] });
     h.showModal.mockResolvedValueOnce({ confirm: false, cancel: true });
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     expect(h.showModal).toHaveBeenCalledWith(expect.objectContaining({
       title: "重新生成会再扣额度",
       content: expect.stringContaining("出图额度会重新扣一次"),
@@ -1322,7 +1362,7 @@ describe("私人定制漫画页", () => {
     expect(textContent(render())).toContain("已取消重新生成");
 
     h.showModal.mockResolvedValueOnce({ confirm: true, cancel: false });
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     expect(h.submit).toHaveBeenCalledTimes(1);
   });
 
@@ -1358,7 +1398,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     expect(h.storage.get("comic:active-run")).toMatchObject({ batchId: "batch-1", bookId: "book-1", submitted: true });
 
     h.slots = []; h.effects = []; h.pollStarts = 0;
@@ -1377,7 +1417,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     h.hide();
     expect(h.pollStop).toHaveBeenCalled();
@@ -1390,7 +1430,7 @@ describe("私人定制漫画页", () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
-    findByText(render(), "确认配置，开始分页出图").props.onClick(); await flush();
+    findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     h.pollFail(Object.assign(new Error("批次不存在（HTTP 404）"), { statusCode: 404 }));
     expect(h.storage.has("comic:active-run")).toBe(false);
