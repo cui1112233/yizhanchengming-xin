@@ -1,0 +1,15 @@
+import {Button,Picker,Text,View} from '@tarojs/components';
+import {useEffect,useRef,useState,type ReactNode} from 'react';
+import {apiRequest} from '../../services/api';
+import {fetchAccountOptions,scopedFetchRequest,type FetchRequest,type FetchAccount} from '../../services/booktestManagement';
+import {onSessionInvalidated,sessionRevision} from '../../services/sessionBoundary';
+import {authStorageKey} from '../../config/localAuth';
+export default function FetchAccountScope({children}:{children:(scope:{request:FetchRequest;key:string;self:boolean;control?:ReactNode})=>ReactNode}){
+ const [accounts,setAccounts]=useState<FetchAccount[]>([]),[self,setSelf]=useState(''),[selected,setSelected]=useState(''),[error,setError]=useState(''),[request,setRequest]=useState<{value:FetchRequest}|null>(null);
+ const epoch=useRef(0),selectedRef=useRef('');
+ const load=async()=>{const e=++epoch.current,revision=sessionRevision();setError('');setAccounts([]);setRequest(null);selectedRef.current='';try{const me=await apiRequest<any>('/api/member/me');const current=me?.member;if(!current?.username)throw Error('账号身份尚未确认');const directory=current.role==='manager'?await apiRequest<any>('/api/member/team'):current.role==='dev'?await apiRequest<any>('/api/account-admin/accounts'):{};if(e!==epoch.current||revision!==sessionRevision())return;setAccounts(fetchAccountOptions(current,directory.members||[],directory.accounts||[]));setSelf(current.username);choose(current.username);}catch(c:any){if(e===epoch.current)setError(c.message||'账号读取失败');}};
+ const choose=(name:string)=>{selectedRef.current=name;setSelected(name);const revision=sessionRevision(),scoped=scopedFetchRequest(apiRequest,name);const guarded:FetchRequest=async<T,>(path:string,options?:Record<string,unknown>)=>{if(selectedRef.current!==name||revision!==sessionRevision())throw Error('查看账号已切换，请重新操作');const result=await scoped<T>(path,options);if(selectedRef.current!==name||revision!==sessionRevision())throw Error('查看账号已切换，已忽略旧结果');return result;};setRequest({value:guarded});};
+ useEffect(()=>{void load();const off=onSessionInvalidated(()=>{epoch.current++;selectedRef.current='';setAccounts([]);setRequest(null);setError('登录账号已改变，请重新打开测书');});return()=>{off();epoch.current++;selectedRef.current='';};},[]);
+ const control=accounts.length>1?<View className="booktest-account-scope"><Text>查看测书账号</Text><Picker range={accounts.map(a=>a.displayName?`${a.displayName} · ${a.username}`:a.username)} value={Math.max(0,accounts.findIndex(a=>a.username===selected))} onChange={e=>choose(accounts[Number(e.detail.value)].username)}><View className="mp-input">{accounts.find(a=>a.username===selected)?.displayName||selected}⌄</View></Picker></View>:null;
+ return <View>{error?<View className="mp-card"><Text className="mp-error">{error}</Text><Button onClick={load}>重新读取账号</Button></View>:null}{request?children({request:request.value,key:authStorageKey(`booktest:${self}:${selected}`),self:self===selected,control}):!error?<Text>正在确认当前账号…</Text>:null}</View>;
+}

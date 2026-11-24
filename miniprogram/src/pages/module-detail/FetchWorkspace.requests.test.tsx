@@ -13,7 +13,7 @@ vi.mock("../../components/AmbientStarfield", () => ({ default: "Starfield" }));
 vi.mock("../../components/BrandHeader", () => ({ default: "Header" }));
 vi.mock("../../components/AppIcon", () => ({ default: "Icon" }));
 vi.mock("../../services/api", () => ({ apiRequest: harness.api }));
-import FetchWorkspace from "./FetchWorkspace";
+import {FetchWorkspaceBody as FetchWorkspace} from "./FetchWorkspace";
 
 const config = { platforms: [{ id: "one", name: "一" }, { id: "two", name: "二" }], app_config: { text_model_id: "A", fetch: { max_txt: 4000 } } };
 const models = [{ id: "A", name: "模型 A" }, { id: "B", name: "模型 B" }];

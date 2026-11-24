@@ -1,14 +1,14 @@
 import {beforeEach,expect,test,vi} from 'vitest';
 const h=vi.hoisted(()=>({slots:[] as any[],cursor:0,effects:[] as Array<()=>any>,api:vi.fn(),show:()=>{}}));
 vi.mock('react',()=>({useState:(initial:any)=>{const i=h.cursor++;if(!(i in h.slots))h.slots[i]=typeof initial==='function'?initial():initial;return [h.slots[i],(next:any)=>{h.slots[i]=typeof next==='function'?next(h.slots[i]):next;}];},useRef:(initial:any)=>{const i=h.cursor++;if(!(i in h.slots))h.slots[i]={current:initial};return h.slots[i];},useEffect:(fn:any,deps:any[])=>{const i=h.cursor++,last=h.slots[i];if(!last||deps.some((v,n)=>v!==last[n])){h.slots[i]=deps;h.effects.push(fn);}}}));
-vi.mock('@tarojs/taro',()=>({default:{showToast:vi.fn(),showModal:()=>Promise.resolve({confirm:true})},useDidHide:()=>{}, useDidShow:(fn:any)=>{h.show=fn;}}));
+vi.mock('@tarojs/taro',()=>({default:{getStorageSync:()=>null,setStorageSync:()=>{},removeStorageSync:()=>{},showToast:vi.fn(),showModal:()=>Promise.resolve({confirm:true})},useDidHide:()=>{}, useDidShow:(fn:any)=>{h.show=fn;}}));
 vi.mock('@tarojs/components',()=>Object.fromEntries(['Button','Checkbox','CheckboxGroup','Input','Picker','ScrollView','Text','Textarea','View'].map(n=>[n,n])));
 vi.mock('../../theme',()=>({withThemedPage:(component:any)=>component}));
 vi.mock('../../components/BrandHeader',()=>({default:'Header'}));
 vi.mock('../../components/AppIcon',()=>({default:'Icon'}));
 vi.mock('./FetchMaintenancePanel',()=>({default:()=>null}));
 vi.mock('../../services/api',()=>({apiRequest:h.api}));
-import Workspace from './FetchWorkspace';
+import {FetchWorkspaceBody as Workspace} from './FetchWorkspace';
 let props:any;
 function render(){h.cursor=0;return Workspace(props);}
 function nodes(tree:any):any[]{return !tree||typeof tree!=='object'?[]:[tree,...[tree.props?.children].flat(Infinity).flatMap(nodes)];}
@@ -65,4 +65,10 @@ test('mobile scheduling sends flat execution settings and preserves an unchecked
  all().find(n=>n.type==='Picker'&&n.props.mode==='time').props.onChange({detail:{value:'12:30'}});
  await click('创建定时任务');await flush();
  const write=h.api.mock.calls.find(([path,options])=>path.endsWith('/schedules')&&options?.method==='POST');expect(write?.[1].data).toMatchObject({inputText:'123456',platform_id:'p1',text_model_id:'m1',selected_versions:['original','ai1'],auto_submit:false});expect(write?.[1].data).not.toHaveProperty('inputSnapshot');
+});
+
+test('unknown new start reads latest jobs instead of refreshing an old completed receipt',async()=>{
+ let started=false;const old={id:'old',status:'done'},fresh={id:'new',status:'running'};
+ h.api.mockImplementation(async(path:string)=>{if(path.endsWith('/process/start')){started=true;throw Error('timeout');}if(path.includes('/jobs/latest'))return{jobs:started?[fresh,old]:[old]};if(path.endsWith('/jobs/new'))return{...fresh,status:'done'};if(path.endsWith('/jobs/old'))return old;return path.includes('/models')?[{id:'m1',name:'模型'}]:path.endsWith('/config')?config:path.endsWith('/tasks')?{tasks:[]}:{schedules:[]};});
+ await mount();all().find(n=>n.type==='Textarea').props.onInput({detail:{value:'123456'}});await click('开始处理');await flush();await click('读取最近作业');await flush();expect(text(render())).toContain('new · running · 核对关联');await click('new · running · 核对关联');await flush();expect(text(render())).not.toContain('上次启动结果待核对');expect(h.api.mock.calls.filter(([p])=>p.endsWith('/process/start'))).toHaveLength(1);
 });
