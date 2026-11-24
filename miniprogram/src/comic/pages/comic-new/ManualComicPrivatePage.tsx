@@ -1,3 +1,5 @@
+import {readComicPendingOperations,clearComicPendingOperation,runComicPaidOperation,type ComicPendingOperation} from '../../services/comicRecovery';
+import {readComicSelectedBook,clearComicSelectedBook} from '../../services/comicRecovery';
 import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
 import { Button, Image, Text, View } from '@tarojs/components';
 import { useEffect, useRef, useState } from 'react';
@@ -119,8 +121,7 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
                 remember({ ...project.current!, pendingImages: {} });
                 patch({ busy: '' });
             } },
-            onError: error => { stopped = true; watcher.current = undefined; if (current(version, p))
-                patch({ busy: '', error: error.message }); },
+            onError:error=>{stopped=true;watcher.current=undefined;if(current(version,p)){if(/生成失败/.test(error.message)){const pending=Object.fromEntries(Object.entries(project.current!.pendingImages).filter(([id,baseline])=>{const page=latest.current.pages.find(v=>v.videoId===id);return !page||(!/fail|error/i.test(page.status)&&!page.images.some(i=>!baseline.includes(i.id)));}));remember({...project.current!,pendingImages:pending});}patch({busy:'',error:error.message});}},
         });
         watcher.current = stopped ? undefined : stop;
     };
@@ -169,9 +170,9 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
         patch({ busy: '' }); });
     useDidShow(() => {
         visible.current = true;
-        const chosen = Taro.getStorageSync('comic:selected-existing-book');
+        const chosen = readComicSelectedBook();
         if (chosen && typeof chosen === 'object' && typeof chosen.sourceText === 'string') {
-            Taro.removeStorageSync('comic:selected-existing-book');
+            clearComicSelectedBook();
             patch({ source: chosen.sourceText, stage: 'source' });
             return;
         }
@@ -217,7 +218,7 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
             p = { ...p, reference };
             remember(p);
         }
-        await extractComicAssets({ batchId: p.batchId, bookId: p.bookId, mode: input.assets.length && input.project?.batchId === p.batchId ? 'force' : 'missing', textModelId: String(p.presetConfig.textModelId || '') || undefined });
+        await runComicPaidOperation({key:`extract:${p.batchId}:${p.bookId}`,batchId:p.batchId,bookId:p.bookId,label:'提取人物场景'},()=>extractComicAssets({batchId:p.batchId,bookId:p.bookId,mode:input.assets.length&&input.project?.batchId===p.batchId?'force':'missing',textModelId:String(p.presetConfig.textModelId||'')||undefined}));
         if (current(version, p))
             await refreshAssets(p);
     });
@@ -235,7 +236,7 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
             if (!answer.confirm || !current(version, p))
                 return;
         }
-        await generateComicPrompts(p.batchId, p.bookId, mode);
+        await runComicPaidOperation({key:`prompts:${p.batchId}:${p.bookId}`,batchId:p.batchId,bookId:p.bookId,label:'生成漫画提示词'},()=>generateComicPrompts(p.batchId,p.bookId,mode));
         if (!current(version, p))
             return;
         remember({ ...p, phase: 'pages', submitted: true });
@@ -250,6 +251,7 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
         if (!p)
             return;
         const version = epoch.current;
+        if(Object.keys(p.pendingImages).length)throw Error('已有页图等待返回，请先刷新读取原任务，未重复生成');
         if (!Object.values(latest.current.assetImages).some(images => images.length))
             throw new Error('请先生成或上传至少一张资产图，再生成漫画图片');
         const pages = await loadComicPages(p.batchId, p.bookId);
@@ -274,7 +276,7 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
             baseline[page.videoId] = page.images.map(image => image.id);
             remember({ ...project.current!, phase: 'pages', pendingImages: { ...baseline } });
             try {
-                await regenerateComicPage(p.batchId, p.bookId, page.videoId, { comicPrompt: page.comicPrompt, imagePrompt: page.imagePrompt, modelId, imageProvider: String(p.presetConfig.imageProvider || '') || undefined, aspectRatio: page.aspectRatio || p.aspectRatio });
+                await runComicPaidOperation({key:`image:${p.batchId}:${p.bookId}:${page.videoId}`,batchId:p.batchId,bookId:p.bookId,label:`生成第${page.ordinal}页图片`},()=>regenerateComicPage(p.batchId,p.bookId,page.videoId,{ comicPrompt: page.comicPrompt, imagePrompt: page.imagePrompt, modelId, imageProvider: String(p.presetConfig.imageProvider || '') || undefined, aspectRatio:page.aspectRatio||p.aspectRatio}));
             }
             catch (cause: any) {
                 if (Number(cause?.statusCode) !== 409) {
@@ -284,6 +286,7 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
                 if ([401, 403].includes(Number(cause?.statusCode)))
                     break;
             }
+                if(readComicPendingOperations(p.batchId,p.bookId).length)break;
         }
         if (!current(version, p))
             return;
@@ -295,6 +298,7 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
         else
             await refreshPages(p);
     });
+    const awaitAssetImageTask=async(p:Project,operation:ComicPendingOperation)=>{const version=epoch.current;for(let attempt=0;attempt<40;attempt++){if(!current(version,p)||!visible.current)return;const status:any=await readComicAssetImageTask(p.batchId,p.bookId,operation.taskId!);if(!current(version,p))return;if(['failed','cancelled','canceled','stopped'].includes(status.status)){clearComicPendingOperation(operation.key);throw Error(status.error||'资产图任务已结束，未成功完成');}if(['completed','succeeded','done','success'].includes(status.status)){clearComicPendingOperation(operation.key);await refreshAssets(p);return;}if(!['pending','processing','queued','running'].includes(status.status))throw Error('资产图状态暂未确认，请保留原任务编号核对');await new Promise(resolve=>setTimeout(resolve,3000));}throw Error('资产图仍未全部返回，请稍后继续读取原任务，没有重复提交');};
     const assetImages = (onlyId?: string) => perform('assetImages', async () => {
         const p = project.current;
         if (!p)
@@ -304,21 +308,10 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
         const ids = input.assets.filter(asset => onlyId ? asset.id === onlyId : !input.assetImages[asset.id]?.length).map(asset => asset.id);
         if (!ids.length)
             return;
-        const result = await generateComicAssetImages({ batchId: p.batchId, bookId: p.bookId, assetIds: ids, modelId: String(p.presetConfig.imageModelId || '') || undefined, imageAspectRatio: '9:16' });
-        if (result.taskId && !result.images.length) {
-            for (let attempt = 0; attempt < 40; attempt++) {
-                if (!current(version, p) || !visible.current)
-                    return;
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                const status: any = await readComicAssetImageTask(p.batchId, p.bookId, result.taskId);
-                if (status.status === 'failed')
-                    throw new Error(status.error || '资产图生成失败');
-                if (!['pending', 'processing'].includes(status.status))
-                    break;
-            }
-        }
-        if (current(version, p))
-            await refreshAssets(p);
+        const result=await runComicPaidOperation({key:`asset-images:${p.batchId}:${p.bookId}`,batchId:p.batchId,bookId:p.bookId,label:'生成资产参考图'},()=>generateComicAssetImages({batchId:p.batchId,bookId:p.bookId,assetIds:ids,modelId:String(p.presetConfig.imageModelId||'')||undefined,imageAspectRatio:'9:16'}),r=>{const hasImages=Array.isArray(r.images)&&r.images.some((image:any)=>typeof image?.id==='string'&&image.id.trim());if(!r.taskId&&!hasImages)throw Error('资产图生成回执未确认，请刷新核对，勿重复生成');return r.taskId&&!hasImages?r.taskId:'';});
+        if(result.taskId&&!result.images.length)await awaitAssetImageTask(p,{key:`asset-images:${p.batchId}:${p.bookId}`,batchId:p.batchId,bookId:p.bookId,label:'生成资产参考图',taskId:result.taskId,at:Date.now()});
+        if(!current(version,p)||!visible.current)return;
+        await refreshAssets(p);
     });
     const exportPages = () => perform('export', async () => {
         const p = project.current;
@@ -359,8 +352,8 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
     const toSource = () => patch({ stage: 'source' });
     const newProject = async () => {
         if (lock.current || watcher.current) return;
-        if (Object.keys(project.current?.pendingImages || {}).length) {
-            const choice = await Taro.showModal({title:'离开当前漫画？',content:'当前仍有图片未确认完成。开始新作品不会取消服务端生成，请先确认已记录当前作品。',confirmText:'开始新作品',cancelText:'留在这里'});
+        if(Object.keys(project.current?.pendingImages||{}).length||(project.current&&readComicPendingOperations(project.current.batchId,project.current.bookId).length)){ 
+            const choice = await Taro.showModal({title:'离开当前漫画？',content:'当前仍有生成结果未确认。开始新作品不会取消服务端任务，请先记录当前作品和任务编号。',confirmText:'开始新作品',cancelText:'留在这里'});
             if (!choice.confirm || lock.current || watcher.current) return;
         }
         epoch.current++; watcher.current=undefined; project.current=null; clearComicActiveRun();
@@ -370,13 +363,14 @@ export default function ManualComicPrivatePage({ initialSource = "" }: {
     const content = s.stage === 'source' ? 'source' : s.stage === 'assets' || s.stage === 'storyboard' ? 'assets' : 'pages';
     return <ThemedPage className={`mp-page comic-page comic-new comic-editor is-${content}${s.stage === 'storyboard' ? ' is-confirm' : ''}`} dynamicGlass={false}>
   <BrandHeader eyebrow="私人定制" title="漫画生成" showBack/>
+  {p&&readComicPendingOperations(p.batchId,p.bookId).length?<View className="ce-recovery-notice"><Text>上次生成回执待核对，保留原任务，避免重复费用。</Text>{readComicPendingOperations(p.batchId,p.bookId).map(operation=><View key={operation.key}><Text>{operation.label}{operation.taskId?` · ${operation.taskId}`:''}</Text>{operation.taskId?<Button disabled={blocked} onClick={()=>void perform('assetImages',()=>awaitAssetImageTask(p,operation))}>继续读取原任务</Button>:null}<Button disabled={blocked} onClick={()=>void perform('refresh',async()=>{await refreshAssets(p);await refreshPages(p);const answer=await Taro.showModal({title:'核对已有生成结果',content:'已刷新当前资产与漫画页。请核对线上任务、提示词和图片；这里只解除本手机等待，不会重新生成。'});if(answer.confirm&&current(epoch.current,p))clearComicPendingOperation(operation.key);})}>刷新核对并解除等待</Button></View>)}</View>:null}
   <View className="ce-project-bar"><View><Text className="ce-project-name">{(s.stage === 'source' ? s.source : p?.source || s.source).trim().split(/\r?\n/)[0]?.slice(0, 22) || '未命名漫画'}</Text><Text className="ce-muted">一战晟铭 · 先提示词，后出图</Text></View>{p ? <Button disabled={blocked} onClick={()=>void newProject()}>新作品</Button> : null}<Button disabled={blocked || !s.pages.length} onClick={() => void exportPages()}>导出</Button></View>
   <ComicStageHeader compact stage={s.stage} title="漫画生成" subtitle="" hasResult={Boolean(s.pages.length)} canSelectStage={stage => !blocked && (stage === 'source' || Boolean(p) && (stage === 'assets' || stage === 'storyboard' || s.pages.length > 0))} onSelectStage={stage => { const selectedProject=project.current; const selectedVersion=epoch.current; patch({ stage }); if (stage === 'render' && selectedProject)
         void refreshPages().catch(cause => {if(current(selectedVersion,selectedProject))patch({error:cause.message});}); }}/>
   <View className="ce-workspace-body">
    {s.stage === 'source' ? <ComicSettingsStage promptOnly source={s.source} styleId={s.styleId} aspectRatio={s.aspectRatio} referencePath={s.referencePath} styles={setup?.styles || []} preset={effective} presets={setup?.presets || []} selectedPresetId={effective?.preset.id || ''} advancedOpen={false} settingPicker={s.settingPicker} settingCatalog={setup?.settingCatalog || { pagePrompts: [], imageDerivations: [], constraints: { quality: [], restriction: [], negative: [] } }} models={setup?.models || []} settingSelections={s.selections} thumbs={s.thumbs} thumbFailed={s.thumbFailed} setupLoading={s.setupLoading} error={s.error} onSourceChange={source => patch({ source })} onPasteSource={() => { void Taro.getClipboardData().then(value => patch({ source: value.data || '' })).catch(() => patch({ error: '剪贴板读取失败，请直接粘贴' })); }} onChooseExisting={() => void Taro.navigateTo({ url: '/comic/pages/comic-config/index?mode=pick' })} onStyleChange={styleId => patch({ styleId })} onAspectChange={aspectRatio => patch({ aspectRatio })} onPresetChange={() => { }} onToggleAdvanced={() => { }} onOpenSettingPicker={settingPicker => patch({ settingPicker })} onCloseSettingPicker={() => patch({ settingPicker: '' })} onSettingSelectionChange={(key, value) => set(prev => ({ ...prev, selections: { ...prev.selections, [key]: value } }))} onConfirmSettingSelections={values => set(prev => ({ ...prev, selections: { ...prev.selections, ...values } }))} onOpenReference={() => patch({ referenceOpen: true })} onRetryThumb={id => { const style = setup?.styles.find(item => item.id === id); if (style?.previewUrl)
         void resolveComicStyleThumb(style.previewUrl).then(path => { set(prev => ({ ...prev, thumbs: { ...prev.thumbs, [id]: path }, thumbFailed: { ...prev.thumbFailed, [id]: !path } })); }); }} onContinue={() => void extract()} continueDisabled={Boolean(sourceReason) || blocked} continueLoading={s.busy === 'extract'} continueHint={sourceReason} configurationHint={configHint}/> : null}
-   {s.stage === 'assets' && p ? <ComicAssetsStage key={p.batchId + ":" + p.bookId} batchId={p.batchId} bookId={p.bookId} assets={s.assets} assetImages={s.assetImages} assetThumbs={s.assetThumbs} loading={s.busy === 'extract'} busy={s.busy} busyAt={0} error={s.error} onGenerateImage={id => void assetImages(id)} onGenerateMissingImages={() => void assetImages()} onExtract={() => void extract()} onRefresh={() => void perform('refresh', async () => { await refreshAssets(); })} onRetry={() => void perform('retry', async () => { await retryComicBookStage({ batchId: p.batchId, bookId: p.bookId }); await refreshAssets(); })} onContinue={() => patch({ stage: 'storyboard' })} onBack={toSource}/> : null}
+   {s.stage === 'assets' && p ? <ComicAssetsStage key={p.batchId + ":" + p.bookId} batchId={p.batchId} bookId={p.bookId} assets={s.assets} assetImages={s.assetImages} assetThumbs={s.assetThumbs} loading={s.busy === 'extract'} busy={s.busy} busyAt={0} error={s.error} onGenerateImage={id => void assetImages(id)} onGenerateMissingImages={() => void assetImages()} onExtract={() => void extract()} onRefresh={() => void perform('refresh', async () => { await refreshAssets(); })} onRetry={() => void perform('retry', async () => { await runComicPaidOperation({key:`retry:${p.batchId}:${p.bookId}`,batchId:p.batchId,bookId:p.bookId,label:'重试漫画阶段'},()=>retryComicBookStage({batchId:p.batchId,bookId:p.bookId})); await refreshAssets(); })} onContinue={() => patch({ stage: 'storyboard' })} onBack={toSource}/> : null}
    {s.stage === 'storyboard' && p ? <ComicConfigConfirmStage promptOnly sourceLength={p.sourceLength} styleName={setup?.styles.find(style => style.id === p.styleId)?.name || ''} aspectRatio={p.aspectRatio} referenceReady={Boolean(p.reference)} assets={s.assets} submitting={blocked} error={s.error} textModelName={setup?.models.find(model => model.id === p.presetConfig.textModelId)?.name || '当前项目文本模型'} imageModelName={setup?.models.find(model => model.id === p.presetConfig.imageModelId)?.name || '当前项目图片模型'} onBack={() => patch({ stage: 'assets' })} onConfirm={() => void prompts()}/> : null}
    {(s.stage === 'render' || s.stage === 'result') && p ? <>
     <View className="ce-manual-status"><Text>{s.busy === 'prompts' ? '正在生成漫画提示词…' : s.busy === 'images' ? '正在读取页图生成结果…' : '先检查提示词，确认后再生成图片'}</Text><Button disabled={blocked} onClick={() => void perform('refresh', async () => { await refreshPages(); await refreshAssets(); if (Object.keys(project.current?.pendingImages || {}).length)

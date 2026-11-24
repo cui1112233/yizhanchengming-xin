@@ -204,7 +204,8 @@ export async function generateComicAssetImages(input: {
       ...(input.imageAspectRatio ? { imageAspectRatio: input.imageAspectRatio } : {}),
     },
   });
-  const source = object(payload);
+  const source=object(payload);
+  if(!text(source.taskId)&&!(Array.isArray(source.images)&&source.images.some((image:any)=>text(image?.id))))throw Error('资产图生成回执未确认，请核对服务端任务，勿重复生成');
   return {
     images: Array.isArray(source.images) ? source.images : [],
     taskId: text(source.taskId),

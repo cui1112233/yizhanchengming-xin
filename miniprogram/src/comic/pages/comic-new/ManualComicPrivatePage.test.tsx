@@ -1,3 +1,4 @@
+import {configureComicRecoveryScope,comicRunStorageKey,comicSelectedBookStorageKey} from '../../services/comicRecovery';
 import { beforeEach, describe, expect, test, vi } from "vitest";
 const h = vi.hoisted(() => ({
     generatePrompts: vi.fn(), saveSettings: vi.fn(), watchPages: vi.fn(), watchStop: vi.fn(), watchCallbacks: null as any,
@@ -177,7 +178,7 @@ vi.mock("../../services/comicManual", async (original) => ({
     watchComicPageImages: h.watchPages,
 }));
 import ComicPrivatePage from "./ManualComicPrivatePage";
-import ComicEntry, { LegacyComicPrivatePage } from "./index";
+import {ComicEntryContent as ComicEntry, LegacyComicPrivatePage } from "./index";
 import ComicStageHeader from "./ComicStageHeader";
 import ComicPageWorkspace from "./ComicPageWorkspace";
 import ComicSettingsStage from "./ComicSettingsStage";
@@ -286,7 +287,7 @@ const MODELS = [
     { id: "image-real", name: "真实图片模型", kind: "image", provider: "doubao" },
 ];
 const SOURCE = `第${"一"}段正文。`.repeat(20);
-beforeEach(() => {
+beforeEach(() => {configureComicRecoveryScope("test-owner");
     h.slots = [];
     h.active = null;
     h.childSlots.clear();
@@ -320,7 +321,7 @@ beforeEach(() => {
     // 取图失败（例如白名单/网络问题）时静默返回空串，界面只显示占位。
     h.assetPath.mockResolvedValue("");
     h.extractAssets.mockResolvedValue({});
-    h.generateImages.mockResolvedValue({ images: [], taskId: "", warning: "" });
+    h.generateImages.mockResolvedValue({ images: [{id:"asset-image-valid"}], taskId: "", warning: "" });
     h.retryStage.mockResolvedValue({});
     h.setPrimary.mockResolvedValue({});
     h.regeneratePage.mockResolvedValue({});
@@ -330,7 +331,7 @@ beforeEach(() => {
     h.showActionSheet.mockResolvedValue({ tapIndex: 0 });
 });
 const PROMPT_PAGES = [{ pageId: "page-1", videoId: "video-1", ordinal: 1, status: "pending", aspectRatio: "9:16", comicPrompt: "分页描述", imagePrompt: "图片描述", primaryImageId: "", images: [] }];
-beforeEach(() => {
+beforeEach(() => {configureComicRecoveryScope("test-owner");
     h.pages.mockResolvedValue([]);
     h.saveSettings.mockResolvedValue({});
     h.generatePrompts.mockImplementation(async () => { h.pages.mockResolvedValue(PROMPT_PAGES); });
@@ -350,10 +351,10 @@ describe("当前私人定制手动链路", () => {
         expect(h.generatePrompts).not.toHaveBeenCalled();
     });
     test("提取失败保留项目，重试同正文不重复创建", async () => {
-        h.extractAssets.mockRejectedValueOnce(new Error("提取暂时失败"));
+        h.extractAssets.mockRejectedValueOnce(Object.assign(new Error("提取暂时失败"),{statusCode:400}));
         await extractFirst();
         expect(textContent(render())).toContain("提取暂时失败");
-        expect(h.storage.get("comic:active-run")).toMatchObject({ batchId: "batch-1", mode: "manual" });
+        expect(h.storage.get(comicRunStorageKey()!)).toMatchObject({ batchId: "batch-1", mode: "manual" });
         findByText(render(), "更多").props.onClick();
         findByText(render(), "重新提取资产").props.onClick();
         await flush();
@@ -404,7 +405,7 @@ describe("当前私人定制手动链路", () => {
         expect(findByText(render(), "导出漫画").props.disabled).toBe(false);
     });
     test("恢复手动项目只读回页图，不自动重复生成", async () => {
-        h.storage.set("comic:active-run", { version: 1, batchId: "batch-1", bookId: "book-1", source: SOURCE, sourceLength: SOURCE.length, styleId: "style-1", presetId: "p2", presetConfig: DUAL_PRESET.preset.config, aspectRatio: "9:16", reference: null, submitted: true, startedAt: Date.now(), mode: "manual", phase: "pages", pendingImages: { "video-1": [] } });
+        h.storage.set(comicRunStorageKey()!, { version: 1, batchId: "batch-1", bookId: "book-1", source: SOURCE, sourceLength: SOURCE.length, styleId: "style-1", presetId: "p2", presetConfig: DUAL_PRESET.preset.config, aspectRatio: "9:16", reference: null, submitted: true, startedAt: Date.now(), mode: "manual", phase: "pages", pendingImages: { "video-1": [] } });
         render();
         runEffects();
         await flush();
@@ -447,14 +448,14 @@ test("入口只对旧已提交自动任务使用兼容页，新建与手动项�
     h.slots = [];
     h.active = h.slots;
     h.cursor = 0;
-    h.storage.set("comic:active-run", { version: 1, batchId: "b", bookId: "k", submitted: true, startedAt: Date.now() });
+    h.storage.set(comicRunStorageKey()!, { version: 1, batchId: "b", bookId: "k", submitted: true, startedAt: Date.now() });
     const legacy = ComicEntry() as any;
     expect(legacy.type).toBe(LegacyComicPrivatePage);
     legacy.props.onNew();
     h.active = h.slots;
     h.cursor = 0;
     expect((ComicEntry() as any).type).toBe(ComicPrivatePage);
-    expect(h.storage.has("comic:active-run")).toBe(false);
+    expect(h.storage.has(comicRunStorageKey()!)).toBe(false);
 });
 test("新一轮页图回读完成后，旧缩略图请求不能覆盖它", async () => {
     await generatePromptsFirst();
@@ -473,10 +474,12 @@ test("新一轮页图回读完成后，旧缩略图请求不能覆盖它", async
 });
 
 test("完成后可开始新作品，清除活动指针但不自动创建",async()=>{
- await generatePromptsFirst();findByText(render(),"新作品").props.onClick();await flush();expect(h.slots[0].project).toBeNull();expect(h.storage.has("comic:active-run")).toBe(false);expect(textContent(render())).toContain("从一段故事开始");expect(h.create).toHaveBeenCalledTimes(1);
+ await generatePromptsFirst();findByText(render(),"新作品").props.onClick();await flush();expect(h.slots[0].project).toBeNull();expect(h.storage.has(comicRunStorageKey()!)).toBe(false);expect(textContent(render())).toContain("从一段故事开始");expect(h.create).toHaveBeenCalledTimes(1);
 });
 
 test("离开恢复的旧项目后，迟到的读取错误不能污染新作品",async()=>{
- h.storage.set("comic:active-run",{version:1,batchId:"old",bookId:"book",source:SOURCE,sourceLength:SOURCE.length,styleId:"style-1",presetId:"p2",presetConfig:DUAL_PRESET.preset.config,aspectRatio:"9:16",reference:null,submitted:true,startedAt:Date.now(),mode:"manual",phase:"pages"});
+ h.storage.set(comicRunStorageKey()!,{version:1,batchId:"old",bookId:"book",source:SOURCE,sourceLength:SOURCE.length,styleId:"style-1",presetId:"p2",presetConfig:DUAL_PRESET.preset.config,aspectRatio:"9:16",reference:null,submitted:true,startedAt:Date.now(),mode:"manual",phase:"pages"});
  let reject:any;h.pages.mockReturnValueOnce(new Promise((_r,j)=>reject=j));render();runEffects();await flush();findByText(render(),"新作品").props.onClick();await flush();reject(new Error("旧项目读取失败"));await flush();expect(textContent(render())).not.toContain("旧项目读取失败");expect(h.slots[0].project).toBeNull();
 });
+
+test('an empty asset generation receipt remains blocked instead of permitting another charge',async()=>{h.generateImages.mockResolvedValue({images:[],taskId:'',warning:''});await extractFirst();const generate=nodesOfType(render(),'Button').find(n=>textContent(n.props.children)==='生成图片');expect(generate?.props.disabled).toBe(false);generate.props.onClick();await flush();expect(h.generateImages).toHaveBeenCalledTimes(1);expect(textContent(render())).toContain('回执未确认');nodesOfType(render(),'Button').find(n=>textContent(n.props.children)==='生成图片').props.onClick();await flush();expect(h.generateImages).toHaveBeenCalledTimes(1);expect(textContent(render())).toContain('待核对');});

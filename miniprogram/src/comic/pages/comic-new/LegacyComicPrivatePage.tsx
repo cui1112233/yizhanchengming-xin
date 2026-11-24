@@ -1,3 +1,4 @@
+import {readComicSelectedBook,clearComicSelectedBook} from '../../services/comicRecovery';
 import Taro, { useDidHide, useDidShow } from "@tarojs/taro";
 import { Button, Image, ScrollView, Text, View } from "@tarojs/components";
 import { useEffect, useRef, useState } from "react";
@@ -395,10 +396,10 @@ export default function ComicPrivatePage({ onNew }: {onNew?: (source?:string) =>
    */
   useDidShow(() => {
     const current = latest.current;
-    const selected = Taro.getStorageSync("comic:selected-existing-book") as { sourceText?: unknown } | "";
+    const selected = readComicSelectedBook() as { sourceText?: unknown } | "";
     const selectedSource = selected && typeof selected === "object" && typeof selected.sourceText === "string" ? selected.sourceText.trim() : "";
     if (selectedSource) {
-      Taro.removeStorageSync("comic:selected-existing-book");
+      clearComicSelectedBook();
       patch({ source: selectedSource, error: "", stage: "source", tab: "create" });
       return;
     }

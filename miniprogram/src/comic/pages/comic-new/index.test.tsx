@@ -1,3 +1,4 @@
+import {configureComicRecoveryScope,comicRunStorageKey,comicSelectedBookStorageKey} from '../../services/comicRecovery';
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
@@ -263,7 +264,7 @@ const MODELS = [
 ];
 const SOURCE = `第${"一"}段正文。`.repeat(20);
 
-beforeEach(() => {
+beforeEach(() => {configureComicRecoveryScope("test-owner");
   h.slots = []; h.active = null; h.childSlots.clear();
   h.effects = [];
   h.seen = new Set();
@@ -454,11 +455,11 @@ describe("旧自动任务兼容页", () => {
     expect(nodesOfType(render(), "Textarea")[0].props.value).toBe("从剪贴板带入的小说正文");
     findByText(render(), "选择已有书籍").props.onClick();
     expect(h.navigateTo).toHaveBeenCalledWith({ url: "/comic/pages/comic-config/index?mode=pick" });
-    h.storage.set("comic:selected-existing-book", { batchId: "old-batch", bookId: "old-book", title: "旧书", sourceText: "从已有书籍带回来的正文" });
+    h.storage.set(comicSelectedBookStorageKey()!, { batchId: "old-batch", bookId: "old-book", title: "旧书", sourceText: "从已有书籍带回来的正文" });
     h.show?.();
     await flush();
     expect(nodesOfType(render(), "Textarea")[0].props.value).toBe("从已有书籍带回来的正文");
-    expect(h.storage.has("comic:selected-existing-book")).toBe(false);
+    expect(h.storage.has(comicSelectedBookStorageKey()!)).toBe(false);
   });
 
   test("高级设置只切换线上画幅，模型卡只切换对应模型", async () => {
@@ -1377,7 +1378,7 @@ describe("旧自动任务兼容页", () => {
   test("冷启动从本地指针恢复到资产阶段并重新读服务端资产", async () => {
     render(); runEffects(); await flush();
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
-    expect(h.storage.get("comic:active-run")).toMatchObject({
+    expect(h.storage.get(comicRunStorageKey()!)).toMatchObject({
       batchId: "batch-1", bookId: "book-1", submitted: false, source: SOURCE,
     });
 
@@ -1399,7 +1400,7 @@ describe("旧自动任务兼容页", () => {
     primaryButton(typeSource(SOURCE)).props.onClick(); await flush();
     findByText(render(), "继续：生成配置确认").props.onClick();
     findByText(render(), "开始生成漫画").props.onClick(); await flush();
-    expect(h.storage.get("comic:active-run")).toMatchObject({ batchId: "batch-1", bookId: "book-1", submitted: true });
+    expect(h.storage.get(comicRunStorageKey()!)).toMatchObject({ batchId: "batch-1", bookId: "book-1", submitted: true });
 
     h.slots = []; h.effects = []; h.pollStarts = 0;
     render();
@@ -1422,7 +1423,7 @@ describe("旧自动任务兼容页", () => {
     h.hide();
     expect(h.pollStop).toHaveBeenCalled();
     expect(h.slots[0].runSubmitted).toBe(true);
-    expect(h.storage.get("comic:active-run")).toBeTruthy();
+    expect(h.storage.get(comicRunStorageKey()!)).toBeTruthy();
   });
 
   test("读进度遇到 404 清掉本地指针，不再反复撞已不存在的批次", async () => {
@@ -1433,11 +1434,11 @@ describe("旧自动任务兼容页", () => {
     findByText(render(), "开始生成漫画").props.onClick(); await flush();
     render(); runEffects(); await flush();
     h.pollFail(Object.assign(new Error("批次不存在（HTTP 404）"), { statusCode: 404 }));
-    expect(h.storage.has("comic:active-run")).toBe(false);
+    expect(h.storage.has(comicRunStorageKey()!)).toBe(false);
   });
 
   test("本地指针超过 24h 自动失效，不恢复旧批次", async () => {
-    h.storage.set("comic:active-run", {
+    h.storage.set(comicRunStorageKey()!, {
       version: 1, batchId: "old-batch", bookId: "old-book", source: "旧正文", sourceLength: 120,
       styleId: "style-1", aspectRatio: "9:16", reference: null, submitted: true,
       startedAt: Date.now() - 25 * 60 * 60 * 1000,
@@ -1445,6 +1446,6 @@ describe("旧自动任务兼容页", () => {
     render();
     h.show();
     expect(h.slots[0].batchId).toBe("");
-    expect(h.storage.has("comic:active-run")).toBe(false);
+    expect(h.storage.has(comicRunStorageKey()!)).toBe(false);
   });
 });
