@@ -789,6 +789,9 @@ func (s *DirectorService) persistComicPromptResults(ctx context.Context, owner, 
 		if comicPromptIsJSONLike(parsed.ScreenPrompt) || comicPromptIsJSONLike(parsed.ImagePrompt) {
 			return nil, fmt.Errorf("%w: 漫画提示词是原始 JSON，拒绝写入", ErrInvalid)
 		}
+		if ComicPromptIsUpstreamRefusal(parsed.ScreenPrompt) || ComicPromptIsUpstreamRefusal(parsed.ImagePrompt) {
+			return nil, fmt.Errorf("%w: 漫画提示词是上游拒绝文案，拒绝写入", ErrInvalid)
+		}
 		encodedScreen, _ := json.Marshal(parsed.ScreenPrompt)
 		encodedImage, _ := json.Marshal(parsed.ImagePrompt)
 		encodedRoles, _ := json.Marshal(parsed.Roles)
@@ -867,6 +870,14 @@ func parseComicBookPromptResults(completion string, videos []Video, snapshot Dir
 		page.Roles = normalizedStringList(page.Roles)
 		page.ScenePresets = normalizedStringList(page.ScenePresets)
 		page.RoleStage = normalizedStringMap(page.RoleStage)
+		// 上游拒绝文案不是画面描述。清空后走「漫画提示词为空」的结构失败
+		// 重试与确定性兜底，不能落库成多页共用的提示词。
+		if ComicPromptIsUpstreamRefusal(page.ScreenPrompt) {
+			page.ScreenPrompt = ""
+		}
+		if ComicPromptIsUpstreamRefusal(page.ImagePrompt) {
+			page.ImagePrompt = ""
+		}
 		normalizedPages = append(normalizedPages, page)
 	}
 	// 单页请求时，模型可能按整书信封返回多条 pages，或漏写 video_id。视频只有
@@ -1031,9 +1042,38 @@ func parseComicPromptResult(completion string) comicPromptResult {
 	if comicPromptIsJSONLike(completion) {
 		return comicPromptResult{}
 	}
+	// 上游内容审核拒绝时会把拒绝文案当正文返回。它同样不是提示词，必须
+	// 返回空结果，让调用方走结构失败重试或确定性兜底。
+	if ComicPromptIsUpstreamRefusal(completion) {
+		return comicPromptResult{}
+	}
 	// Older providers returned one final prompt. Keep those books usable while
 	// new presets return the structured pair above.
 	return comicPromptResult{ScreenPrompt: completion, ImagePrompt: completion}
+}
+
+// ComicPromptIsUpstreamRefusal 识别被上游模型当成提示词返回的拒绝/错误文案。
+// 这类文本不是画面描述：一旦落库，相同拒绝文案会让多页编译出相同的出图
+// 请求（相同快照哈希），最终生成同一张图片，发布合集时被
+// 「合集图片 ID 不能重复」永久卡死。
+func ComicPromptIsUpstreamRefusal(text string) bool {
+	value := strings.ToLower(strings.TrimSpace(text))
+	if value == "" {
+		return false
+	}
+	for _, marker := range []string{
+		"could not be submitted",
+		"prohibited use policy",
+		"sensitive words that violate",
+		"我无法响应您的请求",
+		"系统检测到您当前输入的信息存在敏感内容",
+		"请检查后重新输入",
+	} {
+		if strings.Contains(value, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // comicPromptIsJSONLike 识别模型原始 JSON 或被截断的 JSON 信封。

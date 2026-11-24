@@ -1238,3 +1238,53 @@ func TestComicPagePersistenceRejectsJSONPrompts(t *testing.T) {
 		t.Fatal("JSON 形态的 image_prompt 不能在补丁写入")
 	}
 }
+
+const (
+	comicRefusalEnglish = "The prompt could not be submitted. The prompt contains sensitive words that violate Google's [Generative AI Prohibited Use policy](https://policies.google.com/terms/generative-ai/use-policy). Try rephrasing the prompt."
+	comicRefusalChinese = "抱歉，系统检测到您当前输入的信息存在敏感内容，我无法响应您的请求，请检查后重新输入。"
+)
+
+func TestComicPromptIsUpstreamRefusalDetectsProviderRefusals(t *testing.T) {
+	for _, text := range []string{comicRefusalEnglish, comicRefusalChinese} {
+		if !ComicPromptIsUpstreamRefusal(text) {
+			t.Fatalf("refusal text was not detected: %s", text)
+		}
+	}
+	for _, text := range []string{"", "画面构图与镜头：3:4竖幅三格，女主站在窗前。", "第一格：他推门而入，雨水落在肩上。"} {
+		if ComicPromptIsUpstreamRefusal(text) {
+			t.Fatalf("normal prompt was misdetected as refusal: %s", text)
+		}
+	}
+}
+
+func TestParseComicPromptResultRejectsUpstreamRefusalText(t *testing.T) {
+	for _, text := range []string{comicRefusalEnglish, comicRefusalChinese} {
+		result := parseComicPromptResult(text)
+		if result.ScreenPrompt != "" || result.ImagePrompt != "" {
+			t.Fatalf("refusal text must not become a prompt: %+v", result)
+		}
+	}
+	if result := parseComicPromptResult("第一格：他推门而入，雨水落在肩上。"); result.ScreenPrompt == "" || result.ImagePrompt == "" {
+		t.Fatalf("legacy plain prompt should still be accepted: %+v", result)
+	}
+}
+
+func TestParseComicBookPromptResultsTreatsRefusalPageAsEmpty(t *testing.T) {
+	completion := fmt.Sprintf(`{"pages":[{"video_id":"video-1","screen_prompt":%q,"image_prompt":%q}]}`, comicRefusalChinese, comicRefusalChinese)
+	_, err := parseComicBookPromptResults(completion, []Video{{ID: "video-1", Label: "01"}}, DirectorSnapshot{})
+	if err == nil || !strings.Contains(err.Error(), "漫画提示词为空") {
+		t.Fatalf("refusal page should be a shape failure: %v", err)
+	}
+}
+
+func TestComicPagePersistenceRejectsUpstreamRefusalPrompts(t *testing.T) {
+	input := UpsertComicPageInput{ComicPrompt: comicRefusalChinese, ImagePrompt: comicRefusalChinese}
+	if _, err := normalizeComicPageInput(input); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("refusal prompt must be rejected at persistence: %v", err)
+	}
+	base := UpsertComicPageInput{ComicPrompt: "导演说明", ImagePrompt: "上半文字区，下半插画"}
+	refusal := comicRefusalEnglish
+	if _, err := applyComicPagePatch(base, PatchComicPageInput{ImagePrompt: &refusal}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("refusal patch must be rejected at persistence: %v", err)
+	}
+}

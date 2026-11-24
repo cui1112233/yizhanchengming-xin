@@ -865,6 +865,11 @@ func repairComicImagePrompt(ctx context.Context, owner, imagePrompt, rejection s
 	if len([]rune(repaired)) < 120 {
 		return fallback
 	}
+	// 改写模型自己也可能被内容审核拒绝，把拒绝文案当成改写结果返回。
+	// 这不是提示词，落库后会让多页共用同一提示词并生成同一张图片。
+	if batchfactoryv11.ComicPromptIsUpstreamRefusal(repaired) {
+		return fallback
+	}
 	return sanitizeShuihuoImagePromptViolence(repaired)
 }
 

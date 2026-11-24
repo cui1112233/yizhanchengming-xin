@@ -70,3 +70,18 @@ func TestRepairComicPageImagePromptUsesTextModelAndReSanitizes(t *testing.T) {
 		t.Fatalf("repaired prompt should keep model output: %s", repaired)
 	}
 }
+
+// 改写模型自己被内容审核拒绝时，会把拒绝文案当正文返回。这种文案绝不能
+// 当成提示词：多页共用会生成同一张图片，发布合集时报「合集图片 ID 不能重复」。
+func TestRepairComicPageImagePromptRejectsUpstreamRefusalText(t *testing.T) {
+	generator := comicPageGenerator{rewritePrompt: func(_ context.Context, _ string, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		return "抱歉，系统检测到您当前输入的信息存在敏感内容，我无法响应您的请求，请检查后重新输入。", nil
+	}}
+	repaired := generator.repairComicPageImagePrompt(context.Background(), "alice", shuihuoViolencePromptSample, "violence policy")
+	if strings.Contains(repaired, "我无法响应您的请求") {
+		t.Fatalf("refusal text must not become a prompt: %s", repaired)
+	}
+	if !strings.Contains(repaired, "夏夏") {
+		t.Fatalf("should fall back to deterministic sanitized prompt: %s", repaired)
+	}
+}

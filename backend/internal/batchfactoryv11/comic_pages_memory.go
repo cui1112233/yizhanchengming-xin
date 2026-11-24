@@ -67,6 +67,9 @@ func applyComicPagePatch(base UpsertComicPageInput, patch PatchComicPageInput) (
 	if err := rejectJSONComicPrompt(base.ComicPrompt, base.ImagePrompt); err != nil {
 		return UpsertComicPageInput{}, err
 	}
+	if err := rejectUpstreamRefusalComicPrompt(base.ComicPrompt, base.ImagePrompt); err != nil {
+		return UpsertComicPageInput{}, err
+	}
 	base.ModelID = strings.TrimSpace(base.ModelID)
 	base.AspectRatio = strings.TrimSpace(base.AspectRatio)
 	if base.AspectRatio == "" {
@@ -96,6 +99,9 @@ func normalizeComicPageInput(input UpsertComicPageInput) (UpsertComicPageInput, 
 	if err := rejectJSONComicPrompt(input.ComicPrompt, input.ImagePrompt); err != nil {
 		return UpsertComicPageInput{}, err
 	}
+	if err := rejectUpstreamRefusalComicPrompt(input.ComicPrompt, input.ImagePrompt); err != nil {
+		return UpsertComicPageInput{}, err
+	}
 	if input.AspectRatio == "" {
 		input.AspectRatio = "9:16"
 	}
@@ -110,6 +116,16 @@ func normalizeComicPageInput(input UpsertComicPageInput) (UpsertComicPageInput, 
 func rejectJSONComicPrompt(comicPrompt, imagePrompt string) error {
 	if comicPromptIsJSONLike(comicPrompt) || comicPromptIsJSONLike(imagePrompt) {
 		return fmt.Errorf("%w: 出图提示词不能是 JSON", ErrInvalid)
+	}
+	return nil
+}
+
+// rejectUpstreamRefusalComicPrompt 在持久化边界拦截上游拒绝/错误文案。
+// 解析层已经清空这类返回，这里兜底：同一段拒绝文案会让多页编译出相同的
+// 出图请求并生成同一张图片，发布合集时会被「合集图片 ID 不能重复」卡死。
+func rejectUpstreamRefusalComicPrompt(comicPrompt, imagePrompt string) error {
+	if ComicPromptIsUpstreamRefusal(comicPrompt) || ComicPromptIsUpstreamRefusal(imagePrompt) {
+		return fmt.Errorf("%w: 出图提示词不能是上游拒绝文案", ErrInvalid)
 	}
 	return nil
 }
