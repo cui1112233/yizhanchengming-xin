@@ -29,7 +29,7 @@
 .text-media-tools footer { display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; border-top:1px solid var(--sh-line); }
 .text-media-turn,.text-media-actions { display:flex; align-items:center; gap:6px; }
 .text-media-turn { font-variant-numeric:tabular-nums; }
-.text-media-actions { margin-left:auto; }
+.text-media-actions { margin-left:auto;flex-wrap:wrap;justify-content:flex-end;max-width:100%; }
 .text-media-tools [role=alert] { padding-block:10px; color:var(--sh-text); }
 .batch-factory-text-badge { display:inline-flex; margin-inline:6px; font-size:11px; color:var(--sh-accent,#54ddc8); }
 .text-page-editor { display:grid; gap:12px; margin:12px 0; min-width:0; padding:12px; border:1px solid var(--sh-line); border-radius:8px; }

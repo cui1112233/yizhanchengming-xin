@@ -16,6 +16,14 @@ test('text requests encode book and page identifiers and send optimistic revisio
  assert.equal(seen[2][1].body.size,4);
 });
 
+test('collection download uses the selected protected collection route',async()=>{
+ globalThis.localStorage={getItem:()=>null};let path;
+ globalThis.fetch=async url=>{path=url;return new Response(new Blob(['zip'],{type:'application/zip'}));};
+ const blob=await api.downloadTextCollection('b /','book/1','old+collection');
+ assert.equal(path,'/api/batch-factory/v12/batches/b%20%2F/books/book%2F1/text-collections/old%2Bcollection/download');
+ assert.equal(blob.type,'application/zip');
+});
+
 test('draft preview reports automatic continuation pages and contrast separately',async()=>{
  globalThis.localStorage={getItem:()=>null};
  globalThis.fetch=async()=>new Response(new Blob(['image'],{type:'image/png'}),{headers:{'Content-Type':'image/png','X-Text-Preview-Pages':'3','X-Text-Contrast':'low'}});

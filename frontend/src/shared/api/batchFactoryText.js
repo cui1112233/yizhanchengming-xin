@@ -37,5 +37,6 @@ export const uploadTextBackground = (b,k,file,name) => upload(base(b,k)+'backgro
 export const createTextCollection = (b,k,p) => post(base(b,k)+'collections',p);
 export const listTextCollections = (b,k,options) => apiRequest(base(b,k)+'collections',options);
 export const getTextCollection = (b,k,i,options) => apiRequest(base(b,k)+'collections/'+id(i),options);
+export const downloadTextCollection = (b,k,i) => apiRequest(base(b,k)+'collections/'+id(i)+'/download',{responseType:'blob'});
 export const getTextArtifactBlob = (b,k,i) => apiRequest(base(b,k)+'artifacts/'+id(i)+'/content',{responseType:'blob'});
 export const getTextBackgroundBlob = (b,k,i) => apiRequest(base(b,k)+'backgrounds/'+id(i)+'/content',{responseType:'blob'});

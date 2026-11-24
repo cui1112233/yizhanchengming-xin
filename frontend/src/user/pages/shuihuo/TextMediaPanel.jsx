@@ -309,6 +309,13 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
     });
     chooseCollection(result.id); setCollectionDetail(result); setCollectionImage(''); setTab('collections');
   }
+  async function downloadCollection(){
+    const blob=await api.downloadTextCollection(batchId,book.id,collection.id);
+    if(!blob?.size || blob.type!=='application/zip')throw Error('未收到有效的合集压缩包，请重试');
+    const url=URL.createObjectURL(blob),anchor=document.createElement('a');
+    anchor.href=url;anchor.download=(title.replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').trim() || '文本合集')+'.zip';
+    document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
   return <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextPlaceholder:'var(--sh-muted)',colorBorder:'var(--sh-line)',controlItemBgActive:'var(--sh-panel-strong)',controlItemBgHover:'var(--sh-panel-strong)',colorPrimary:'var(--sh-accent)'}}}><div className="text-media-panel" aria-label="文本媒体库">
     <section className="text-media-preview" aria-label="成品预览">{live.url?<img src={live.url} alt="排版预览"/>:session?<div className="text-media-empty">{live.error?'当前排版无法预览，请调整设置':'正在更新排版预览…'}</div>:preview
       ? <AuthenticatedTextPageImage contentUrl={preview} alt={tab === 'pages' ? `文字页 ${page?.ordinal}` : tab === 'cover' ? '文本封面' : '文本合集预览'} />
@@ -372,6 +379,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
       </div>}<div className="text-media-actions">
         <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded ? '收起目录' : '页目录'}</button>
         <button type="button" disabled={!!busy || !!session || !canCompose} onClick={()=>run('compose',compose)}>{collections.length ? '重新合成' : '合成当前书'}</button>
+        {tab==='collections' && <button type="button" disabled={!!busy || !!session || !collection} onClick={()=>run('download',downloadCollection)}>{busy==='download'?'正在打包…':'下载合集'}</button>}
         <button type="button" disabled={upload.disabled || !!selectedReceipt?.error || !!busy || !!session} onClick={publish}>{upload.label}</button>
       </div></footer>
     </aside>

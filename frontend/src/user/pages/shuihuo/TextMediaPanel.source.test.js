@@ -41,6 +41,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
       async function until(f){for(let i=0;i<300;i++){if(f())return;await sleep(20)}throw Error(document.body.innerText)}
       let reads=0, rendering=true,requests=[],previewBodies=[],saved,aborted=false,restores=0,locked=false,coverLocked=false;
       const mutations=[];
+      const downloads=[];HTMLAnchorElement.prototype.click=function(){downloads.push({name:this.download,url:this.href})};
       let confirmRestore=false, confirmCount=0, releaseSave, single=true;
       let bookRevision=7, bookWrites=0, ready=false, collection, publishes=0;
       let uploadSummary='';
@@ -48,6 +49,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
       window.fetch=async(path,opts)=>{
         requests.push([path,opts.method]); if(opts.method==='POST')mutations.push([path,opts.body]);
         let items=[];
+        if(path.endsWith('text-collections/c/download'))return new Response(new Blob(['zip'],{type:'application/zip'}));
         if(path.endsWith('/preview')){
           const body=JSON.parse(opts.body);
           previewBodies.push(body);
@@ -200,6 +202,9 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         ready=true;button('文字页').click();await until(()=>button('更新文字页'));
         button('更新文字页').click();await until(()=>button('合成当前书')?.disabled===false);
         button('合成当前书').click();await until(()=>button('重新合成')&&button('上传网络')?.disabled===false);
+        button('下载合集').click();await until(()=>downloads.length===1 && button('下载合集')?.disabled===false);
+        if(downloads[0].name!=='测试书.zip' || !requests.some(([path])=>path.endsWith('text-collections/c/download')))throw Error('没有下载当前选中的文本合集');
+        if(publishes!==0)throw Error('下载触发了上传');
         button('上传网络').click();await until(()=>button('再次上传'));
         if(!uploadSummary.includes('作品：测试书') || !uploadSummary.includes('页数：'))throw Error('上传前未核对作品和页数');
         confirmRestore=false;button('再次上传').click();await sleep(50);if(publishes!==1)throw Error('取消后重复上传');

@@ -125,6 +125,7 @@ func registerBatchTextRoutes(m *http.ServeMux, opt RouterOptions, c *BatchAutoma
 		{"POST", "cover/preview", a.picture}, {"POST", "cover/render", a.picture}, {"POST", "cover/upload", a.upload}, {"POST", "cover/restore", a.restore},
 		{"GET", "backgrounds", a.backgrounds}, {"POST", "backgrounds", a.upload}, {"GET", "backgrounds/{backgroundId}/content", a.content},
 		{"GET", "artifacts/{artifactId}/content", a.content}, {"GET", "collections", a.collections}, {"POST", "collections", a.collections}, {"GET", "collections/{collectionId}", a.collections},
+		{"GET", "collections/{collectionId}/download", a.downloadCollection},
 	} {
 		m.HandleFunc(route.method+" "+base+route.path, a.scoped(route.fn))
 	}
