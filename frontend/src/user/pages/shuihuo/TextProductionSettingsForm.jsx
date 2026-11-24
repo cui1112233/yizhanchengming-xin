@@ -1,5 +1,5 @@
 import ColorPicker from './TextColorPicker.jsx';
-import { Alert, Button, Input, InputNumber, Select, Switch, Tabs, Upload, message } from 'antd';
+import { Alert, Button, Input, InputNumber, Select, Switch, Tabs, message } from 'antd';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { getAvailableModelCatalog, modelSelectOptions } from '../../../shared/api/modelCatalog';
 import { getN8ComicPublishStatus } from '../../../shared/api/batchFactoryV12';
@@ -17,21 +17,14 @@ const SharedImagePublishSettings = lazy(() => import('./BatchFactoryImagePublish
 const SettingsPreview = lazy(()=>import('./TextSettingsPreview.jsx'));
 
 function BackgroundPicker({value,items,onChange,onUploaded}) {
-  const [busy,setBusy]=useState(false);
-  const image = Boolean(value?.id);
   const upload=async file=>{
-    setBusy(true);
-    try {
       const item=await uploadPersonalTextBackground(file);
       onUploaded(item);
-      onChange({kind:'library',id:item.id,color:value?.color || '#111318'});
-    } catch(error) {message.error(error.message || '背景上传失败');}
-    finally {setBusy(false);}
+      return item;
   };
   return <div className="batch-factory-background-controls">
     <ColorPicker label="背景颜色" value={value?.color || '#111318'} onChange={color=>onChange({kind:'color',color})}/>
-    <TextBackgroundGallery value={value} items={items} onChange={onChange}/>
-    <Upload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={file=>{void upload(file);return false;}}><Button loading={busy}>上传背景</Button></Upload>
+    <TextBackgroundGallery value={value} items={items} onChange={onChange} onUpload={upload}/>
   </div>;
 }
 

@@ -115,6 +115,12 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         await until(area);
         const originalDraft=area().value;
         if(document.querySelector('.text-page-editor input[type=color]'))throw Error('颜色控件仍是原生横条');
+        if(document.querySelector('.text-page-editor input[type=file]'))throw Error('编辑区仍有重复的背景上传入口');
+        const colorTrigger=document.querySelector('button[aria-label="文字颜色"]');colorTrigger.click();
+        await until(()=>document.querySelector('.batch-factory-theme-color-picker .ant-popover-inner'));
+        const popup=document.querySelector('.batch-factory-theme-color-picker .ant-popover-inner');
+        if(getComputedStyle(popup).backgroundColor!=='rgb(32, 38, 51)')throw Error('取色弹窗未使用主题背景：'+getComputedStyle(popup).backgroundColor);
+        colorTrigger.click();
         const gallery=document.querySelector('.text-editor-gallery');
         if(gallery.querySelector('.ant-btn').getBoundingClientRect().top<gallery.querySelector('span').getBoundingClientRect().bottom)throw Error('图库按钮挤在标题旁');
         for(const [label,fontSize,fontId] of [['舒适阅读',40,'noto-sans-sc'],['纸感手写',44,'long-cang'],['清晰黑体',46,'lxgw-wenkai']]){
@@ -205,9 +211,9 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
     `},bundle:true,jsx:'automatic',write:false,format:'iife',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"production"'},minify:true});
     writeFileSync(join(dir,'app.js'),result.outputFiles[0].contents);
     const html=join(dir,'index.html');
-    const styles=readFileSync(new URL('../shuihuo-production.css',import.meta.url),'utf8')+'\n'+readFileSync(new URL('./text-media-panel.css',import.meta.url),'utf8');
+    const styles=readFileSync(new URL('../shuihuo-production.css',import.meta.url),'utf8')+'\n'+readFileSync(new URL('./text-media-panel.css',import.meta.url),'utf8')+'\n'+readFileSync(new URL('./publish-settings.css',import.meta.url),'utf8');
     writeFileSync(join(dir,'styles.css'),styles);
-    writeFileSync(html,'<meta charset="utf-8"><link rel="stylesheet" href="styles.css"><style>.ant-modal{animation:none!important;transform:none!important;transition:none!important}</style><div id="root"></div><script>'+result.outputFiles[0].text.replaceAll('</script','<\\/script')+'</script>');
+    writeFileSync(html,'<meta charset="utf-8"><link rel="stylesheet" href="styles.css"><style>:root{--sh-panel:#202633;--sh-panel-strong:#293241;--sh-text:#eeeeee;--sh-muted:#bec8d5;--sh-line:#546078;--sh-accent:#67dac1}.ant-modal{animation:none!important;transform:none!important;transition:none!important}</style><div id="root"></div><script>'+result.outputFiles[0].text.replaceAll('</script','<\\/script')+'</script>');
     const dom=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking',
       '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget=24000',
       '--dump-dom',pathToFileURL(html).href],{timeout:45000,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']});

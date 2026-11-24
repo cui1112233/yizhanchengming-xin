@@ -59,8 +59,8 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     try {
       const bg=await api.uploadTextBackground(batchId,bookId,file);
       setItems(list=>[bg,...list.filter(v=>v.id!==bg.id)]);
-      setBackground({kind:'library',id:bg.id});
-    } catch(e){setBgError(e.message);} finally{onUploading(false);setFileBusy(false);}
+      return bg;
+    } catch(e){setBgError(e.message);throw e;} finally{onUploading(false);setFileBusy(false);}
   };
   return <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextPlaceholder:'var(--sh-muted)',colorBorder:'var(--sh-line)',controlItemBgActive:'var(--sh-panel-strong)',controlItemBgHover:'var(--sh-panel-strong)',colorPrimary:'var(--sh-accent)'}}}><fieldset className="text-page-editor" disabled={busy || fileBusy}>
     <legend>{cover?'封面排版':'排版调整 · 仅本页'}</legend>
@@ -74,15 +74,15 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
       if(f.type==='color')return <div className="text-editor-field" key={key}><span>{f.label}</span><TextColorPicker label={f.label} value={value} onChange={next=>setLayout(key,next)}/></div>;
       const opts=key==='fontId' && fonts?.length ? fonts.filter(v=>v.available!==false).map(v=>({value:v.id,label:f.options?.find(option=>option.value===v.id)?.label || v.name})) : f.options;
       return <label key={key}>{f.label}{opts ? <Select aria-label={f.label} disabled={busy || fileBusy} value={value} options={opts} getPopupContainer={trigger=>trigger.parentElement} onChange={next=>setLayout(key,typeof f.initial==='number'?Number(next):next)}/>
-        : <input disabled={key==='targetCharacters' && draft.layout.paginationMode!=='target'} type={f.type==='color'?'color':'number'} min={f.min} max={f.max} step={f.step || 1} value={f.type==='percent'?Math.round(value*100):value}
-            onChange={e=>setLayout(key,f.type==='color'?e.target.value:Number(e.target.value)/(f.type==='percent'?100:1))}/>}</label>;
+        : <input disabled={key==='targetCharacters' && draft.layout.paginationMode!=='target'} type="number" min={f.min} max={f.max} step={f.step || 1} value={f.type==='percent'?Math.round(value*100):value}
+            onChange={e=>setLayout(key,Number(e.target.value)/(f.type==='percent'?100:1))}/>}</label>;
     })}</div>
     {!cover && <TextContrastNotice color={draft.layout.textColor} background={draft.background} warning={contrastWarning} onChange={setColors}/>}
     {!cover && <><div className="text-layout-fields">
       <div className="text-editor-field"><span>背景色</span><TextColorPicker label="背景色" value={draft.background.color || '#111318'} onChange={color=>setBackground({kind:'color',color})}/></div>
-      <div className="text-editor-field text-editor-gallery"><span>背景图库</span><div className="text-editor-gallery-actions"><TextBackgroundGallery value={draft.background} items={items} loading={bgLoading} disabled={busy || fileBusy} onChange={setBackground}/></div></div>
+      <div className="text-editor-field text-editor-gallery"><span>背景图库</span><div className="text-editor-gallery-actions"><TextBackgroundGallery value={draft.background} items={items} loading={bgLoading} disabled={busy || fileBusy} onChange={setBackground} onUpload={upload}/></div></div>
     </div>
-    <label className="text-upload-input">上传背景图<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files[0];e.target.value='';void upload(file);}}/></label></>}
+    </>}
     {bgError && <p role="alert">{bgError}</p>}
     {stale && <p role="alert">此页版本已更新。请复制需要保留的修改，再重新打开排版调整。</p>}
     <div className="text-editor-actions">
