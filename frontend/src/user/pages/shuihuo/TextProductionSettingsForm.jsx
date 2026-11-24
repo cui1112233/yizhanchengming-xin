@@ -8,7 +8,8 @@ import { producerAccountOptions } from './batchFactoryComicPublishAccounts';
 import { TEXT_PRODUCTION_SECTIONS, textProductionInitialSection, textProfileChanges } from './textProductionConfig';
 import TextBackgroundGallery from './TextBackgroundGallery.jsx';
 import './publish-settings.css';
-import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores} from './textLayoutTemplates.js';
+import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores,textColorScheme} from './textLayoutTemplates.js';
+import TextContrastNotice from './TextContrastNotice.jsx';
 
 const SharedImagePublishSettings = lazy(() => import('./BatchFactoryImagePublishSettingsForm').then(module => ({default:module.BatchFactoryComicPublishSettingsForm})));
 const SettingsPreview = lazy(()=>import('./TextSettingsPreview.jsx'));
@@ -110,7 +111,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
     const attrs={'aria-label':field.label};
     if(field.type==='background')return <BackgroundPicker value={v} items={backgrounds} onChange={set} onUploaded={item=>setBackgrounds(old=>[item,...old.filter(x=>x.id!==item.id)])}/>;
     if(field.type==='switch')return <Switch {...attrs} checked={v} onChange={set}/>;
-    if(field.type==='color')return <ColorPicker label={field.label} value={v} onChange={set}/>;
+    if(field.type==='color')return <div><ColorPicker label={field.label} value={v} onChange={set}/>{field.key==='textColor' && <TextContrastNotice color={v} background={value.textBackground} onChange={onChange}/>}</div>;
     if(field.type==='number' || field.type==='percent'){
       const percent=field.type==='percent';
       return <InputNumber {...attrs} min={field.min} max={field.max} step={field.step || 1} addonAfter={percent ? '%' : undefined}
@@ -148,7 +149,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
   const panel=section=><>{section.key==='publish' && <Suspense fallback={null}><SharedImagePublishSettings productionMode="text" singleBook={scope==='book'} value={{comicPublishSettings:sharedPublishValue}} onChange={next=>{
     const changes=Object.fromEntries(Object.entries(next.comicPublishSettings || {}).filter(([key,v])=>JSON.stringify(v)!==JSON.stringify(sharedPublishValue[key])).map(([key,v])=>['comicPublishSettings.'+key,v]));
     if(Object.keys(changes).length)onChange(changes);
-  }}/></Suspense>}{section.key==='publish' && scope==='book' && <div className="text-publish-restores">{publishOverrideRestores(explicitKeys).map(group=><Button key={group.label} size="small" onClick={()=>onChange(Object.fromEntries(group.keys.map(key=>[key,undefined])))}>{group.label} · 恢复继承</Button>)}</div>}{section.key==='layout' && <div className="text-layout-presets"><b>排版预设</b>{TEXT_LAYOUT_TEMPLATES.map(preset=><Button key={preset.id} onClick={()=>onChange(structuredClone(preset.values))}>{preset.label}</Button>)}<Button onClick={()=>onChange({textColor:'#222222'})}>深色文字</Button><Button onClick={()=>onChange({textColor:'#FFFFFF'})}>浅色文字</Button></div>}<div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
+  }}/></Suspense>}{section.key==='publish' && scope==='book' && <div className="text-publish-restores">{publishOverrideRestores(explicitKeys).map(group=><Button key={group.label} size="small" onClick={()=>onChange(Object.fromEntries(group.keys.map(key=>[key,undefined])))}>{group.label} · 恢复继承</Button>)}</div>}{section.key==='layout' && <div className="text-layout-presets"><b>排版预设</b>{TEXT_LAYOUT_TEMPLATES.map(preset=><Button key={preset.id} onClick={()=>onChange(structuredClone(preset.values))}>{preset.label}</Button>)}<Button onClick={()=>onChange(textColorScheme('dark'))}>深色文字</Button><Button onClick={()=>onChange(textColorScheme('light'))}>浅色文字</Button></div>}<div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
     {fieldGroups(section).map(group=><section className="batch-factory-engine-group" key={group.title || section.key}>
       {group.title ? <div className="batch-factory-engine-group-title">{group.title}</div> : null}
       {group.fields.map(renderField)}

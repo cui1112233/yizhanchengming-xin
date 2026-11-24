@@ -1,7 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores} from './textLayoutTemplates.js';
+import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores,textColorScheme,hasLowTextContrast,readableTextColor} from './textLayoutTemplates.js';
 import {applyTextProductionChanges,textProductionBookOverride} from './textProductionConfig.js';
+test('handwriting uses Long Cang and paired colors remain readable',()=>{
+ assert.equal(TEXT_LAYOUT_TEMPLATES.find(p=>p.id==='handwriting').values.textFontId,'long-cang');
+ for(const mode of ['dark','light']){
+  const scheme=textColorScheme(mode);
+  assert.equal(hasLowTextContrast(scheme.textColor,scheme.textBackground),false);
+ }
+ assert.equal(hasLowTextContrast('#222222',{kind:'color',color:'#111318'}),true);
+ assert.equal(hasLowTextContrast('#FFFFFF',{kind:'color',color:'#FFFFFF'}),true);
+ assert.equal(hasLowTextContrast('#222222',{kind:'library',id:'image',color:'#111318'}),false);
+ assert.equal(readableTextColor({kind:'color',color:'#111318'}),'#FFFFFF');
+ assert.equal(readableTextColor({kind:'color',color:'#F6EFDF'}),'#222222');
+});
 test('presets alter only layout and do not replace publishing or selected source',()=>{
  const initial={textSourceLimit:4000,comicPublishSettings:{organizationId:'8',producerAdminName:'test'}};
  const next=applyTextProductionChanges(initial,TEXT_LAYOUT_TEMPLATES[0].values);

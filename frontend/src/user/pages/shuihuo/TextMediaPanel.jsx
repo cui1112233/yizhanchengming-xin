@@ -354,7 +354,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
               <button type="button" disabled={!!busy || !pages[pageIndex+1] || pages[pageIndex+1].locked} onClick={()=>changePages(true)}>与下一页合并</button>
               </div>
           </section>}
-          {session && <TextPageEditor key={session.id} session={session} fonts={snapshot.fonts} batchId={batchId} bookId={book.id} busy={!!busy} stale={stale} impact={impact} onUploading={value=>{backgroundUploading.current=value;}}
+          {session && <TextPageEditor key={session.id} session={session} contrastWarning={live.warning} fonts={snapshot.fonts} batchId={batchId} bookId={book.id} busy={!!busy} stale={stale} impact={impact} onUploading={value=>{backgroundUploading.current=value;}}
             onDraft={fn=>setSession(s=>s?.id===session.id?{...s,draft:fn(s.draft)}:s)} onCancel={discard}
             onSave={()=>run('save',saveEdit)} onApplyBackground={()=>run('background',applyBookBackground)}/>}
           {!loading && !error && !session && <section className="text-media-operation-section"><h4>整书操作</h4><div className="text-media-operation-grid is-pair"><button type="button" disabled={!!busy} onClick={()=>run('prepare',()=>prepareTextBook(batchId,book.id,doc?{expectedRevision:doc.revision}:{}))}>{doc?'更新文字页':'准备文字页'}</button>

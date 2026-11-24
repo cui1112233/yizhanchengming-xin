@@ -51,6 +51,12 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
           const layoutFields=[...layoutGrid.querySelectorAll('.batch-factory-engine-field')].slice(0,4);
           const layoutRows=layoutFields.map(field=>field.getBoundingClientRect().height);
           if(Math.max(...layoutRows)-Math.min(...layoutRows)>2) throw Error('layout rows are uneven');
+          byText('button','纸感手写').click();
+          await waitFor(()=>document.querySelector('.ant-select-selection-item[title="龙藏体 · 自然手写"]'),'Long Cang preset');
+          byText('button','深色文字').click();
+          await waitFor(()=>document.querySelector('[aria-label="背景颜色色值"]')?.value==='#F6EFDF','readable light background');
+          byText('button','浅色文字').click();
+          await waitFor(()=>document.querySelector('[aria-label="背景颜色色值"]')?.value==='#111318','readable dark background');
           const publish=()=>waitFor(()=>byText('[role=tab]','发布配置'),'publish tab');
           (await publish()).click();
           const publishGroup=await waitFor(()=>byText('.batch-factory-engine-group-title','发布映射'),'publish group');

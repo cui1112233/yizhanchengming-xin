@@ -114,13 +114,20 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         const area=()=>document.querySelector('textarea[aria-label="页面正文"]');
         await until(area);
         const originalDraft=area().value;
-        for(const [label,fontSize,fontId] of [['舒适阅读',40,'noto-sans-sc'],['纸感手写',44,'lxgw-wenkai'],['清晰黑体',46,'noto-sans-sc']]){
+        for(const [label,fontSize,fontId] of [['舒适阅读',40,'noto-sans-sc'],['纸感手写',44,'long-cang'],['清晰黑体',46,'noto-sans-sc']]){
           const count=previewBodies.length;button(label).click();
           await until(()=>previewBodies.length>count && previewBodies.at(-1).layout.fontSize===fontSize);
           if(previewBodies.at(-1).layout.fontId!==fontId)throw Error('预设没有更新实际预览字体');
         }
         button('深色文字').click();await until(()=>previewBodies.at(-1)?.layout.textColor==='#222222');
+        if(previewBodies.at(-1).background.color!=='#F6EFDF')throw Error('深色字没有搭配浅色背景');
         button('浅色文字').click();await until(()=>previewBodies.at(-1)?.layout.textColor==='#FFFFFF');
+        if(previewBodies.at(-1).background.color!=='#111318')throw Error('浅色字没有搭配深色背景');
+        const customColor=document.querySelector('.text-layout-fields input[type=color]');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(customColor,'#222222');customColor.dispatchEvent(new Event('input',{bubbles:true}));customColor.dispatchEvent(new Event('change',{bubbles:true}));
+        await until(()=>previewBodies.at(-1)?.layout.textColor==='#222222' && button('一键调整文字颜色'));
+        button('一键调整文字颜色').click();await until(()=>previewBodies.at(-1)?.layout.textColor==='#FFFFFF');
+        if(previewBodies.at(-1).background.color!=='#111318')throw Error('调整文字颜色改动了自选背景');
         if(area().value!==originalDraft)throw Error('选择预设改动了正文内容');
         const change=(s)=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(area(),s);area().dispatchEvent(new Event('input',{bubbles:true}))};
         change('较慢的草稿。');await until(()=>previewBodies.some(p=>p.text==='较慢的草稿。'));
