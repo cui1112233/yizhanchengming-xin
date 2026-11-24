@@ -20,7 +20,7 @@ export const FUNCTION_VISUALS: Record<CatalogModuleKey, FunctionVisual> = {
   fetch: { asset: novelBook, label: "小说创作", description: "从灵感到完整故事" },
   batch: { asset: batchBooks, label: "批量测书", description: "批量获取与生产" },
   shuihuo: { asset: videoClapper, label: "水货生产", description: "漫剧项目与素材生产" },
-  comic: { asset: comicFilm, label: "漫剧创作", description: "小说一键漫剧，角色生动开演" },
+  comic: { asset: comicFilm, label: "漫画生成", description: "从故事正文到漫画页图" },
   aicut: { asset: aiCut, label: "AI-CUT", description: "智能剪辑与成片" },
   agent: { asset: cmCanvas, label: "CM 画布", description: "多步骤智能协作" },
   voice: { asset: voiceStudio, label: "配音", description: "文本生成自然语音" },

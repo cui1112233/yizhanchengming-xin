@@ -61,7 +61,7 @@ test("matches the approved nine-card copy and visual order", () => {
   expect(allText).toContain("批量测书");
   expect(allText).toContain("水货生产");
   expect(allText).toContain("AI-CUT");
-  expect(allText).toContain("漫剧创作");
+  expect(allText).toContain("漫画生成");
   expect(allText).toContain("CM 画布");
   expect(allText).toContain("配音");
   expect(allText).toContain("插件");
