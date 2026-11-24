@@ -114,7 +114,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         const area=()=>document.querySelector('textarea[aria-label="页面正文"]');
         await until(area);
         const originalDraft=area().value;
-        for(const [label,fontSize,fontId] of [['舒适阅读',40,'noto-sans-sc'],['纸感手写',44,'long-cang'],['清晰黑体',46,'noto-sans-sc']]){
+        for(const [label,fontSize,fontId] of [['舒适阅读',40,'noto-sans-sc'],['纸感手写',44,'long-cang'],['清晰黑体',46,'lxgw-wenkai']]){
           const count=previewBodies.length;button(label).click();
           await until(()=>previewBodies.length>count && previewBodies.at(-1).layout.fontSize===fontSize);
           if(previewBodies.at(-1).layout.fontId!==fontId)throw Error('预设没有更新实际预览字体');

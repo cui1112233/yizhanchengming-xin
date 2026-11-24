@@ -4,6 +4,7 @@ import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores,textColorScheme,hasLowText
 import {applyTextProductionChanges,textProductionBookOverride} from './textProductionConfig.js';
 test('handwriting uses Long Cang and paired colors remain readable',()=>{
  assert.equal(TEXT_LAYOUT_TEMPLATES.find(p=>p.id==='handwriting').values.textFontId,'long-cang');
+ assert.equal(TEXT_LAYOUT_TEMPLATES.find(p=>p.id==='clear').values.textFontId,'lxgw-wenkai');
  for(const mode of ['dark','light']){
   const scheme=textColorScheme(mode);
   assert.equal(hasLowTextContrast(scheme.textColor,scheme.textBackground),false);

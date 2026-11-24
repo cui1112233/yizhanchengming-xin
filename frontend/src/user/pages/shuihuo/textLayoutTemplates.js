@@ -2,7 +2,7 @@
 export const TEXT_LAYOUT_TEMPLATES = [
  {id:'reading',label:'舒适阅读',values:{textPaginationMode:'auto',textFontId:'noto-sans-sc',textFontSize:40,textFontWeight:400,textLineHeight:1.8,textParagraphSpacing:40,textPadding:112,textMaxHeightRatio:0.75,textAlign:'left',textColor:'#FFFFFF',textBackground:{kind:'color',color:'#111318'}}},
  {id:'handwriting',label:'纸感手写',values:{textPaginationMode:'auto',textFontId:'long-cang',textFontSize:44,textFontWeight:400,textLineHeight:1.8,textParagraphSpacing:36,textPadding:104,textMaxHeightRatio:0.75,textAlign:'left',textColor:'#302920',textBackground:{kind:'color',color:'#F6EFDF'}}},
- {id:'clear',label:'清晰黑体',values:{textPaginationMode:'auto',textFontId:'noto-sans-sc',textFontSize:46,textFontWeight:500,textLineHeight:1.65,textParagraphSpacing:32,textPadding:96,textMaxHeightRatio:0.75,textAlign:'left',textColor:'#FFFFFF',textBackground:{kind:'color',color:'#111318'}}},
+ {id:'clear',label:'清晰黑体',values:{textPaginationMode:'auto',textFontId:'lxgw-wenkai',textFontSize:46,textFontWeight:500,textLineHeight:1.65,textParagraphSpacing:32,textPadding:96,textMaxHeightRatio:0.75,textAlign:'left',textColor:'#FFFFFF',textBackground:{kind:'color',color:'#111318'}}},
 ];
 
 export function textColorScheme(mode){
