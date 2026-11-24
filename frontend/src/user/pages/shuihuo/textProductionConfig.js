@@ -44,7 +44,7 @@ export const TEXT_PRODUCTION_SECTIONS = [
     field('textCover.layout.fontSize','标题字号','number',64,{min:1,max:256}),
     field('textCover.layout.fontWeight','标题字重','choice',600,{options:options([100,200,300,400,500,600,700,800,900])}),
     field('textCover.layout.align','标题对齐','choice','center',{options:align}),
-    field('textCover.layout.textColor','标题颜色','color','#123040')
+    field('textCover.layout.textColor','标题颜色','color','#FFFFFF')
   ]},
   {key:'publish',label:'发布配置',fields:[
     field('comicPublishSettings.producerAdminName','上传人','producer',''),

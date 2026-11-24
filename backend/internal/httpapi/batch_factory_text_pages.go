@@ -254,7 +254,7 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 	}
 	coverStyle.Layout.HighlightRules = ""
 	coverStyle.Layout.HighlightLines = ""
-	fingerprint, err := json.Marshal([]any{s.Title, coverStyle.Layout, "builtin-text-cover-v1"})
+	fingerprint, err := json.Marshal([]any{s.Title, coverStyle.Layout, txt.DefaultCoverVersion})
 	if err != nil {
 		return s, txt.ErrInvalid
 	}

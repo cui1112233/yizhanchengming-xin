@@ -96,6 +96,7 @@ type RenderInput struct {
 	HighlightReuseEnabled bool
 	DialogueRanges        []HighlightRange
 	DialogueRangesSet     bool
+	VerticalCenterRatio   float64
 	// Preview samples the actual cropped background behind the glyphs.
 	WarnLowContrast func()
 }
@@ -525,6 +526,9 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 	rangeIndex := 0
 	spread := boldSpread(c)
 	paint := func(line lineGeometry, x, y int) error {
+		if in.VerticalCenterRatio > 0 {
+			y += int(math.Round(float64(size.Y) * (in.VerticalCenterRatio - 0.5)))
+		}
 		for _, g := range line.glyphs {
 			for rangeIndex < len(ranges) && ranges[rangeIndex].End <= g.index {
 				rangeIndex++

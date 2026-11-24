@@ -113,6 +113,7 @@ func (a textAPI) renderInput(x textRequest, d txt.Document, p txt.Page, cover bo
 		if content == "" {
 			content = "未命名作品"
 		}
+		content = txt.FormatCoverTitle(content)
 		if prior.Layout == nil {
 			defaults := txt.DefaultCoverLayout(snap.Layout.AspectRatio)
 			prior.Layout = &defaults
@@ -125,7 +126,7 @@ func (a textAPI) renderInput(x textRequest, d txt.Document, p txt.Page, cover bo
 	var bg []byte
 	if cover {
 		bg = txt.DefaultCoverImage()
-		style.Background = txt.Background{Kind: "image", ID: "builtin-text-cover-v1"}
+		style.Background = txt.Background{Kind: "image", ID: txt.DefaultCoverVersion}
 	} else {
 		bg, err = a.bgData(x, style.Background)
 		if err != nil {
@@ -135,6 +136,7 @@ func (a textAPI) renderInput(x textRequest, d txt.Document, p txt.Page, cover bo
 	in := txt.RenderInput{Owner: x.scope.Owner, BookID: x.scope.BookID, VersionID: d.ActiveVersionID, Text: content, Layout: style.Layout, Background: style.Background, BackgroundImage: bg, HighlightReuseEnabled: style.HighlightReuseEnabled && !cover}
 	if cover {
 		in.Layout.HighlightRules = "off"
+		in.VerticalCenterRatio = 0.38
 	}
 	if !cover && (txt.HighlightRuleEnabled(style.Layout.HighlightRules, "dialogue") || txt.HighlightRuleEnabled(style.Layout.HighlightRules, "lines")) {
 		version, err := a.repo.GetVersion(x, x.scope, d.ActiveVersionID)
