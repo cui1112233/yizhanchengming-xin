@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import { ConfigProvider, Select } from 'antd';
 import * as api from '../../../shared/api/batchFactoryText.js';
 import {layoutFields,pageControls} from './textMediaActions.js';
 
@@ -53,21 +54,21 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
       setBackground({kind:'library',id:bg.id});
     } catch(e){setBgError(e.message);} finally{onUploading(false);setFileBusy(false);}
   };
-  return <fieldset className="text-page-editor" disabled={busy || fileBusy}>
+  return <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextPlaceholder:'var(--sh-muted)',colorBorder:'var(--sh-line)',controlItemBgActive:'var(--sh-panel-strong)',controlItemBgHover:'var(--sh-panel-strong)',colorPrimary:'var(--sh-accent)'}}}><fieldset className="text-page-editor" disabled={busy || fileBusy}>
     <legend>{cover?'封面排版':'排版调整'}</legend>
     {!cover && <label>页面正文<textarea aria-label="页面正文" rows={6} value={draft.text} onChange={e=>{const text=e.target.value;onDraft(old=>({...old,text}));}}/></label>}
     <div className="text-layout-fields">{pageControls.filter(f=>!cover || ['fontId','fontSize','fontWeight','align','textColor'].includes(layoutFields[f.key])).map(f=>{
       const key=layoutFields[f.key], value=draft.layout[key];
       const opts=key==='fontId' && fonts?.length ? fonts.filter(v=>v.available!==false).map(v=>({value:v.id,label:v.name})) : f.options;
-      return <label key={key}>{f.label}{opts ? <select value={value} onChange={e=>setLayout(key,typeof f.initial==='number'?Number(e.target.value):e.target.value)}>
-        {opts.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>
+      return <label key={key}>{f.label}{opts ? <Select aria-label={f.label} disabled={busy || fileBusy} value={value} options={opts} getPopupContainer={trigger=>trigger.parentElement} onChange={next=>setLayout(key,typeof f.initial==='number'?Number(next):next)}/>
         : <input type={f.type==='color'?'color':'number'} min={f.min} max={f.max} step={f.step || 1} value={f.type==='percent'?Math.round(value*100):value}
             onChange={e=>setLayout(key,f.type==='color'?e.target.value:Number(e.target.value)/(f.type==='percent'?100:1))}/>}</label>;
     })}</div>
     <div className="text-layout-fields">
       <label>背景色<input type="color" value={draft.background.color || '#111318'} onChange={e=>setBackground({kind:'color',color:e.target.value})}/></label>
-      <label>背景图库<select aria-label="背景图库" value={draft.background.id || ''} onChange={e=>setBackground(e.target.value ? {kind:'library',id:e.target.value}:{kind:'color',color:'#111318'})}>
-        <option value="">{bgLoading?'正在读取…':'纯色背景'}</option><optgroup label="我的图库">{items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</optgroup></select></label>
+      <label>背景图库<Select aria-label="背景图库" disabled={busy || fileBusy} loading={bgLoading} value={draft.background.id || ''} getPopupContainer={trigger=>trigger.parentElement}
+        options={[{value:'',label:'纯色背景'},{label:'我的图库',options:items.length ? items.map(i=>({value:i.id,label:i.name})) : [{value:'__empty__',label:'暂无背景，请上传背景图',disabled:true}]}]}
+        onChange={id=>setBackground(id ? {kind:'library',id}:{kind:'color',color:'#111318'})}/></label>
     </div>
     <label className="text-upload-input">上传背景图<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files[0];e.target.value='';void upload(file);}}/></label>
     {bgError && <p role="alert">{bgError}</p>}
@@ -77,5 +78,5 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
       {!cover && <button type="button" title="更新使用整书背景的文字页，保留单页背景和已锁定的图片。" disabled={stale || draft.text!==session.base.text || Object.keys(draft.layout).some(k=>draft.layout[k]!==session.base.layout[k])} onClick={onApplyBackground}>背景应用到整本书</button>}
       <button type="button" onClick={onCancel}>关闭调整</button>
     </div>
-  </fieldset>;
+  </fieldset></ConfigProvider>;
 }
