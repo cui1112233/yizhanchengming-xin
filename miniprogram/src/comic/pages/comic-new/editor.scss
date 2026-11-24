@@ -241,3 +241,10 @@
   .ce-page-tools { height: 110PX; padding-top: 27PX; }
   .ce-page-scope-note { position: absolute; top: 6PX; left: 12PX; right: 12PX; font-size: 10PX; line-height: 15PX; color: var(--comic-muted); text-align: center; }
 }
+.mp-page.comic-new.comic-editor {
+ .ce-manual-status, .ce-prompt-review-head { display: flex; align-items: center; justify-content: space-between; gap: 10PX; margin-bottom: 8PX; font-size: 12PX; line-height: 19PX; color: var(--comic-muted); }
+ .ce-manual-status button, .ce-prompt-review-head button { min-height: 44PX; padding: 0 6PX; font-size: 11PX; flex-shrink: 0; color: var(--comic-accent); }
+ .ce-page-prompt-preview { height: 100%; width: 100%; box-sizing: border-box; padding: 12PX; color: var(--comic-ink); font-size: 13PX; line-height: 22PX; background: var(--comic-paper); }
+ .ce-page-prompt-preview text { display: block; white-space: pre-wrap; margin-bottom: 10PX; }
+ .ce-prompt-preview-title { font-weight: 600; color: var(--comic-accent); }
+}

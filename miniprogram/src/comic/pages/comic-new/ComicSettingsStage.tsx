@@ -13,6 +13,7 @@ import { privateComicAction } from "./privateComicParity";
 import { estimateComicRunText } from "../../services/runStage";
 
 export type ComicSettingsStageProps = {
+  promptOnly?: boolean;
   source: string;
   styleId: string;
   aspectRatio: string;
@@ -79,7 +80,7 @@ function presetSummary(option?: ComicPresetOption) {
 
 /** 设置只负责输入和继续意图；创建、上传、提取等服务动作由页面持有。 */
 export default function ComicSettingsStage({
-  source, styleId, aspectRatio, referencePath, styles, preset, presets, selectedPresetId, advancedOpen, settingPicker, settingCatalog, models, settingSelections, thumbs, thumbFailed, setupLoading, error,
+  promptOnly = false, source, styleId, aspectRatio, referencePath, styles, preset, presets, selectedPresetId, advancedOpen, settingPicker, settingCatalog, models, settingSelections, thumbs, thumbFailed, setupLoading, error,
   onSourceChange, onPasteSource, onChooseExisting, onStyleChange, onAspectChange, onPresetChange, onToggleAdvanced, onOpenReference, onRetryThumb, onContinue,
   onOpenSettingPicker, onCloseSettingPicker, onSettingSelectionChange, onConfirmSettingSelections,
   continueDisabled = false, continueLoading = false, continueHint = "", configurationHint = "",
@@ -111,9 +112,9 @@ export default function ComicSettingsStage({
     batchId: "", assetsCount: 0, pagesCount: 0, submitted: false,
     busy: setupLoading || continueLoading || continueDisabled,
   });
-  const countText = length ? (remaining > 0 ? `已输入 ${length} 字，还需 ${remaining} 字` : `已输入 ${length} 字，可以开始生成了`) : "还没有输入正文";
+  const countText = length ? (remaining > 0 ? `已输入 ${length} 字，还需 ${remaining} 字` : `已输入 ${length} 字，${promptOnly ? "可以提取人物场景" : "可以开始生成了"}`) : "还没有输入正文";
   // 估算只在够提交长度后出现，措辞固定「预计 / 约 / 估算」，不写成承诺。
-  const estimate = length >= MIN_COMIC_SOURCE_CHARS ? estimateComicRunText(length) : "";
+  const estimate = !promptOnly && length >= MIN_COMIC_SOURCE_CHARS ? estimateComicRunText(length) : "";
   const selectedStyle = styles.find((style) => style.id === styleId)?.name || "未选择";
   const baseSummary = presetSummary(preset);
   const pickerTitle = settingPicker ? {
@@ -137,7 +138,7 @@ export default function ComicSettingsStage({
     <View className="ce-option-side"><View className={`ce-option-radio${active ? " is-checked" : ""}`}>{active ? <Text className="ce-check-glyph">✓</Text> : null}</View><Button className="ce-option-detail-button" onClick={event => {event.stopPropagation();setDetail(detail === id ? "" : id);}}>{detail === id ? "收起" : "完整名称"}</Button></View>
   </View>;
   const presetChoice = (key: keyof ComicSettingSelections, option: ComicCatalogPreset, current: string, caption: string) => choice(`${key}:${option.id}`, option.name, `${caption} · v${option.version}`, selected(key, current) === option.id, () => choose(key, option.id));
-  const hint = continueHint || (setupLoading ? "正在读取画风和预设…" : !styleId ? "还没有可用画风，稍后再试" : !length ? "先粘贴小说正文" : remaining > 0 ? `还需 ${remaining} 字` : "先创建项目并提取资产，下一步再确认分镜");
+  const hint = continueHint || (setupLoading ? "正在读取画风和预设…" : !styleId ? "还没有可用画风，稍后再试" : !length ? "先粘贴小说正文" : remaining > 0 ? `还需 ${remaining} 字` : promptOnly ? "下一步先检查人物场景" : "先创建项目并提取资产，下一步再确认分镜");
   return <View className={`comic-settings-stage${reducedMotion ? " is-motion-reduced" : ""}`}>
     {error ? <Text className="mp-error comic-error">{error}</Text> : null}
 
@@ -145,7 +146,7 @@ export default function ComicSettingsStage({
     <View className={`ce-config-readiness${configurationHint ? " needs-setup" : ""}`}><Text>{setupLoading ? "正在读取创作配置" : configurationHint ? "创作配置待完善" : "创作配置已齐全"}</Text><Text className="ce-muted">{setupLoading ? "稍候即可查看当前画风、模型与提示词" : configurationHint || "已配置画风、模型与提示词，可按当前设置继续"}</Text></View>
     <View className={`ce-source-card${!length ? " is-empty" : ""}${tooLong || setupLoading ? " has-notice" : ""}`}>
     <View className="ce-source-head"><Text>故事正文</Text>{length > 0 ? <View><Button onClick={onPasteSource}>粘贴内容</Button><Button onClick={onChooseExisting}>选择已有书籍</Button></View> : <Text className="ce-muted">粘贴或直接输入</Text>}</View>
-    {!length ? <View className="ce-source-start"><Text className="ce-start-title">从一段故事开始</Text><Text className="ce-start-copy">先放入正文，再检查人物与场景，最后确认生成漫画。</Text><View className="ce-start-actions"><Button onClick={onPasteSource}>粘贴内容</Button><Button id="comic-use-example" onClick={() => onSourceChange(COMIC_EXAMPLE_SOURCE)}>使用示例</Button><Button onClick={onChooseExisting}>选择已有书籍</Button></View></View> : null}
+    {!length ? <View className="ce-source-start"><Text className="ce-start-title">从一段故事开始</Text><Text className="ce-start-copy">{promptOnly ? "先提取人物场景，再生成提示词，检查后另行生成图片。" : "先放入正文，再检查人物与场景，最后确认生成漫画。"}</Text><View className="ce-start-actions"><Button onClick={onPasteSource}>粘贴内容</Button><Button id="comic-use-example" onClick={() => onSourceChange(COMIC_EXAMPLE_SOURCE)}>使用示例</Button><Button onClick={onChooseExisting}>选择已有书籍</Button></View></View> : null}
     <Textarea className="ce-source-input" value={source} maxlength={-1} placeholder={length ? "粘贴要生成漫画的正文…" : "也可以在这里直接输入故事正文…"} onInput={event => onSourceChange(String(event.detail.value))} />
     <View className="ce-source-count"><Text>{length.toLocaleString()} 字</Text><Button onClick={() => onSourceChange("")}>清空</Button></View>
     {tooLong ? <Text className="comic-hint">内容较长，一次最多生成 35 页，请确认处理范围。</Text> : null}
@@ -194,7 +195,7 @@ export default function ComicSettingsStage({
       <View className="comic-dock-copy">
         <Text className="comic-dock-line">{countText}</Text>
         {estimate ? <Text className="comic-dock-caption">{estimate}</Text> : <Text className="comic-dock-caption">{hint}</Text>}
-        <Text className="comic-dock-next">先识别人物场景，确认后再分页出图</Text>
+        <Text className="comic-dock-next">{promptOnly ? "先生成提示词，图片需要另行确认" : "先识别人物场景，确认后再分页出图"}</Text>
       </View>
       <Button className="mp-primary" loading={continueLoading} disabled={!action.enabled} onClick={() => { if (action.enabled) onContinue(); }}>
         {continueLoading ? "正在创建项目…" : "提取人物场景"}

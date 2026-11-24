@@ -171,7 +171,7 @@ vi.mock("../../services/comicEditing", () => ({
   replaceComicImage: h.replaceImage, setComicAssetPrimary: h.assetPrimary,
 }));
 
-import ComicPrivatePage from "./index";
+import { LegacyComicPrivatePage as ComicPrivatePage } from "./index";
 import ComicStageHeader from "./ComicStageHeader";
 import ComicPageWorkspace from "./ComicPageWorkspace";
 import ComicSettingsStage from "./ComicSettingsStage";
@@ -307,7 +307,7 @@ beforeEach(() => {
   h.showActionSheet.mockResolvedValue({ tapIndex: 0 });
 });
 
-describe("私人定制漫画页", () => {
+describe("旧自动任务兼容页", () => {
   test("资产编辑保存当前选中资产并重新读取当前书籍", async () => {
     h.saveAsset.mockResolvedValue({});
     render();runEffects();await flush();primaryButton(typeSource(SOURCE)).props.onClick();await flush();

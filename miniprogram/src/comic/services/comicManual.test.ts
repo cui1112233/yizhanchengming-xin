@@ -1,0 +1,31 @@
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+const h = vi.hoisted(() => ({ request: vi.fn(), pages: vi.fn() }));
+vi.mock('../../services/api', () => ({ apiRequest: h.request }));
+vi.mock('../../services/batchFactoryV11', () => ({ BATCH_FACTORY_BASE: '/api/batch-factory/v12' }));
+vi.mock('./comicResult', () => ({ loadComicPages: h.pages }));
+import { generateComicPrompts, comicPromptMode, saveComicManualSettings, watchComicPageImages } from './comicManual';
+beforeEach(() => { vi.clearAllMocks(); h.request.mockResolvedValue({}); });
+afterEach(() => vi.useRealTimers());
+test('manual prompts use only the comic stage', async () => {
+    expect(comicPromptMode([])).toBe('bootstrap');
+    expect(comicPromptMode([{ comicPrompt: '已有', imagePrompt: '' }, { comicPrompt: '', imagePrompt: '' }])).toBe('missing');
+    expect(comicPromptMode([{ comicPrompt: '', imagePrompt: '已有' }])).toBe('force');
+    await generateComicPrompts('b/a', 'k/b', 'missing');
+    expect(h.request).toHaveBeenCalledWith('/api/batch-factory/v12/batches/b%2Fa/books/k%2Fb/stages/comic', expect.objectContaining({ method: 'POST', data: expect.objectContaining({ mode: 'missing', requestId: expect.any(String) }) }));
+    expect(h.request.mock.calls.some(([url]) => url.includes('automation/start') || url.endsWith('/generate'))).toBe(false);
+});
+test('settings preserve batch revision', async () => { h.request.mockResolvedValueOnce({ batch: { revision: 9 } }); await saveComicManualSettings('b', { imageAspectRatio: '9:16' }); expect(h.request.mock.calls[1]).toEqual(['/api/batch-factory/v12/batches/b/settings', { method: 'PUT', data: { expectedRevision: 9, patch: { imageAspectRatio: '9:16' } } }]); });
+test('regeneration waits for a new candidate', async () => {
+    vi.useFakeTimers();
+    const done = vi.fn();
+    h.pages.mockResolvedValueOnce([{ videoId: 'v', status: 'completed', images: [{ id: 'old' }] }]).mockResolvedValue([{ videoId: 'v', status: 'completed', images: [{ id: 'old' }, { id: 'new' }] }]);
+    const stop = watchComicPageImages('b', 'k', { v: ['old'] }, { onPages: vi.fn(), onDone: done, onError: vi.fn() });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(done).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(done).toHaveBeenCalledTimes(1);
+    stop();
+});
+test('stop ignores late reads and never submits images', async () => { vi.useFakeTimers(); let resolve: any; h.pages.mockReturnValue(new Promise(r => resolve = r)); const onPages = vi.fn(); const stop = watchComicPageImages('b', 'k', { v: [] }, { onPages, onDone: vi.fn(), onError: vi.fn() }); stop(); resolve([{ videoId: 'v', status: 'completed', images: [{ id: 'new' }] }]); await Promise.resolve(); expect(onPages).not.toHaveBeenCalled(); expect(h.request).not.toHaveBeenCalled(); });
+test('poll timeout preserves a clear pending result without generating again', async () => { vi.useFakeTimers(); h.pages.mockResolvedValue([{ videoId: 'v', status: 'pending', images: [] }]); const done = vi.fn(); const error = vi.fn(); watchComicPageImages('b', 'k', { v: [] }, { onPages: vi.fn(), onDone: done, onError: error }, { timeoutMs: 6000 }); await vi.advanceTimersByTimeAsync(6000); expect(done).not.toHaveBeenCalled(); expect(error).toHaveBeenCalledTimes(1); expect(h.request).not.toHaveBeenCalled(); });
+test('failed read reports the error without charging a retry', async () => { h.pages.mockRejectedValue(new Error('登录已失效')); const error = vi.fn(); watchComicPageImages('b', 'k', { v: [] }, { onPages: vi.fn(), onDone: vi.fn(), onError: error }); await Promise.resolve(); await Promise.resolve(); expect(error).toHaveBeenCalledTimes(1); expect(h.request).not.toHaveBeenCalled(); });
