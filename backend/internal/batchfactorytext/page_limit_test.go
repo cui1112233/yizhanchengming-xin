@@ -57,20 +57,22 @@ func TestTextPaginationEnforcesConfiguredPageLimitWithoutTruncation(t *testing.T
 }
 
 func TestReadingPaginationBalancesTinyFinalPageAtParagraphBoundary(t *testing.T) {
-	text := strings.Repeat(strings.Repeat("字", 30)+"。\n", 3) + "SUV车窗降下"
-	pages, err := Paginate(context.Background(), PaginationInput{Text: text, Layout: LayoutConfig{PaginationMode: "auto"}}, runeCapacity(96))
-	if err != nil || len(pages) != 2 {
-		t.Fatalf("pages=%d error=%v", len(pages), err)
-	}
-	if len([]rune(strings.TrimSpace(pages[1].Text))) < 25 {
-		t.Fatalf("tiny final page was not balanced: %q", pages[1].Text)
-	}
-	if pages[0].Text+pages[1].Text != text || !strings.HasSuffix(pages[0].Text, "\n") {
-		t.Fatal("balancing lost text or split a paragraph")
-	}
-	for _, page := range pages {
-		if len([]rune(page.Text)) > 96 {
-			t.Fatal("balanced page overflowed")
+	for _, mode := range []string{"auto", "target"} {
+		text := strings.Repeat(strings.Repeat("字", 30)+"。\n", 3) + "SUV车窗降下"
+		pages, err := Paginate(context.Background(), PaginationInput{Text: text, Layout: LayoutConfig{PaginationMode: mode}}, runeCapacity(96))
+		if err != nil || len(pages) != 2 {
+			t.Fatalf("pages=%d error=%v", len(pages), err)
+		}
+		if len([]rune(strings.TrimSpace(pages[1].Text))) < 25 {
+			t.Fatalf("tiny final page was not balanced: %q", pages[1].Text)
+		}
+		if pages[0].Text+pages[1].Text != text || !strings.HasSuffix(pages[0].Text, "\n") {
+			t.Fatal("balancing lost text or split a paragraph")
+		}
+		for _, page := range pages {
+			if len([]rune(page.Text)) > 96 {
+				t.Fatal("balanced page overflowed")
+			}
 		}
 	}
 }

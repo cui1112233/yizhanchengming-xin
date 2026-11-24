@@ -134,10 +134,8 @@ func Paginate(ctx context.Context, input PaginationInput, measure MeasureFunc) (
 		start = end
 	}
 	p.flush()
-	if input.Layout.PaginationMode == "auto" {
-		if err := p.balanceTail(); err != nil {
-			return nil, err
-		}
+	if err := p.balanceTail(); err != nil {
+		return nil, err
 	}
 	if len(p.pages) > limit {
 		return nil, &PageLimitError{Pages: len(p.pages), Limit: limit}
