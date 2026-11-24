@@ -1,4 +1,4 @@
-import Taro, { useDidShow } from "@tarojs/taro";
+import Taro, { useDidShow,useDidHide } from "@tarojs/taro";
 import { Button, Checkbox, CheckboxGroup, Input, Picker, ScrollView, Text, Textarea, View } from "@tarojs/components";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import BrandHeader from "../../components/BrandHeader";
@@ -173,7 +173,10 @@ export function FetchWorkspaceBody({title="小说获取",compact=false,initialTa
       .finally(() => { if (refreshId === refreshVersion.current) setRefreshing(false); });
   };
 
-  useDidShow(refresh);
+  const visibleCycle=useRef(false);
+  useEffect(()=>{if(!visibleCycle.current){visibleCycle.current=true;refresh();}},[]);
+  useDidShow(()=>{if(!visibleCycle.current){visibleCycle.current=true;refresh();}});
+  useDidHide(()=>{visibleCycle.current=false;});
 
   const saveTextModel = async (modelId: string) => {
     if (!requestGuard.beginModelSave()) return;
