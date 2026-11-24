@@ -450,7 +450,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		imageCapacityRedis = transport.Do
 	}
 	imageCapacityController := imagecapacity.NewController(imageCapacityPolicies, imageCapacityRedis, "qiantie:imagecapacity")
-	usageTracker := &yzcmusage.Tracker{Store: usageStore, Client: yzcmusage.Client{HTTP: safehttp.NewClientWithTimeout(12 * time.Second)}}
+	usageTracker := &yzcmusage.Tracker{Store: usageStore, Client: yzcmusage.Client{HTTP: safehttp.NewClientWithTimeout(12 * time.Second)}, ReceiptDir: filepath.Join(cfg.MemberSystemDir, "usage-receipts")}
 	safehttp.SetManagedOutboundDecorator(func(base http.RoundTripper, timeout time.Duration) http.RoundTripper {
 		return imageCapacityController.WrapTransportWithTimeout(usageTracker.Wrap(base), timeout)
 	})

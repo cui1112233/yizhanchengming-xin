@@ -30,6 +30,7 @@ func Fingerprint(key string) string {
 }
 
 type Tracker struct {
+	ReceiptDir        string
 	Store             Store
 	Client            Client
 	ResolveCredential func(context.Context, string, string) (string, error)
@@ -80,6 +81,7 @@ func (t *Tracker) Run(ctx context.Context) {
 	t.once.Do(func() {
 		t.wake = make(chan struct{}, 1)
 		go func() {
+			t.flushReceipts(ctx)
 			timer := time.NewTicker(20 * time.Second)
 			defer timer.Stop()
 			for {
@@ -89,6 +91,7 @@ func (t *Tracker) Run(ctx context.Context) {
 				case <-timer.C:
 				case <-t.wake:
 				}
+				t.flushReceipts(ctx)
 				t.reconcile(ctx)
 			}
 		}()
@@ -200,11 +203,8 @@ func (t *trackedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 	t.t.remember(key)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	err = t.t.Store.Record(ctx, Request{ID: id, Owner: i.Owner, Feature: feature}, Fingerprint(key), response.StatusCode)
+	t.t.recordReceipt(ctx, Request{ID: id, Owner: i.Owner, Feature: feature}, Fingerprint(key), response.StatusCode, time.Now().UTC())
 	cancel()
-	if err != nil {
-		log.Print("YZCM usage: request persistence failed")
-	}
 	// A bounded worker, rather than a goroutine per response, performs lookups.
 	return response, nil
 }

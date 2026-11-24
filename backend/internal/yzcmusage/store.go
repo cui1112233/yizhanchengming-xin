@@ -48,10 +48,13 @@ func SchemaStatements() []string {
 }
 
 func (s Store) Record(ctx context.Context, r Request, keyHash string, status int) error {
+	return s.recordAt(ctx, r, keyHash, status, time.Now().UTC())
+}
+func (s Store) recordAt(ctx context.Context, r Request, keyHash string, status int, at time.Time) error {
 	if r.ID == "" || r.Owner == "" || len(r.ID) > 64 || len(r.Owner) > 32 {
 		return errors.New("invalid usage identity")
 	}
-	_, err := s.DB.ExecContext(ctx, `INSERT IGNORE INTO yzcm_usage_requests(request_id,owner,feature,credential_hash,created_at,http_status) VALUES(?,?,?,?,?,?)`, r.ID, r.Owner, r.Feature, keyHash, time.Now().UTC(), status)
+	_, err := s.DB.ExecContext(ctx, `INSERT IGNORE INTO yzcm_usage_requests(request_id,owner,feature,credential_hash,created_at,http_status) VALUES(?,?,?,?,?,?)`, r.ID, r.Owner, r.Feature, keyHash, at.UTC(), status)
 	return err
 }
 func (s Store) Pending(ctx context.Context) ([]Pending, error) {
