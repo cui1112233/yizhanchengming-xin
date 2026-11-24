@@ -310,7 +310,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
     chooseCollection(result.id); setCollectionDetail(result); setCollectionImage(''); setTab('collections');
   }
   return <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextPlaceholder:'var(--sh-muted)',colorBorder:'var(--sh-line)',controlItemBgActive:'var(--sh-panel-strong)',controlItemBgHover:'var(--sh-panel-strong)',colorPrimary:'var(--sh-accent)'}}}><div className="text-media-panel" aria-label="文本媒体库">
-    <section className="text-media-preview" aria-label="成品预览">{live.url?<img src={live.url} alt="排版预览"/>:preview
+    <section className="text-media-preview" aria-label="成品预览">{live.url?<img src={live.url} alt="排版预览"/>:session?<div className="text-media-empty">{live.error?'当前排版无法预览，请调整设置':'正在更新排版预览…'}</div>:preview
       ? <AuthenticatedTextPageImage contentUrl={preview} alt={tab === 'pages' ? `文字页 ${page?.ordinal}` : tab === 'cover' ? '文本封面' : '文本合集预览'} />
       : <div className="text-media-empty">{loading ? '正在读取文本页…' : tab === 'cover' ? '暂无封面图' : tab === 'collections' ? '暂无合集预览' : state.error || state.label}</div>}
       {(live.error||live.warning) && <div className="text-preview-note" role="status">{live.error||live.warning}</div>}</section>

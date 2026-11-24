@@ -53,7 +53,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
           previewBodies.push(body);
           if(body.text==='较慢的草稿。') return new Promise((resolve,reject)=>opts.signal.addEventListener('abort',()=>{aborted=true;reject(new DOMException('取消','AbortError'))},{once:true}));
           if(body.text==='太长的草稿。')return new Response('{"error":"文字超出页面"}',{status:400});
-          return new Response(new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],{type:'image/png'}),{headers:{'X-Text-Contrast':'low'}});
+          return new Response(new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],{type:'image/png'}),{headers:{'X-Text-Contrast':'low','X-Text-Preview-Pages':'2'}});
         }else if(opts.method==='PATCH'){saved=JSON.parse(opts.body);await new Promise(resolve=>{releaseSave=resolve});
           items={affectedPageIds:['p2','downstream'],pages:[{id:'p1',revision:2},{id:'p2',revision:4,ordinal:2,status:'pending'},{id:'downstream',revision:5,ordinal:3,status:'pending'}]};}
         else if(opts.method==='PUT'){
@@ -113,13 +113,22 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         edit.click();
         const area=()=>document.querySelector('textarea[aria-label="页面正文"]');
         await until(area);
+        const originalDraft=area().value;
+        for(const [label,fontSize,fontId] of [['舒适阅读',40,'noto-sans-sc'],['纸感手写',44,'lxgw-wenkai'],['清晰黑体',46,'noto-sans-sc']]){
+          const count=previewBodies.length;button(label).click();
+          await until(()=>previewBodies.length>count && previewBodies.at(-1).layout.fontSize===fontSize);
+          if(previewBodies.at(-1).layout.fontId!==fontId)throw Error('预设没有更新实际预览字体');
+        }
+        button('深色文字').click();await until(()=>previewBodies.at(-1)?.layout.textColor==='#222222');
+        button('浅色文字').click();await until(()=>previewBodies.at(-1)?.layout.textColor==='#FFFFFF');
+        if(area().value!==originalDraft)throw Error('选择预设改动了正文内容');
         const change=(s)=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(area(),s);area().dispatchEvent(new Event('input',{bubbles:true}))};
         change('较慢的草稿。');await until(()=>previewBodies.some(p=>p.text==='较慢的草稿。'));
         change('较新的草稿。');await until(()=>aborted && document.querySelector('img[alt="排版预览"]'));
         if(!document.body.innerText.includes('对比度较低'))throw Error('未显示颜色提示');
-        const last=document.querySelector('img[alt="排版预览"]').src;
+        if(!document.body.innerText.includes('本页内容将分为 2 页'))throw Error('未说明完整内容会续页');
         change('太长的草稿。'); await until(()=>document.body.innerText.includes('文字超出页面'));
-        if(document.querySelector('img[alt="排版预览"]').src!==last)throw Error('预览失败丢失上一张图');
+        if(document.querySelector('.text-media-preview img'))throw Error('预览失败仍显示旧图，会误认为预设没有生效');
         change('最终手改。'); await until(()=>previewBodies.some(p=>p.text==='最终手改。'));
         const esc=()=>document.querySelector('.ant-modal-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',keyCode:27,bubbles:true}));
         const mask=()=>document.querySelector('.ant-modal-wrap').click();

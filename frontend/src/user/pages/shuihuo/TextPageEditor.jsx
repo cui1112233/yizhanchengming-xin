@@ -11,19 +11,21 @@ export function useDraftPreview(batchId,bookId,session) {
   useEffect(()=>{setView({});},[key]);
   useEffect(()=>{
     if(!session) return;
+    setView({key:session.id,pending:true});
     const controller=new AbortController();
     const timer=setTimeout(async()=>{
       try {
         const {draft,cover,id,rev,docRev}=session;
         const p={expectedRevision:rev,expectedDocumentRevision:docRev,layout:draft.layout,background:draft.background};
         const options={signal:controller.signal,withMetadata:true};
-        const {blob,warning}=cover ? await api.previewTextCover(batchId,bookId,p,options)
+        const {blob,warning,pageCount=1}=cover ? await api.previewTextCover(batchId,bookId,p,options)
           : await api.previewTextPage(batchId,bookId,id,{...p,text:draft.text},options);
         if(controller.signal.aborted)return;
         if(!blob?.size || blob.type!=='image/png')throw Error('未收到有效的预览图片');
-        setView({key:id,url:URL.createObjectURL(blob),warning});
+        const reflowNote=pageCount>1?`本页内容将分为 ${pageCount} 页，当前预览第 1 页；保存后其余内容会完整顺延。`:'';
+        setView({key:id,url:URL.createObjectURL(blob),warning:[reflowNote,warning].filter(Boolean).join(' ')});
       } catch(e) {
-        if(!controller.signal.aborted)setView(last=>({...last,key:session.id,error:e.message}));
+        if(!controller.signal.aborted)setView({key:session.id,error:e.message});
       }
     },300);
     return ()=>{clearTimeout(timer);controller.abort();};

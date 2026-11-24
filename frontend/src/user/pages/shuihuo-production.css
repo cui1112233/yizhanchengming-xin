@@ -521,7 +521,8 @@ body.shuihuo-reference-shell .legacy-content { padding: 0; overflow: auto; }
 body.batch-factory-column-resizing, body.batch-factory-column-resizing * { cursor: col-resize !important; user-select: none !important; }
 .batch-factory-book-row .shuihuo-workbench-cell { min-height: 206px; }
 .batch-factory-book-content strong { color: var(--sh-text); font-size: 14px; }
-.batch-factory-book-content > span, .batch-factory-placeholder > span, .batch-factory-actions > span { color: var(--sh-muted); line-height: 1.55; font-size: 12px; }
+.batch-factory-book-content > span { color: var(--sh-muted); line-height: 1.4; font-size: 10px; }
+.batch-factory-placeholder > span, .batch-factory-actions > span { color: var(--sh-muted); line-height: 1.55; font-size: 12px; }
 .batch-factory-book-title-row { display: flex; align-items: center; justify-content: flex-start; gap: 6px; min-width: 0; }
 .batch-factory-book-title-row > strong { flex: 1 1 auto; min-width: 0; overflow: hidden; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
 .batch-factory-book-title-row > small,

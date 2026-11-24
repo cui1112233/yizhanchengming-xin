@@ -15,3 +15,11 @@ test('text requests encode book and page identifiers and send optimistic revisio
  assert.equal(seen[2][0],'/api/batch-factory/v12/batches/b/books/k/text-pages/p/upload?expectedRevision=9');
  assert.equal(seen[2][1].body.size,4);
 });
+
+test('draft preview reports automatic continuation pages and contrast separately',async()=>{
+ globalThis.localStorage={getItem:()=>null};
+ globalThis.fetch=async()=>new Response(new Blob(['image'],{type:'image/png'}),{headers:{'Content-Type':'image/png','X-Text-Preview-Pages':'3','X-Text-Contrast':'low'}});
+ const result=await api.previewTextPage('b','k','p',{text:'完整正文。'},{withMetadata:true});
+ assert.equal(result.pageCount,3);assert.equal(result.blob.type,'image/png');
+ assert.match(result.warning,/对比度较低/);
+});

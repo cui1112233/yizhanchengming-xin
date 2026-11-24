@@ -176,7 +176,14 @@ func (a textAPI) picture(w http.ResponseWriter, r *http.Request, x textRequest) 
 		return err
 	}
 	lowContrast := false
+	previewPages := 1
 	if preview {
+		if !cover {
+			input, previewPages, err = textPreviewInput(x, input, renderer)
+			if err != nil {
+				return textLayoutError(err)
+			}
+		}
 		input.WarnLowContrast = func() { lowContrast = true }
 	}
 	data, mime, err := renderer.Render(x, input)
@@ -184,6 +191,7 @@ func (a textAPI) picture(w http.ResponseWriter, r *http.Request, x textRequest) 
 		return textLayoutError(err)
 	}
 	if preview {
+		w.Header().Set("X-Text-Preview-Pages", strconv.Itoa(previewPages))
 		if lowContrast {
 			w.Header().Set("X-Text-Contrast", "low")
 		}
@@ -198,6 +206,22 @@ func (a textAPI) picture(w http.ResponseWriter, r *http.Request, x textRequest) 
 	}
 	writeJSON(w, 201, view)
 	return nil
+}
+
+func textPreviewInput(ctx context.Context, input txt.RenderInput, renderer txt.Renderer) (txt.RenderInput, int, error) {
+	fits, _, err := renderer.MeasureFunc(ctx)(input.Text, input.Layout)
+	if err != nil || fits {
+		return input, 1, err
+	}
+	pages, err := txt.Paginate(ctx, txt.PaginationInput{Text: input.Text, Layout: input.Layout}, renderer.MeasureFunc(ctx))
+	if err != nil {
+		return input, 0, err
+	}
+	if len(pages) == 0 {
+		return input, 0, txt.ErrInvalid
+	}
+	input.Text = pages[0].Text
+	return input, len(pages), nil
 }
 func (a textAPI) saveImage(x textRequest, pageID string, rev int64, upload bool, backgroundName string, data []byte, mime string) (view textMediaView, err error) {
 	f, err := a.files.SaveImage("text_"+rand.Text(), mime, bytes.NewReader(data))
