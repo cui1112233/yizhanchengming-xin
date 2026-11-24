@@ -594,6 +594,7 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
       const confirmed = await new Promise(resolve => {
         Modal.confirm({
           title: `确认把整批切换为${nextLabel}？`,
+          className: 'batch-factory-confirm-modal',
           content: `整批 ${batchBooks.length} 本将切换为${nextLabel}。已生成的内容和资产全部保留，随时可切回。${overrideCount ? `${overrideCount} 本单书的模式覆盖将被清除。` : ''}在途${previousLabel}任务不会迁移。`,
           okText: '确认切换',
           cancelText: '保持当前模式',

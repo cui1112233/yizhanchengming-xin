@@ -756,6 +756,10 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-preset-option small { color:var(--sh-muted); flex:none; font-size:11px; }
 .batch-factory-engine-field .ant-select, .batch-factory-engine-field .ant-input, .batch-factory-engine-field .ant-input-number { max-width:300px; }
 .batch-factory-settings-card{gap:0!important;padding:14px!important;border-radius:12px!important;background:var(--sh-panel)!important}
+.batch-factory-confirm-modal .ant-modal-content{color:var(--sh-text);background:var(--sh-panel);border:1px solid var(--sh-line);border-radius:12px}
+.batch-factory-confirm-modal .ant-modal-confirm-title{color:var(--sh-text)!important}
+.batch-factory-confirm-modal .ant-modal-confirm-content{color:var(--sh-muted)!important;line-height:1.7}
+.batch-factory-confirm-modal .ant-btn-default{color:var(--sh-text);background:var(--sh-panel-strong);border-color:var(--sh-line)}
 .batch-factory-color-trigger{display:grid;place-items:center;flex:none;width:36px;height:34px;padding:5px;border:1px solid var(--sh-line);border-radius:8px;background:var(--sh-panel-strong);cursor:pointer}
 .batch-factory-color-trigger i{display:block;width:100%;height:100%;border:1px solid var(--sh-line);border-radius:4px;background:var(--selected-color)}
 .batch-factory-color-trigger:hover,.batch-factory-color-trigger:focus-visible{border-color:var(--sh-accent);outline:2px solid color-mix(in srgb,var(--sh-accent) 20%,transparent);outline-offset:1px}
