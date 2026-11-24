@@ -5124,22 +5124,32 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     try {
       const presets = automationPresets.length ? automationPresets : await loadAutomationPresets();
       const modePresets = automationPresetsForMode(presets, batchProductionMode);
-      const activePresetID = automationActive ? String(automationStatus?.preset?.id || '').trim() : '';
+      const activePresetID = !automationJobMode || automationJobMode === batchProductionMode
+        ? String(automationStatus?.preset?.id || '').trim() : '';
       const selectedPresetID = String(automationPresetID || '').trim();
-      const presetID = (modePresets.some(item => String(item.id) === activePresetID) && activePresetID)
+      const presetID = (automationActive && modePresets.some(item => String(item.id) === activePresetID) && activePresetID)
         || (modePresets.some(item => String(item.id) === selectedPresetID) && selectedPresetID)
+        || (modePresets.some(item => String(item.id) === activePresetID) && activePresetID)
         || modePresets[0]?.id
         || '';
       if (!presetID) {
-        message.warning(`请先在自动生产中选择一个${automationPresetModeLabel(batchProductionMode)}预设。`);
+        await openAutomationStart(selectedBookIds);
+        message.info(`请选择一个${automationPresetModeLabel(batchProductionMode)}预设后执行已选书籍。`);
         return;
       }
+      const reusePrevious = presetID === activePresetID && (automationActive || !selectedPresetID);
+      const availableRunModes = batchProductionMode === 'text' ? ['video_no_submit','full_submit'] : ['storyboard_only','video_no_submit','full_submit'];
+      const previousRunMode = String(automationStatus?.runMode || '');
+      const executionRunMode = reusePrevious && availableRunModes.includes(previousRunMode) ? previousRunMode : automationRunMode;
+      const executionConcurrency = normalizeAutomationConcurrency(reusePrevious ? automationStatus?.concurrency : automationConcurrency);
       setAutomationPresetID(presetID);
+      setAutomationRunMode(executionRunMode);
+      setAutomationConcurrency(executionConcurrency);
       setAutomationBookScope('selected');
       setActionBusy('selected-production');
       const preflightResponse = await preflightBatchAutomation(batch.id, {
         presetId: presetID,
-        runMode: automationRunMode,
+        runMode: executionRunMode,
         productionMode: batchProductionMode,
         bookIds: selectedBookIds,
         queueIfActive: automationActive
@@ -5159,9 +5169,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       }
       if (batchProductionMode === 'text') {
         const started = await startBatchAutomation(batch.id, {
-          presetId:presetID, bookIds:runnableBookIds, productionMode:'text', runMode:automationRunMode,
-          autoPublish:automationRunMode === 'full_submit', forceRegenerate:automationForceRegenerate,
-          scheduleMode:'execute', concurrency:normalizeAutomationConcurrency(automationConcurrency), queueIfActive:automationActive
+          presetId:presetID, bookIds:runnableBookIds, productionMode:'text', runMode:executionRunMode,
+          autoPublish:executionRunMode === 'full_submit', forceRegenerate:automationForceRegenerate,
+          scheduleMode:'execute', concurrency:executionConcurrency, queueIfActive:automationActive
         });
         setAutomationStatus(current => mergeAutomationLogSnapshot(current, resultData(started, 'automation')));
         message.success(`已提交 ${runnableBookIds.length} 本选中的文本作品`);
@@ -5173,7 +5183,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         : requestID('batch-execution');
       const effectiveExecutionConfig = {
         presetId: presetID,
-        runMode: automationRunMode,
+        runMode: executionRunMode,
         productionMode: batchProductionMode,
         bookTitles: Object.fromEntries(selectedBooks.map(book => [book.id, book.title || book.bookId || book.id]))
       };

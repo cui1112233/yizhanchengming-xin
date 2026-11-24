@@ -183,7 +183,7 @@ test('当前上传以回执状态为准，首次上传、等待回读和再次�
   assert.equal(helpers.textUploadControl({id:'c'},{published:false,publish:{status:'pending'},lastPublished:previous}).disabled,true);
   assert.deepEqual(helpers.textUploadControl({id:'c'},{published:true,publish:previous}),{label:'再次上传',disabled:false,force:true});
   assert.ok(panel.includes('getTextPublishStatus'));
-  assert.ok(panel.includes('window.confirm(\'这个文本合集已上传，确认再次上传？\')'));
+  assert.ok(panel.includes("window.confirm(summary+'\\n这个文本合集已上传，确认再次上传？')"));
 });
 
 test('混选漫画与文本会在提交前提示分开选择', () => {
@@ -220,7 +220,7 @@ test('Chrome 点击上传、取消和确认再次上传，等待回读期间不�
       async function until(test){for(let i=0;i<500;i++){if(test())return;await sleep(20)}throw Error(document.body.innerText)}
       let collection=null,status={published:false,publish:null},confirms=0,confirmResult=false;
       const posts=[];
-      window.confirm=()=>{confirms++;return confirmResult};
+      window.confirm=message=>{if(message.startsWith('上传确认')&&!message.includes('确认再次上传？'))return true;confirms++;return confirmResult};
       window.fetch=async(url,opts={})=>{
         const path=String(url).split('?')[0];
         let data;
@@ -315,7 +315,7 @@ test('Chrome 重开媒体库后沿用原上传记录，轮询图片数量、回�
     const history={status:'published',carouselId:9,imageIds:[2,3,4]};
     const posts=[];
     let publish,reads=0,failOnce=false;
-    window.confirm=()=>{throw Error('继续上传不应触发强制重传确认')};
+    window.confirm=message=>{if(message.startsWith('上传确认')&&!message.includes('确认再次上传？'))return true;throw Error('继续上传不应触发强制重传确认')};
     window.fetch=async(url,options={})=>{
       const path=String(url).split('?')[0];
       let data={};
@@ -402,7 +402,7 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
     const book={id:'b',title:'手动上传的书',bookId:'101',sourceText:'正文。',txtText:'正文。',settingsState:{patch:{}},videos:[]};
     const batch={id:'batch',revision:1,title:'文本批次',settingsState:{patch:{productionMode:'text'}},books:[book]};
     const history={kind:'text',bookId:'b',collectionId:'c',status:'published',carouselId:1,imageIds:[2]};
-    const runtime={stageSummaries:{b:{textPublishSource:'manual',textPublishRecord:{kind:'text',bookId:'b',collectionId:'c',status:'failed'},textLastPublishedRecord:history}},automation:{state:'idle',books:[]},production:{jobs:[]},merge:{jobs:[]}};
+    const runtime={stageSummaries:{b:{textPublishSource:'manual',textPublishRecord:{kind:'text',bookId:'b',collectionId:'c',status:'failed'},textLastPublishedRecord:history}},automation:{state:'completed',preset:{id:'saved-preset'},productionMode:'text',runMode:'video_no_submit',concurrency:2,books:[]},production:{jobs:[]},merge:{jobs:[]}};
     window.fetch=async(url,opts={})=>{
       const path=String(url).split('?')[0],method=opts.method||'GET';
       const payload=opts.body?JSON.parse(opts.body):null;
@@ -416,7 +416,7 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
       else if(path.endsWith('/books/b2/text-collections'))data={items:[{id:'do-not-guess'},{id:'choose-b2'}]};
       else if(path.endsWith('/text-collections/choose-b2/publish'))data={published:false,publish:null};
       else if(path.endsWith('/automation/retry'))data={automation:{state:'running'}};
-      else if(path.endsWith('automation-presets'))data={presets:[{id:'preset',name:'文本预设',config:{productionMode:'text'}}]};
+      else if(path.endsWith('automation-presets'))data={presets:[{id:'preset',name:'另一个预设',config:{productionMode:'text'}},{id:'saved-preset',name:'上次使用的文本预设',config:{productionMode:'text'}}]};
       else if(path.endsWith('automation/preflight'))data={readOnly:true,books:[{bookId:'b',passed:true}]};
       else if(path.endsWith('automation/start'))data={automation:{state:'running',books:[{bookId:'b',stage:'text_process',status:'running'}]}};
       else if(path.endsWith('config-versions'))data={configVersions:[]};
@@ -437,9 +437,12 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
       logs().querySelector('.ant-modal-close').click();await sleep(350);
       step='选择书';document.querySelector('.batch-factory-book-row input[type=checkbox]').click();await sleep(60);
       step='批量操作';button('批量操作').dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await until(()=>Array.from(document.querySelectorAll('[role=menuitem]')).some(n=>n.textContent.includes('立即执行已选')));
+      if(!Array.from(document.querySelectorAll('[role=menuitem]')).some(n=>n.textContent.includes('立即执行已选（1）')))throw Error('勾选一本后快捷菜单计数没有更新');
       Array.from(document.querySelectorAll('[role=menuitem]')).find(n=>n.textContent.includes('立即执行已选')).click();
       step='已选启动';await until(()=>posts.some(x=>x.path.endsWith('/automation/start')));
       if(posts.some(x=>x.path.includes('/executions')) || posts.find(x=>x.path.endsWith('/automation/start')).payload.bookIds.join(',')!=='b')throw Error('提交到错误模式或书目');
+      const immediate=posts.find(x=>x.path.endsWith('/automation/start')).payload;
+      if(immediate.presetId!=='saved-preset'||immediate.runMode!=='video_no_submit'||immediate.concurrency!==2)throw Error('快捷入口没有复用上次任务的预设、执行模式和并行数');
       step='两本书一次重试';
       const book2={...book,id:'b2',bookId:'102',title:'第二本'};
       batch.books=[book,book2];
