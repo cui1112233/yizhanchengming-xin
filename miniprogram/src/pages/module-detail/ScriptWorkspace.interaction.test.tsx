@@ -1,12 +1,12 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ slots: [] as any[], cursor: 0, show: null as any, api: vi.fn(), modal: vi.fn() }));
+const h = vi.hoisted(() => ({ slots: [] as any[], cursor: 0, show: null as any, api: vi.fn(), modal: vi.fn(),draft:{recovery:null as any,status:"",restore:vi.fn(),keepCurrent:vi.fn()} }));
 vi.mock("react", () => ({
   useState: (initial: any) => { const i = h.cursor++; if (!(i in h.slots)) h.slots[i] = typeof initial === "function" ? initial() : initial; return [h.slots[i], (next: any) => { h.slots[i] = typeof next === "function" ? next(h.slots[i]) : next; }]; },
   useRef: (initial: any) => { const i = h.cursor++; if (!(i in h.slots)) h.slots[i] = { current: initial }; return h.slots[i]; },
   useEffect: () => undefined,
 }));
-vi.mock("@tarojs/taro", () => ({ default: { showToast: vi.fn(), showModal: h.modal, getFileSystemManager: () => ({ unlink: vi.fn() }) }, useDidShow: (fn: any) => { h.show = fn; } }));
+vi.mock("@tarojs/taro", () => ({ default: { showToast: vi.fn(), showModal: h.modal, getFileSystemManager: () => ({ unlink: vi.fn() }) }, useDidHide:()=>{}, useDidShow: (fn: any) => { h.show = fn; } }));
 vi.mock("@tarojs/components", () => Object.fromEntries(["Button", "Input", "Picker", "Text", "Textarea", "View", "ScrollView", "Image", "Switch"].map(n => [n, n])));
 vi.mock("../../theme", () => ({ withThemedPage: (fn: any) => fn }));
 vi.mock("../../services/api", () => ({ apiRequest: h.api }));
@@ -16,6 +16,7 @@ vi.mock("../../components/AppIcon", () => ({ default: () => null }));
 vi.mock("./ScriptVideoProduction", () => ({ default: () => null }));
 vi.mock("./ScriptPersonalPrompts", () => ({ default: () => null }));
 vi.mock("./ScriptEntityMedia", () => ({ default: () => null }));
+vi.mock("./useScriptDraft",()=>({default:()=>h.draft}));
 import Workspace from "./ScriptWorkspace";
 
 function render() { h.cursor = 0; return Workspace({}); }
@@ -25,7 +26,7 @@ function find(label: string) { const found = nodes(render()).find(n => n.type ==
 async function setup() { render(); h.show(); await Promise.resolve(); await Promise.resolve(); render(); }
 function inputNovel(value: string) { const input = nodes(render()).find(n => n.type === "Textarea" && n.props.placeholder === "粘贴小说原文"); expect(input).toBeTruthy(); input.props.onInput({ detail: { value } }); }
 beforeEach(() => {
-  h.slots = []; h.cursor = 0; h.api.mockReset(); h.modal.mockResolvedValue({confirm:true});
+  h.slots = []; h.cursor = 0; h.draft.recovery=null;h.draft.restore.mockReset();h.api.mockReset(); h.modal.mockResolvedValue({confirm:true});
   h.api.mockImplementation(async (path: string, request: any) => {
     if (path === "/api/models?kind=text") return [{ id: "text-real", name: "真实文本模型" }];
     if (path === "/api/models?kind=image") return [];
@@ -145,4 +146,17 @@ test('history button opens private history and restores the explicitly selected 
   h.api.mockImplementation(async(path:string)=>path==='/api/history/h-real'?{id:'h-real',novelText:'历史原文',output:'历史结果',extractInfo:{characters:[],scenes:[]}}:{});
   history.props.onSelect('h-real');for(let i=0;i<20;i++)await Promise.resolve();
   expect(h.api).toHaveBeenCalledWith('/api/history/h-real');expect(text(render())).toContain('历史结果');
+});
+
+test('edited output saves a distinct history version and starts with no old video receipts',async()=>{
+ const normal=h.api.getMockImplementation()!,saved=new Map<string,any>();h.api.mockImplementation(async(p,o)=>{if(p==='/api/history'&&o?.method==='POST'){saved.set(o.data.id,o.data);return{};}if(p.startsWith('/api/history/'))return saved.get(decodeURIComponent(p.slice('/api/history/'.length)))||{};return normal(p,o);});
+ await setup();for(let i=0;i<8;i++)await Promise.resolve();inputNovel('她推开门。');await find('提取人物场景').props.onClick();await find('生成剧本').props.onClick();const before=[...saved.keys()][0];
+ const video=nodes(render()).find(n=>typeof n.type==='function'&&n.props.output==='真实返回的分镜');video.props.onTasksChange({0:{taskId:'old-video',status:'completed'}});
+ find('编辑剧本 / 分镜').props.onClick();nodes(render()).find(n=>n.type==='Textarea'&&String(n.props.className).includes('studio-result-edit')).props.onInput({detail:{value:'### 分镜1\n新的画面'}});find('应用为新版本').props.onClick();await find('保存当前剧本版本').props.onClick();
+ const entries=[...saved.values()];expect(entries).toHaveLength(2);expect(entries[1].id).not.toBe(before);expect(entries[1]).toMatchObject({output:'### 分镜1\n新的画面',videoTasks:{}});expect(entries[0].output).toBe('真实返回的分镜');
+});
+
+test('draft restore is disabled during an in-flight extraction and same-tick taps cannot interrupt it',async()=>{
+ await setup();inputNovel('小说原文');h.draft.recovery={state:{novelText:'旧草稿'}};const normal=h.api.getMockImplementation()!;let finish:any;h.api.mockImplementation((p,o)=>p==='/api/chat'?new Promise(resolve=>{finish=resolve;}):normal(p,o));
+ const restore=find('恢复本机草稿').props.onClick,work=find('提取人物场景').props.onClick();restore();expect(h.draft.restore).not.toHaveBeenCalled();expect(find('恢复本机草稿').props.disabled).toBe(true);finish({characters:[{id:'c',name:'人物'}],scenes:[]});await work;expect(find('恢复本机草稿').props.disabled).toBe(false);
 });

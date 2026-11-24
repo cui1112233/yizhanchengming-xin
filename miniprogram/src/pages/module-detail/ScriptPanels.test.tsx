@@ -1,6 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 const h = vi.hoisted(() => ({ slots: [] as any[], cursor: 0, seen: new Set<number>(), effects: [] as any[], cleanups: [] as any[], api: vi.fn() }));
 vi.mock('react', () => ({ useState: (v:any)=>{const i=h.cursor++;if(!(i in h.slots))h.slots[i]=typeof v==='function'?v():v;return[h.slots[i],(next:any)=>{h.slots[i]=typeof next==='function'?next(h.slots[i]):next;}];}, useRef: (v:any)=>{const i=h.cursor++;if(!(i in h.slots))h.slots[i]={current:v};return h.slots[i];}, useEffect:(fn:any)=>{const i=h.cursor++;if(!h.seen.has(i)){h.seen.add(i);h.effects.push(fn);}} }));
+vi.mock('@tarojs/taro',()=>({default:{showModal:vi.fn()}}));
 vi.mock('@tarojs/components',()=>Object.fromEntries(['Button','Input','Picker','Text','Textarea','View','ScrollView'].map(name=>[name,name])));
 vi.mock('../../services/api',()=>({apiRequest:h.api}));
 vi.mock('../../components/AppIcon',()=>({default:'Icon'}));
