@@ -53,8 +53,8 @@ describe("小程序功能目录", () => {
   });
 
   it("每个一级功能都有唯一的小程序入口路由", () => {
-    expect(moduleRoute("script")).toBe("/pages/module-detail/index?key=script");
-    expect(moduleRoute("agent")).toBe("/pages/module-detail/index?key=agent");
+    expect(moduleRoute("script")).toBe("/comic/pages/module-detail/index?key=script");
+    expect(moduleRoute("agent")).toBe("/comic/pages/module-detail/index?key=agent");
     expect(moduleRoute("comic")).toBe("/comic/pages/comic-new/index");
     expect(moduleRoute("batch")).toBe("/pages/batch/index");
     expect(moduleRoute("voice")).toBe("/comic/pages/tts/index");

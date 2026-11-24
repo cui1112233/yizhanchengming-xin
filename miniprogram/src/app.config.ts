@@ -21,6 +21,7 @@ export default {
     {
       root: "comic",
       pages: [
+        "pages/module-detail/index",
         "pages/index/index",
         "pages/aicut/index",
         "pages/novel/index",

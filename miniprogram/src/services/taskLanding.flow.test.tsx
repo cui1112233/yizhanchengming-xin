@@ -22,7 +22,7 @@ vi.mock('../pages/module-detail/PanelWorkspace',()=>({default:()=>null}));
 vi.mock('../pages/module-detail/ShuihuoWorkspace',()=>({default:()=>null}));
 import AICut from '../comic/pages/aicut';
 import Novel from '../comic/pages/novel';
-import Detail from '../pages/module-detail';
+import Detail from '../comic/pages/module-detail';
 let root:Root,container:HTMLDivElement;
 beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);h.api.mockReset();h.store.clear();container=document.createElement('div');root=createRoot(container);h.api.mockImplementation(async(p:string)=>p==='/api/ai-cut/projects'?{projects:[{id:'cut1',title:'工程一'},{id:'cut2',title:'工程二'}]}:p==='/api/novel-creation/projects'?{projects:[{id:'novel1',title:'小说一'}]}:p.includes('/models?')?{models:[{id:'m',name:'模型'}]}:{sessions:[]});});
 afterEach(async()=>{await act(async()=>root.unmount());vi.unstubAllGlobals();});

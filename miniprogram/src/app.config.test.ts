@@ -35,6 +35,7 @@ describe("小程序页面配置", () => {
   test("新增功能页全部位于 comic 分包，主包页面列表不扩大", () => {
     const subPackage = appConfig.subPackages?.find((item) => item.root === "comic");
     expect(subPackage?.pages).toEqual([
+      "pages/module-detail/index",
       "pages/index/index",
       "pages/aicut/index",
       "pages/novel/index",

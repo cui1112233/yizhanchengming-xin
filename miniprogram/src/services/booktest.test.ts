@@ -5,7 +5,7 @@ import {fetchTaskOverallStatus,normalizeFetchTask,fetchWorkspaceState} from './f
 import {fetchDetailBody} from './fetchDetailBody';
 test('book testing opens fetch processing while factory tasks keep the existing batch route',()=>{
  expect(MODULES.find(item=>item.label==='批量测书')?.key).toBe('booktest');
- expect(moduleRoute('booktest')).toBe('/pages/module-detail/index?key=booktest');
+ expect(moduleRoute('booktest')).toBe('/comic/pages/module-detail/index?key=booktest');
  expect(moduleRoute('batch')).toBe('/pages/batch/index');
  expect(taskSourceForModule('booktest')).toBe('fetch');
  expect(taskSourceForModule('batch')).toBe('batch');

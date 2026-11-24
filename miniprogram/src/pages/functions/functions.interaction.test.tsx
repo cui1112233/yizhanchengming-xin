@@ -117,5 +117,5 @@ test("legacy fetch resume preserves its real route without marking novel creatio
   h.value = "fetch";
   expect(render().filter(n => n.type === "Button" && n.props.className.includes("is-recent"))).toHaveLength(0);
   render().find(n => n.props.className === "gallery-resume").props.onClick();
-  expect(h.navigate).toHaveBeenLastCalledWith({url: "/pages/module-detail/index?key=fetch"});
+  expect(h.navigate).toHaveBeenLastCalledWith({url: "/comic/pages/module-detail/index?key=fetch"});
 });

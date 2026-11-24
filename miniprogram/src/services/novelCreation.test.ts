@@ -5,7 +5,7 @@ import { createNovelJournal } from './novelRecovery';
 import { moduleRoute } from '../config/modules';
 test('novels use an independent entry without breaking existing fetch task links',()=>{
   expect(moduleRoute('novel')).toBe('/comic/pages/novel/index');
-  expect(moduleRoute('fetch')).toBe('/pages/module-detail/index?key=fetch');
+  expect(moduleRoute('fetch')).toBe('/comic/pages/module-detail/index?key=fetch');
 });
 test('original discussions use novel studio endpoints, not fetch or generic chat',async()=>{
   const request=vi.fn().mockResolvedValue({session:{id:'s1'}});const client=createNovelClient(request);

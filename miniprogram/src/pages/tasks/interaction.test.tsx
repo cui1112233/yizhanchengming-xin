@@ -69,7 +69,7 @@ test('ready records render during sync with an explicit incomplete-statistics no
 test('flat record opens the existing encoded module destination',async()=>{
  const tree=await ready();expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row'))).toHaveLength(4);
  tree.find(n=>n.props?.className?.split(' ').includes('task-studio-row')&&content(n).includes('失败项目')).props.onClick();
- expect(h.navigate).toHaveBeenCalledWith({url:'/pages/module-detail/index?key=booktest&taskId=a%2Fb'});
+ expect(h.navigate).toHaveBeenCalledWith({url:'/comic/pages/module-detail/index?key=booktest&taskId=a%2Fb'});
 });
 test('a record without an ID cannot open an empty or unrelated destination',async()=>{
  h.load.mockResolvedValue({sources:[{source:'fetch',state:'ready'}],entries:[{source:'fetch',sourceLabel:'Fetch',title:'Missing ID',status:'unknown'}]});

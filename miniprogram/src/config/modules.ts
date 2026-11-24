@@ -42,5 +42,10 @@ export function moduleRoute(key: ModuleKey) {
   if (key === "voice") return "/comic/pages/tts/index";
   if (key === "aicut") return "/comic/pages/aicut/index";
   if (key === "comic") return "/comic/pages/comic-new/index";
-  return key === "batch" ? "/pages/batch/index" : `/pages/module-detail/index?key=${key}`;
+  return key === "batch" ? "/pages/batch/index" : `/comic/pages/module-detail/index?key=${key}`;
+}
+
+export function legacyModuleDetailDestination(params:Record<string,unknown>){
+  const query=Object.entries(params).filter(([,value])=>value!==undefined&&value!==null).map(([key,value])=>`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`).join('&');
+  return `/comic/pages/module-detail/index${query?'?'+query:''}`;
 }

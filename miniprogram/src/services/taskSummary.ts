@@ -1,4 +1,5 @@
 import {sessionRevision} from './sessionBoundary';
+import {moduleRoute} from '../config/modules';
 import {loadCmTaskFeed,loadNovelTaskFeed,loadCutTaskFeed,loadWaterTaskFeed,limitTaskRequests} from './taskFeeds';
 export type TaskSource = "script" | "agent" | "fetch" | "batch" | "shuihuo" | "novel" | "aicut";
 export type TaskStatus = "running" | "retry" | "attention" | "completed" | "unknown";
@@ -380,13 +381,13 @@ export function taskCounts(entries: AggregatedTask[]) {
 export function taskDestination(entry: AggregatedTask) {
   const id = encodeURIComponent(entry.id || '');
   if (entry.source === 'batch') return `/pages/batch/index?batchId=${encodeURIComponent(entry.projectId||entry.id||'')}${entry.bookId?`&bookId=${encodeURIComponent(entry.bookId)}`:''}`;
-  if (entry.source === 'shuihuo') return `/pages/module-detail/index?key=shuihuo&projectId=${encodeURIComponent(entry.projectId || '')}`;
-  if (entry.source === 'agent') return `/pages/module-detail/index?key=agent&taskId=${encodeURIComponent(entry.projectId||entry.id||'')}&tab=tasks`;
+  if (entry.source === 'shuihuo') return `${moduleRoute('shuihuo')}&projectId=${encodeURIComponent(entry.projectId || '')}`;
+  if (entry.source === 'agent') return `${moduleRoute('agent')}&taskId=${encodeURIComponent(entry.projectId||entry.id||'')}&tab=tasks`;
   if(entry.source==='novel'&&entry.taskType==='project')return `/comic/pages/novel/index?projectId=${encodeURIComponent(entry.projectId||entry.id||'')}`;
   if(entry.source==='aicut'&&entry.taskType==='project')return `/comic/pages/aicut/index?projectId=${encodeURIComponent(entry.projectId||entry.id||'')}`;
   if(entry.source==='novel'&&entry.taskType==='writing-plan')return `/comic/pages/novel/index?projectId=${encodeURIComponent(entry.projectId||'')}&sessionId=${encodeURIComponent(entry.sessionId||'')}&tab=automation&planId=${id}&planKind=${entry.planKind==='batches'?'batches':'schedules'}`;
   if(entry.source==='novel')return `/comic/pages/novel/index?projectId=${encodeURIComponent(entry.projectId||'')}&sessionId=${encodeURIComponent(entry.sessionId||'')}&runId=${id}`;
   if(entry.source==='aicut')return `/comic/pages/aicut/index?projectId=${encodeURIComponent(entry.projectId||'')}&timelineId=${encodeURIComponent(entry.timelineId||'default')}&tab=exports`;
-  if (entry.source === 'fetch') return `/pages/module-detail/index?key=booktest&taskId=${id}`;
-  return `/pages/module-detail/index?key=script&historyId=${id}`;
+  if (entry.source === 'fetch') return `${moduleRoute('booktest')}&taskId=${id}`;
+  return `${moduleRoute('script')}&historyId=${id}`;
 }
