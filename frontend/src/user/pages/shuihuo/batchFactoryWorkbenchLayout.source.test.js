@@ -31,3 +31,8 @@ test('workbench header wraps its controls instead of creating a parent horizonta
   assert.match(layout, /\.batch-factory-workbench\s*>\s*\.shuihuo-workbench-header\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto[^}]*grid-template-rows:\s*auto/s);
   assert.match(layout, /\.batch-factory-workbench\s+\.shuihuo-workbench-toolbar\s*\{[^}]*grid-column:\s*1\s*\/\s*-1[^}]*overflow-x:\s*auto/s);
 });
+
+test('all production modes share one compact Batch Factory table header rule', () => {
+  assert.match(stylesheet, /\.batch-factory-workbench-table \.shuihuo-workbench-head\s*\{[^}]*min-height:\s*32px/s);
+  assert.doesNotMatch(stylesheet, /(?:text|comic|video)[^,{]*\.shuihuo-workbench-head\s*\{[^}]*min-height/s);
+});

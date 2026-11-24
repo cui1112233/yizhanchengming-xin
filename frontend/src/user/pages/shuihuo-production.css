@@ -753,6 +753,23 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-preset-option > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .batch-factory-preset-option small { color:var(--sh-muted); flex:none; font-size:11px; }
 .batch-factory-engine-field .ant-select, .batch-factory-engine-field .ant-input, .batch-factory-engine-field .ant-input-number { max-width:300px; }
+.batch-factory-settings-card{gap:0!important;padding:14px!important;border-radius:12px!important;background:var(--sh-panel)!important}
+.batch-factory-settings-card .batch-factory-engine-card-body{gap:0}
+.batch-factory-engine-group{display:grid;grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px;min-width:0}
+.batch-factory-engine-group+.batch-factory-engine-group{padding-top:14px;margin-top:14px;border-top:1px solid var(--sh-line)}
+.batch-factory-engine-group-title{grid-column:1/-1;color:var(--sh-muted);font-size:11px;font-weight:800;letter-spacing:.08em}
+.batch-factory-settings-card .batch-factory-engine-field{grid-template-columns:132px minmax(0,1fr);gap:10px}
+.batch-factory-settings-card .batch-factory-engine-field>span b{font-size:12px}
+.batch-factory-settings-card .batch-factory-engine-field>.ant-select,
+.batch-factory-settings-card .batch-factory-engine-field>.ant-input,
+.batch-factory-settings-card .batch-factory-engine-field>.ant-input-number,
+.batch-factory-engine-control-with-action>.ant-select{width:100%;max-width:none}
+.batch-factory-engine-control-with-action{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;min-width:0}
+.batch-factory-settings-card .batch-factory-engine-field.is-switch-row{grid-template-columns:minmax(0,1fr) auto;min-height:38px;padding:0 10px;border:1px solid var(--sh-line);border-radius:8px;background:var(--sh-panel-strong)}
+.batch-factory-settings-card .batch-factory-engine-field.is-switch-row>.ant-switch{justify-self:end}
+.batch-factory-settings-card .batch-factory-engine-field>span+.ant-space{width:100%}
+.batch-factory-settings-card .batch-factory-engine-field>span+.ant-space>.ant-space-item:last-child{flex:1;min-width:0}
+.batch-factory-settings-card .batch-factory-engine-field>span+.ant-space>.ant-space-item:last-child .ant-input{width:100%!important}
 
 .batch-factory-automation-modal.ant-modal { width:min(680px,calc(100vw - 96px))!important; max-width:calc(100vw - 24px); top:12px; padding-bottom:0; }
 .batch-factory-automation-modal .ant-modal-content { overflow:hidden; max-height:calc(100vh - 24px); padding:0; border:1px solid var(--sh-line); border-radius:16px; color:var(--sh-text); background:var(--sh-panel); box-shadow:0 24px 70px rgba(0,0,0,.42); }
@@ -801,7 +818,7 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-audio-option b { color:var(--sh-text); font-size:13px; }
 .batch-factory-audio-option small, .batch-factory-audio-option em { color:var(--sh-muted); font-size:12px; line-height:1.45; font-style:normal; }
 .batch-factory-audio-option em { color:var(--sh-accent); font-size:11px; }
-@media (max-width: 780px) { .batch-factory-engine-grid, .batch-factory-audio-options { grid-template-columns:1fr; } .batch-factory-engine-field { grid-template-columns:1fr; gap:8px; } .batch-factory-book-audio-head { align-items:stretch; flex-direction:column; } .batch-factory-book-audio-duration .batch-factory-engine-field { grid-template-columns:1fr; } }
+@media (max-width: 780px) { .batch-factory-engine-grid, .batch-factory-engine-group, .batch-factory-audio-options { grid-template-columns:1fr; } .batch-factory-engine-field,.batch-factory-settings-card .batch-factory-engine-field { grid-template-columns:1fr; gap:8px; } .batch-factory-settings-card .batch-factory-engine-field.is-switch-row{grid-template-columns:minmax(0,1fr) auto}.batch-factory-book-audio-head { align-items:stretch; flex-direction:column; } .batch-factory-book-audio-duration .batch-factory-engine-field { grid-template-columns:1fr; } }
 
 .batch-factory-book-row .batch-factory-book-preset-cell,
 .batch-factory-book-row .batch-factory-book-prompt-cell,
@@ -3353,9 +3370,9 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-text-rendered-cell{padding:0!important}
 .batch-factory-text-page-open{padding:0;border:0;background:transparent;color:var(--sh-accent);font-size:10px;cursor:pointer;white-space:nowrap}
 .batch-factory-text-page-open:disabled{color:var(--sh-muted);cursor:default}
-.batch-factory-text-page-image{display:flex;align-items:center;justify-content:center;width:100%;min-height:150px;padding:8px;border:0;background:color-mix(in srgb,var(--sh-panel-strong) 82%,#000);cursor:pointer;overflow:hidden}
+.batch-factory-text-page-image{display:grid;place-items:center;width:100%;height:100%;min-height:0;padding:2px;border:0;background:color-mix(in srgb,var(--sh-panel-strong) 82%,#000);cursor:pointer;overflow:hidden}
 .batch-factory-text-page-image:disabled{cursor:default}
-.batch-factory-text-page-image img{display:block;width:auto;max-width:100%;height:150px;object-fit:contain;aspect-ratio:3/4;border-radius:6px;background:#111827}
+.batch-factory-text-page-image img{display:block;width:min(100%,180px);height:auto;max-height:100%;object-fit:contain;aspect-ratio:3/4;border-radius:6px;background:#111827}
 .batch-factory-text-page-empty{display:grid;place-items:center;gap:7px;min-height:134px;color:var(--sh-muted);font-size:11px;text-align:center}
 .batch-factory-text-page-empty .anticon{font-size:24px;color:color-mix(in srgb,var(--sh-accent) 55%,var(--sh-muted))}
 .batch-factory-text-rendered-cell .batch-factory-cell-pager span{overflow:hidden;color:var(--sh-muted);font-size:10px;text-align:center;text-overflow:ellipsis;white-space:nowrap}
@@ -4246,6 +4263,9 @@ body.shuihuo-reference-shell
   grid-template-columns: var(--bf-workbench-columns);
   min-width: var(--bf-workbench-min-width);
 }
+.batch-factory-workbench-table .shuihuo-workbench-head{height:32px;min-height:32px}
+.batch-factory-workbench-table .shuihuo-workbench-head>div{display:flex;align-items:center;height:32px;min-height:32px;padding:5px 10px;box-sizing:border-box}
+.batch-factory-workbench-table .shuihuo-workbench-head>div:first-child{justify-content:center}
 /* BF_WORKBENCH_LAYOUT_CONTRACT_END */
 
 .batch-factory-inline-comic{display:grid;grid-template-rows:auto minmax(120px,1fr) 42px 28px;min-height:360px;gap:6px;padding:10px}

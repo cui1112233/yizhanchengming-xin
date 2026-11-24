@@ -114,19 +114,31 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
       allowClear={field.type!=='choice'} disabled={disabled} options={choices(field)}
       placeholder={many?'默认使用文本模型':'请选择'} value={v==='' ? undefined : v} onChange={n=>set(n ?? (many?[]:''))}/>;
   };
-  const panel=section=><div className="batch-factory-engine-card"><div className="batch-factory-engine-card-body batch-factory-engine-grid">
-    {section.fields.map(field=>{
+  const fieldGroups=section=>{
+    if(section.key==='layout') return [
+      {title:'正文排版',fields:section.fields.filter(field=>field.key!=='textBackground' && !field.key.startsWith('textCover.'))},
+      {title:'背景与标题',fields:section.fields.filter(field=>field.key==='textBackground' || field.key.startsWith('textCover.'))}
+    ];
+    if(section.key==='publish') return [
+      {title:'发布映射',fields:section.fields.slice(0,4)},
+      {title:'自动发布',fields:section.fields.slice(4)}
+    ];
+    return [{title:'',fields:section.fields}];
+  };
+  const renderField=field=>{
       const own=explicitKeys.includes(field.key);
-      return <div className="batch-factory-engine-field" key={field.key}>
+      const action=field.type==='profile' ? <Button size="small" loading={syncing} onClick={syncProfiles}>同步网站配置档</Button> : null;
+      return <div className={`batch-factory-engine-field${field.type==='switch' ? ' is-switch-row' : ''}`} key={field.key}>
         <span><b>{field.label}</b>{scope==='book' && own && <small> · 本书覆盖</small>}</span>
-        {control(field)}
+        {action ? <div className="batch-factory-engine-control-with-action">{control(field)}{action}</div> : control(field)}
         {scope==='book' && own && <Button size="small" type="link" onClick={()=>onRestore(field.key)}>恢复继承</Button>}
-        {field.key==='sensitiveMode' && <small>{value.sensitiveMode==='ai'?field.aiHint:value.sensitiveMode==='off'?'直接使用生产稿。':'系统优化在本地执行。'}</small>}
-        {field.key==='highlightReuseEnabled' && <small>复用已有标红词，本地排版。</small>}
-        {field.key==='textFontId' && value[field.key]==='ma-shan-zheng' && <small>部分字回退到 Noto Sans SC。</small>}
-        {field.type==='profile' && <Button size="small" loading={syncing} onClick={syncProfiles}>同步网站配置档</Button>}
       </div>;
-    })}
+  };
+  const panel=section=><div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
+    {fieldGroups(section).map(group=><section className="batch-factory-engine-group" key={group.title || section.key}>
+      {group.title ? <div className="batch-factory-engine-group-title">{group.title}</div> : null}
+      {group.fields.map(renderField)}
+    </section>)}
   </div></div>;
   return <>{error && <Alert type="warning" showIcon message={error}/>}
     <Tabs activeKey={tab} onChange={setTab} items={TEXT_PRODUCTION_SECTIONS.map(s=>({key:s.key,label:s.label,children:panel(s)}))}/>

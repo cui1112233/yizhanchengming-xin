@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,6 +19,8 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
         import {createRoot} from 'react-dom/client';
         import Form from './TextProductionSettingsForm.jsx';
         import {applyTextProductionChanges,normalizeTextProductionConfig} from './textProductionConfig.js';
+        window.addEventListener('error',event=>{document.body.dataset.error=event.error?.message||event.message;});
+        window.addEventListener('unhandledrejection',event=>{document.body.dataset.error=event.reason?.message||String(event.reason);});
         function Harness() {
           const [draft, setDraft] = useState({sensitiveMode:'ai'});
           const [open,setOpen] = useState(true);
@@ -35,20 +37,39 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
         }
         const byText=(selector,text)=>[...document.querySelectorAll(selector)].find(el=>el.textContent.trim()===text);
         async function run() {
+          document.body.dataset.step='render';
           createRoot(document.querySelector('#root')).render(<Harness/>);
-          await waitFor(()=>document.body.textContent.includes('停止生产并显示失败原因'),'production failure note');
+          await waitFor(()=>document.body.textContent.includes('按关键词标红'),'engine fields');
+          if(document.body.textContent.includes('复用已有标红词，本地排版。')) throw Error('redundant highlight note');
+          if(document.body.textContent.includes('系统优化在本地执行。')) throw Error('redundant sensitive-mode note');
+          (await waitFor(()=>byText('[role=tab]','排版配置'),'layout tab')).click();
+          await waitFor(()=>byText('.batch-factory-engine-group-title','正文排版'),'layout group');
+          document.body.dataset.step='layout';
+          const layoutGrid=document.querySelector('.batch-factory-engine-grid');
+          const layoutColumns=getComputedStyle(layoutGrid).gridTemplateColumns;
+          if(!layoutColumns.startsWith('repeat(2,') && layoutColumns.split(' ').length!==2) throw Error('layout is not two columns: '+layoutColumns);
+          const layoutFields=[...layoutGrid.querySelectorAll('.batch-factory-engine-field')].slice(0,4);
+          const layoutRows=layoutFields.map(field=>field.getBoundingClientRect().height);
+          if(Math.max(...layoutRows)-Math.min(...layoutRows)>2) throw Error('layout rows are uneven');
           const publish=()=>waitFor(()=>byText('[role=tab]','发布配置'),'publish tab');
           (await publish()).click();
+          const publishGroup=await waitFor(()=>byText('.batch-factory-engine-group-title','发布映射'),'publish group');
+          document.body.dataset.step='publish';
+          const publishFields=[...publishGroup.closest('.batch-factory-engine-card').querySelectorAll('.batch-factory-engine-field')];
+          if(publishFields.length!==7) throw Error('publish fields escaped the shared grid');
           (await waitFor(()=>byText('button','同步网站配置档'),'sync button')).click();
           await waitFor(()=>window.synced,'sync request');
+          document.body.dataset.step='synced';
           const combo=await waitFor(()=>document.querySelector('[aria-label="网站配置档"]'),'profile field');
           combo.closest('.ant-select').querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
           (await waitFor(()=>byText('.ant-select-item-option-content','8个解压'),'profile option')).click();
           await waitFor(()=>document.querySelector('.ant-select-selection-item[title="8个解压"]'),'selected label');
+          document.body.dataset.step='selected';
           document.querySelector('#toggle').click();
           await waitFor(()=>!document.querySelector('[role=tab]'),'closing dialog');
           document.querySelector('#toggle').click();
           (await publish()).click();
+          document.body.dataset.step='reopened';
           await waitFor(()=>document.querySelector('.ant-select-selection-item[title="8个解压"]'),'label on reopen');
           const saved=JSON.parse(window.saved).publishSettings;
           if(saved.organization!=='7' || saved.websiteProfileId!=='121-8' || window.synced!==1) throw Error('saved mapping');
@@ -71,13 +92,14 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
       }}],
       bundle:true,jsx:'automatic',write:false,format:'iife',minify:true,define:{'process.env.NODE_ENV':'"production"'}
     });
-    writeFileSync(join(dir,'form.js'),bundle.outputFiles[0].contents);
+    writeFileSync(join(dir,'styles.css'),readFileSync(fileURLToPath(new URL('../shuihuo-production.css',import.meta.url))));
     const html = join(dir,'index.html');
-    writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="form.js"></script>');
+    const script=bundle.outputFiles[0].text.replaceAll('</script','<\\/script');
+    writeFileSync(html,`<meta charset="utf-8"><link rel="stylesheet" href="styles.css"><div id="root"></div><script>${script}</script>`);
     const result = execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking',
-      '--host-resolver-rules=MAP * ~NOTFOUND','--virtual-time-budget=10000','--user-data-dir='+join(dir,'profile'),
+      '--host-resolver-rules=MAP * ~NOTFOUND','--window-size=1021,901','--virtual-time-budget=10000','--user-data-dir='+join(dir,'profile'),
       '--dump-dom',pathToFileURL(html).href],{encoding:'utf8',timeout:60000,maxBuffer:8<<20,windowsHide:true,stdio:['ignore','pipe','pipe']});
-    assert.ok(result.includes('data-result="passed"'), result.match(/data-error="([^"]*)"/)?.[1] || 'browser did not finish');
+    assert.ok(result.includes('data-result="passed"'), result.match(/data-error="([^"]*)"/)?.[1] || `browser stopped at ${result.match(/data-step="([^"]*)"/)?.[1] || 'unknown'} ${result.match(/<body[^>]*>/)?.[0] || ''}`);
   } finally {
     rmSync(dir,{recursive:true,force:true,maxRetries:4,retryDelay:200});
   }
