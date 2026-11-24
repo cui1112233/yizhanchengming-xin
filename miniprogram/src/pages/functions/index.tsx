@@ -5,7 +5,7 @@ import AppIcon from "../../components/AppIcon";
 import { getModule, moduleRoute, type CatalogModuleKey } from "../../config/modules";
 import { applyMobileTheme, readMobileTheme, ThemedPage } from "../../theme";
 import { FUNCTION_VISUALS } from "./functionVisuals";
-import heroArtwork from "../../assets/functions/functions-hero-reference-hd.webp";
+import heroArtwork from "../../assets/functions/functions-hero-reference-hd.jpg";
 import "./gallery.scss";
 
 const ACTIVE_MODULE_KEY = "yzcm.mobile.activeModule";

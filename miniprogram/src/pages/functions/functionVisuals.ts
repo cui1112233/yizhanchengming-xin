@@ -1,12 +1,12 @@
-import privateBook from "../../assets/functions/private-custom-reference-3d.webp";
-import novelBook from "../../assets/functions/novel-creation-3d.webp";
-import batchBooks from "../../assets/functions/batch-review-3d.webp";
-import videoClapper from "../../assets/functions/shuihuo-production-3d.webp";
-import comicFilm from "../../assets/functions/comic-production-reference-3d.webp";
-import aiCut from "../../assets/functions/ai-cut-3d.webp";
-import cmCanvas from "../../assets/functions/cm-canvas-3d.webp";
-import voiceStudio from "../../assets/functions/voice-studio-3d.webp";
-import plugins from "../../assets/functions/plugins-3d.webp";
+import privateBook from "../../assets/functions/private-custom-reference-3d.png";
+import novelBook from "../../assets/functions/novel-creation-3d.png";
+import batchBooks from "../../assets/functions/batch-review-3d.png";
+import videoClapper from "../../assets/functions/shuihuo-production-3d.png";
+import comicFilm from "../../assets/functions/comic-production-reference-3d.png";
+import aiCut from "../../assets/functions/ai-cut-3d.png";
+import cmCanvas from "../../assets/functions/cm-canvas-3d.png";
+import voiceStudio from "../../assets/functions/voice-studio-3d.png";
+import plugins from "../../assets/functions/plugins-3d.png";
 import type { CatalogModuleKey } from "../../config/modules";
 
 export type FunctionVisual = {
