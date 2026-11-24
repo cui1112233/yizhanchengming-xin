@@ -3399,10 +3399,10 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-text-rendered-cell .batch-factory-cell-pager span{overflow:hidden;color:var(--sh-muted);font-size:10px;text-align:center;text-overflow:ellipsis;white-space:nowrap}
 
 /* Compact novel list: selection + publish essentials only. */
-.batch-factory-novel-list-view{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:20px 24px 32px}
-.batch-factory-novel-list-view-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.batch-factory-novel-list-view{flex:1 1 auto;min-width:0;min-height:0;overflow:auto;padding:12px 16px 24px}
+.batch-factory-novel-list-view-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
 .batch-factory-novel-list-view-header>div{display:grid;gap:3px;min-width:0}
-.batch-factory-novel-list-view-header strong{color:var(--sh-text);font-size:18px}
+.batch-factory-novel-list-view-header strong{color:var(--sh-text);font-size:14px;line-height:1.5}
 .batch-factory-novel-list-view-header span{color:var(--sh-muted);font-size:12px}
 /* 自动化状态行：列表打开时作为列表头部状态行，不再用整宽横条压住列表内容。 */
 .batch-factory-automation-status-line{display:inline-flex;align-items:center;flex-wrap:wrap;gap:2px 8px;max-width:100%;padding:4px 8px;color:var(--sh-muted);border:1px solid color-mix(in srgb,var(--sh-accent) 30%,var(--sh-line));border-radius:6px;background:color-mix(in srgb,var(--sh-panel-strong) 72%,transparent);font:inherit;font-size:11px;line-height:1.5;text-align:left;white-space:normal;overflow-wrap:anywhere;cursor:pointer}
@@ -3410,17 +3410,25 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-automation-status-line:focus-visible{outline:2px solid color-mix(in srgb,var(--sh-accent) 70%,transparent);outline-offset:1px}
 .batch-factory-novel-list-view-header .batch-factory-automation-status-line{justify-self:start;margin-top:2px}
 .batch-factory-workbench > .batch-factory-automation-status-line{align-self:flex-start;max-width:calc(100% - 40px);margin:6px 20px 0}
-.batch-factory-novel-list-toolbar{display:flex;align-items:center;justify-content:flex-start;padding:0 12px 8px;margin-bottom:-1px}
+.batch-factory-novel-list-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;margin-bottom:0;border:1px solid var(--sh-line);border-bottom:0;border-radius:8px 8px 0 0;background:var(--sh-panel-strong)}
+.batch-factory-novel-list-toolbar>.ant-space{width:100%}
+.batch-factory-novel-list-toolbar>.ant-space>.ant-space-item:last-child{margin-left:auto}
 .batch-factory-novel-selected-count{font-size:12px;color:var(--sh-muted)}
 .batch-factory-novel-list-v13{min-width:780px!important;width:100%}
 .batch-factory-novel-list-v13 .batch-factory-novel-list-head,
 .batch-factory-novel-list-v13 .batch-factory-novel-list-row{
-  display:grid!important;grid-template-columns:56px minmax(240px,320px) minmax(96px,1.3fr) minmax(72px,1fr) minmax(64px,1fr) minmax(88px,1fr) 96px!important;
+  display:grid!important;grid-template-columns:56px minmax(240px,2.4fr) minmax(96px,1fr) minmax(88px,1fr) minmax(64px,.7fr) minmax(104px,1fr) 80px!important;
   min-width:780px!important;width:100%;align-items:center
 }
 .batch-factory-novel-list-v13 .batch-factory-novel-list-head>span,
-.batch-factory-novel-list-v13 .batch-factory-novel-list-row>span{min-width:0;padding:8px 10px!important;border-right:1px solid var(--sh-line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-factory-novel-list-v13 .batch-factory-novel-list-row>span{min-width:0;padding:6px 8px!important;border-right:1px solid var(--sh-line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;align-self:stretch;align-content:center}
+.batch-factory-novel-list-v13 .batch-factory-novel-list-head>span{padding:4px 8px!important}
+.batch-factory-novel-list-v13 .batch-factory-novel-list-head{min-height:32px;font-size:11px}
 .batch-factory-novel-list-v13 .batch-factory-novel-list-row{min-height:48px}
+.batch-factory-novel-list-v13 .batch-factory-novel-list-row:not(.batch-factory-novel-add-row):hover{background:color-mix(in srgb,var(--sh-accent) 5%,transparent)}
+.batch-factory-novel-list-v13 .batch-factory-novel-actions .ant-btn{height:24px;padding:0 10px;font-size:11px}
+.batch-factory-novel-list-v13 .batch-factory-content-version{font-size:11px;font-weight:400}
+.batch-factory-novel-list-v13 .batch-factory-text-badge{display:inline-flex;vertical-align:middle;align-items:center;line-height:16px;margin-left:6px;padding:0 5px;border:1px solid var(--sh-line);border-radius:4px;color:var(--sh-accent);font-size:10px;font-weight:500}
 .batch-factory-novel-list-v13 .batch-factory-source-status{display:grid;gap:2px;min-width:0;white-space:normal;line-height:1.25}
 .batch-factory-novel-list-v13 .batch-factory-source-status b{font-size:11px;color:var(--sh-text)}
 .batch-factory-novel-list-v13 .batch-factory-source-status small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-muted);font-size:10px}
@@ -3431,7 +3439,7 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-novel-list-v13 .batch-factory-novel-add-row{background:color-mix(in srgb,var(--sh-panel-strong) 55%,transparent);color:var(--sh-muted)}
 .batch-factory-novel-list-v13 .batch-factory-novel-add-row .ant-btn{padding:0;color:var(--sh-accent,var(--text-success));font-weight:700}
 .batch-factory-novel-list-v13 .batch-factory-novel-add-row small{color:var(--sh-muted);font-size:10px}
-.batch-factory-novel-list-v13 .batch-factory-novel-add-row{min-height:58px;border-top:1px dashed color-mix(in srgb,var(--sh-accent,var(--text-success)) 38%,var(--sh-line));background:linear-gradient(90deg,color-mix(in srgb,var(--sh-accent,var(--text-success)) 7%,transparent),transparent 70%)}
+.batch-factory-novel-list-v13 .batch-factory-novel-add-row{min-height:52px;border-top:1px dashed color-mix(in srgb,var(--sh-accent,var(--text-success)) 38%,var(--sh-line));background:linear-gradient(90deg,color-mix(in srgb,var(--sh-accent,var(--text-success)) 7%,transparent),transparent 70%)}
 .batch-factory-novel-list-v13 .batch-factory-novel-add-row .is-order{color:var(--sh-accent,var(--text-success));font-size:18px}
 .batch-factory-add-books-modal .ant-modal-content{overflow:hidden;border:1px solid color-mix(in srgb,var(--sh-accent,var(--text-success)) 28%,var(--sh-line));background:var(--sh-panel-strong);box-shadow:0 18px 55px rgba(0,0,0,.38)}
 .batch-factory-add-books-modal .ant-modal-header{padding:18px 22px 14px;background:transparent;border-bottom:1px solid var(--sh-line)}
@@ -3442,11 +3450,11 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-add-books-modal .ant-alert{border-radius:9px}
 .batch-factory-add-books-modal .ant-input-textarea textarea{min-height:150px!important;padding:12px 13px;line-height:1.7;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
 .batch-factory-add-books-modal .batch-factory-engine-field{gap:7px}
-.batch-factory-novel-list-v13 .is-order{display:flex;align-items:center;gap:8px}.batch-factory-novel-list-v13 .is-order b{font-variant-numeric:tabular-nums}
+.batch-factory-novel-list-v13 .is-order{display:flex;align-items:center;justify-content:center;gap:6px}.batch-factory-novel-list-v13 .is-order b{font-variant-numeric:tabular-nums}
 .batch-factory-novel-list-v13 .is-novel-head{display:flex;align-items:center;gap:4px}
 .batch-factory-novel-list-v13 .batch-factory-copy-books{height:22px;padding:0 2px;color:var(--sh-muted)}
 .batch-factory-novel-list-v13 .batch-factory-copy-books:hover{color:var(--sh-accent,var(--text-success))}
-.batch-factory-novel-list-v13 .is-book{display:grid;gap:3px}.batch-factory-novel-list-v13 .is-book strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-text)}.batch-factory-novel-list-v13 .is-book small{color:var(--sh-muted);font-size:10px}
+.batch-factory-novel-list-v13 .is-book{display:grid;gap:3px;align-content:center;justify-items:start}.batch-factory-novel-list-v13 .is-book strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-text)}.batch-factory-novel-list-v13 .is-book small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-muted);font-size:10px;line-height:1.5}
 .batch-factory-source-kind{display:inline-flex;align-items:center;max-width:120px;padding:2px 6px;border:1px solid var(--sh-line);border-radius:4px;color:var(--sh-muted);font-size:10px;line-height:1.2;white-space:nowrap}
 .batch-factory-source-kind.is-ready{color:var(--text-success);border-color:color-mix(in srgb,var(--text-success) 35%,var(--sh-line))}
 .batch-factory-source-kind.is-running{color:var(--text-link);border-color:color-mix(in srgb,var(--text-link) 35%,var(--sh-line))}
@@ -3527,7 +3535,7 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
   .batch-factory-workbench > .batch-factory-automation-status-line{max-width:calc(100% - 24px);margin:6px 12px 0}
   .batch-factory-audio-options-v13{grid-template-columns:1fr}
   .batch-factory-novel-list-v13{min-width:700px!important}
-  .batch-factory-novel-list-v13 .batch-factory-novel-list-head,.batch-factory-novel-list-v13 .batch-factory-novel-list-row{grid-template-columns:52px minmax(170px,240px) minmax(96px,1.3fr) minmax(72px,1fr) minmax(64px,1fr) minmax(88px,1fr) 96px!important;min-width:700px!important}
+  .batch-factory-novel-list-v13 .batch-factory-novel-list-head,.batch-factory-novel-list-v13 .batch-factory-novel-list-row{grid-template-columns:56px minmax(200px,2.4fr) minmax(88px,1fr) minmax(72px,1fr) minmax(56px,.7fr) minmax(100px,1fr) 80px!important;min-width:700px!important}
   .batch-factory-follow-audio-control{justify-content:flex-start}.batch-factory-follow-audio-control small{text-align:left}
 }
 /* BF_AUDIO_PLANNING_V13_1_END */
@@ -5149,7 +5157,7 @@ body.shuihuo-reference-shell
   position: sticky;
   right: 0;
   z-index: 2;
-  min-width: 96px;
+  min-width: 80px;
   color: var(--text-primary);
   background: var(--frost-floating, var(--surface-2, #252e3c));
   backdrop-filter: var(--frost-floating-blur, blur(24px));
@@ -5162,7 +5170,7 @@ body.shuihuo-reference-shell
 }
 @media (max-width: 960px) {
   .batch-factory-novel-list-v13 .batch-factory-novel-list-head > span:nth-child(7),
-  .batch-factory-novel-list-v13 .batch-factory-novel-list-row > span:nth-child(7) { min-width: 96px; }
+  .batch-factory-novel-list-v13 .batch-factory-novel-list-row > span:nth-child(7) { min-width: 80px; }
 }
 
 /* 单书配置只在“真正偏离批次”的字段上挂一个短徽标，继承态完全不出文字。 */
