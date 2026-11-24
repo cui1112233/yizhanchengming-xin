@@ -7,7 +7,7 @@ import { deriveTaskPageState } from "../../services/taskPageState";
 import { filterTaskEntries, loadTaskSummary, taskCounts, taskDestination, type AggregatedTask, type TaskFilter, type TaskSummary } from "../../services/taskSummary";
 import BrandHeader from "../../components/BrandHeader";
 import AppIcon from "../../components/AppIcon";
-import taskHeroArt from "../../assets/tasks/task-center-hero.webp";
+import taskHeroArt from "../../assets/tasks/task-center-runtime-hero-v2.png";
 import taskRunningArt from "../../assets/functions/clapper-play-v2.webp";
 import taskAttentionArt from "../../assets/tasks/task-attention-clock.webp";
 import taskCompletedArt from "../../assets/tasks/task-completed-check.webp";
@@ -37,6 +37,15 @@ function validProgress(entry: AggregatedTask) {
   return { completed: Math.max(0, Number(completed)), total: Number(total), percent: Math.min(100, Math.max(0, Math.round((Number(completed) / Number(total)) * 100))) };
 }
 
+function aggregateProgress(entries: AggregatedTask[]) {
+  const values = entries.map(validProgress).filter((value): value is NonNullable<ReturnType<typeof validProgress>> => Boolean(value));
+  if (!values.length) return undefined;
+  const completed = values.reduce((total, value) => total + value.completed, 0);
+  const total = values.reduce((sum, value) => sum + value.total, 0);
+  if (total <= 0) return undefined;
+  return Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+}
+
 export default function TasksPage() {
   const [summary, setSummary] = useState<TaskSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +69,7 @@ export default function TasksPage() {
   useDidShow(load);
   const pageState = deriveTaskPageState({ loading, summary, configurationError });
   const entries = summary?.entries || [];
+  const overallProgress = aggregateProgress(entries);
   const filtered = filterTaskEntries(entries, filter);
   const counts = taskCounts(entries);
   const failedSources = summary?.sources.filter((source) => source.state === "error") || [];
@@ -83,6 +93,7 @@ export default function TasksPage() {
       <View className="task-studio-hero">
         <View className="task-studio-hero-copy"><Text className="task-studio-title">任务中心</Text><Text className="task-studio-subtitle">追踪全部创作与生产记录</Text><Text className="task-studio-title-stroke" /></View>
         <Image className="task-studio-hero-art" src={taskHeroArt} mode="aspectFit" />
+        {overallProgress !== undefined ? <View className="task-studio-hero-progress"><Text className="task-studio-hero-progress-value">{overallProgress}%</Text></View> : null}
         <Button className="task-studio-refresh" aria-label="刷新任务" loading={refreshing} disabled={loading} onClick={load}><AppIcon name="refresh-ccw" size={16} /></Button>
       </View>
     </View>

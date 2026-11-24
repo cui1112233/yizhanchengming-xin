@@ -54,6 +54,11 @@ test('right side renders real progress, retry, completed and detailed states wit
  const tree=await ready();const page=content(tree[0]);
  expect(page).toContain('40%');expect(page).toContain('需重试');expect(page).toContain('已完成');expect(page).toContain('待提交');expect(page).not.toContain('状态同步中');
 });
+test('hero aggregate progress is rendered as live UI text instead of baked into the image',async()=>{
+ const tree=await ready();
+ expect(content(tree.find(n=>n.props?.className==='task-studio-hero-progress-value'))).toBe('40%');
+ expect(tree.find(n=>n.props?.className==='task-studio-hero-art')?.props.src).not.toContain('68');
+});
 test('flat record opens the existing encoded module destination',async()=>{
  const tree=await ready();expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row'))).toHaveLength(4);
  tree.find(n=>n.props?.className?.split(' ').includes('task-studio-row')&&content(n).includes('失败项目')).props.onClick();
@@ -76,7 +81,8 @@ test('task center keeps the compact phone scale from the approved reference',()=
  expect(style).toMatch(/\.task-studio-counts\s*\{[^}]*min-height:72PX/);
  expect(style).toMatch(/\.task-studio-count-art\s*\{[^}]*width:44PX[^}]*height:44PX/);
  expect(style).toMatch(/\.task-studio-segments\s*\{[^}]*height:42PX/);
- expect(style).toMatch(/\.task-studio-row\s*\{[^}]*min-height:76PX/);
+ expect(style).toMatch(/\.task-studio-row\s*\{[^}]*display:grid[^}]*grid-template-columns:[^;}]*48PX[^;}]*minmax\(0,1fr\)[^;}]*72PX[^;}]*16PX[^}]*min-height:76PX/);
  expect(style).toMatch(/\.task-studio-row-title\s*\{[^}]*font-size:15PX/);
+ expect(style).not.toMatch(/\.task-studio-row-art\s*\{[^}]*position:absolute/);
  expect(style).not.toContain('.task-studio-row:last-child');
 });
