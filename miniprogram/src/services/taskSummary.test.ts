@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterTaskEntries, loadTaskSummary, taskCounts, taskStatusFromServer } from "./taskSummary";
+import { filterTaskEntries, loadTaskSummary, taskCounts, taskStatusDetail, taskStatusFromServer } from "./taskSummary";
 
 type ResponseMap = Record<string, unknown | Error>;
 
@@ -16,6 +16,17 @@ function source(summary: Awaited<ReturnType<typeof loadTaskSummary>>, name: stri
 }
 
 describe("真实任务汇总", () => {
+  it("识别后端当前真实状态，不再把等待重试显示成未知", () => {
+    expect(taskStatusFromServer("waiting_retry")).toBe("retry");
+    expect(taskStatusFromServer("failed")).toBe("retry");
+    expect(taskStatusFromServer("scheduled_waiting")).toBe("running");
+    expect(taskStatusFromServer("processing")).toBe("running");
+    expect(taskStatusFromServer("completed")).toBe("completed");
+    expect(taskStatusDetail("waiting_classification")).toBe("待确认分类");
+    expect(taskStatusDetail("pending_submit")).toBe("待提交");
+    expect(taskStatusDetail(undefined)).toBe("状态未返回");
+  });
+
   it("只把明确需要人工处理的状态归为待确认", () => {
     expect(["waiting-review", "pending_confirmation", "accepted_pending", "待确认", "待审核"].map(taskStatusFromServer)).toEqual([
       "attention", "attention", "attention", "attention", "attention",
@@ -23,16 +34,16 @@ describe("真实任务汇总", () => {
     expect(["queued", "pending", "waiting"].map(taskStatusFromServer)).toEqual(["running", "running", "running"]);
   });
 
-  it("待确认筛选和顶部统计使用同一批真实任务", () => {
+  it("需重试筛选和顶部统计使用同一批真实任务", () => {
     const entries = [
       { status: "running", id: "run" },
       { status: "attention", id: "review" },
       { status: "completed", id: "done" },
-      { status: "failed", id: "failed" },
+      { status: "retry", id: "failed" },
       { status: "unknown", id: "unknown" },
     ] as Parameters<typeof filterTaskEntries>[0];
-    expect(filterTaskEntries(entries, "待确认").map((entry) => entry.id)).toEqual(["review"]);
-    expect(taskCounts(entries)).toEqual({ running: 1, attention: 1, completed: 1 });
+    expect(filterTaskEntries(entries, "需重试").map((entry) => entry.id)).toEqual(["failed"]);
+    expect(taskCounts(entries)).toEqual({ running: 1, retry: 1, completed: 1 });
   });
 
   it("小说获取阶段状态进入正确分类，同时失败记录保留在全部任务", async () => {
@@ -44,7 +55,7 @@ describe("真实任务汇总", () => {
       ] },
     }));
     expect(filterTaskEntries(summary.entries, "进行中").map(row => row.id)).toEqual(["1"]);
-    expect(filterTaskEntries(summary.entries, "全部").filter(row => row.status === "failed").map(row => row.id)).toEqual(["2", "3"]);
+    expect(filterTaskEntries(summary.entries, "全部").filter(row => row.status === "retry").map(row => row.id)).toEqual(["2", "3"]);
     expect(summary.entries.map(row => row.rawStatus)).toEqual(["ai_processing", "original_failed", "ai_failed"]);
   });
   it("汇总服务端来源并保留真实状态、时间和视频进度", async () => {
@@ -74,7 +85,7 @@ describe("真实任务汇总", () => {
     expect(summary.entries.map((entry) => [entry.source, entry.title, entry.status])).toEqual([
       ["script", "第 2 集", "running"],
       ["agent", "修订对白", "completed"],
-      ["fetch", "原著 A", "failed"],
+      ["fetch", "原著 A", "retry"],
       ["fetch", "漫剧批次", "attention"],
     ]);
     expect(summary.entries[0]).toMatchObject({
@@ -119,8 +130,14 @@ describe("真实任务汇总", () => {
       createdAt: undefined,
       rawStatus: undefined,
       status: "unknown",
+      statusDetail: "状态未返回",
       progress: undefined,
       visualHint: undefined,
+      moduleKey: "script",
+      kind: undefined,
+      stage: undefined,
+      taskType: undefined,
+      retryable: false,
     }]);
     expect(filterTaskEntries(summary.entries, "已完成")).toEqual([]);
     expect(filterTaskEntries(summary.entries, "全部")).toHaveLength(1);

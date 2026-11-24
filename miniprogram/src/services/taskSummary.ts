@@ -1,6 +1,6 @@
 export type TaskSource = "script" | "agent" | "fetch" | "batch" | "shuihuo";
-export type TaskStatus = "running" | "attention" | "failed" | "completed" | "unknown";
-export type TaskFilter = "全部" | "进行中" | "待确认" | "已完成";
+export type TaskStatus = "running" | "retry" | "attention" | "completed" | "unknown";
+export type TaskFilter = "全部" | "进行中" | "需重试" | "已完成";
 
 export type AggregatedTask = {
   source: TaskSource;
@@ -11,8 +11,14 @@ export type AggregatedTask = {
   createdAt: string | undefined;
   rawStatus: string | undefined;
   status: TaskStatus;
+  statusDetail: string;
   progress: { completed: number; total: number } | undefined;
   visualHint: string | undefined;
+  moduleKey: TaskSource;
+  kind: string | undefined;
+  stage: string | undefined;
+  taskType: string | undefined;
+  retryable: boolean;
 };
 
 export type TaskSourceResult = {
@@ -49,10 +55,19 @@ const TASK_SOURCE_DEFINITIONS: SourceDefinition[] = [
   { source: "shuihuo", sourceLabel: "水货生产", path: "/api/shuihuo-production/projects", collection: "projects" },
 ];
 
-const COMPLETED_STATUSES = new Set(["done", "completed", "success", "succeeded", "finished", "已完成", "完成", "成功", "已合并"]);
-const FAILED_STATUSES = new Set(["failed", "error", "canceled", "cancelled", "original_failed", "ai_failed", "失败", "异常"]);
+const COMPLETED_STATUSES = new Set(["done", "completed", "success", "succeeded", "finished", "ai_done", "已完成", "完成", "成功", "已合并"]);
+const RETRY_STATUSES = new Set(["failed", "error", "canceled", "cancelled", "stopped", "waiting_retry", "original_failed", "ai_failed", "失败", "异常", "等待重试"]);
 const ATTENTION_STATUSES = new Set(["waiting-review", "waiting_review", "pending_confirmation", "accepted_pending", "待确认", "待审核"]);
-const RUNNING_STATUSES = new Set(["queued", "pending", "running", "processing", "executing", "waiting", "ai_processing", "进行中", "处理中", "排队中", "等待中"]);
+const RUNNING_STATUSES = new Set(["queued", "pending", "running", "processing", "executing", "waiting", "scheduled_waiting", "ai_processing", "retrying", "进行中", "处理中", "排队中", "等待中"]);
+
+const STATUS_DETAILS: Record<string, string> = {
+  scheduled_waiting: "等待定时启动", input_ready: "待开始", waiting_retry: "需重试",
+  waiting_classification: "待确认分类", waiting_sensitive_ai: "等待敏感词处理",
+  waiting_configuration: "待配置", waiting_login: "待登录", pending_submit: "待提交",
+  upload_pending: "提交结果待确认", stopped: "已停止", queued: "排队中", pending: "排队中",
+  processing: "进行中", running: "进行中", completed: "已完成", succeeded: "已完成",
+  failed: "需重试", error: "需重试",
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -84,10 +99,34 @@ export function taskStatusFromServer(value: unknown): TaskStatus {
   const status = textValue(value)?.toLowerCase();
   if (!status) return "unknown";
   if (COMPLETED_STATUSES.has(status)) return "completed";
-  if (FAILED_STATUSES.has(status)) return "failed";
+  if (RETRY_STATUSES.has(status)) return "retry";
   if (ATTENTION_STATUSES.has(status)) return "attention";
   if (RUNNING_STATUSES.has(status)) return "running";
   return "unknown";
+}
+
+export function taskStatusDetail(value: unknown) {
+  const status = textValue(value)?.toLowerCase();
+  if (!status) return "状态未返回";
+  if (STATUS_DETAILS[status]) return STATUS_DETAILS[status];
+  const normalized = taskStatusFromServer(status);
+  if (normalized === "running") return "进行中";
+  if (normalized === "retry") return "需重试";
+  if (normalized === "attention") return "待确认";
+  if (normalized === "completed") return "已完成";
+  return `状态：${status}`;
+}
+
+function numberValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  return undefined;
+}
+
+function recordProgress(record: Record<string, unknown>) {
+  const completed = numberValue(record.completed ?? record.progressCurrent ?? record.ready);
+  const total = numberValue(record.total ?? record.progressTotal);
+  return completed !== undefined && total !== undefined && total > 0 ? { completed, total } : undefined;
 }
 
 function historyVideoState(entry: Record<string, unknown>) {
@@ -101,14 +140,14 @@ function historyVideoState(entry: Record<string, unknown>) {
   const completed = statuses.filter((status) => status === "completed").length;
   const progress = { completed, total: tasks.length };
 
-  if (statuses.includes("failed")) return { status: "failed" as TaskStatus, progress };
+  if (statuses.includes("retry")) return { status: "retry" as TaskStatus, progress };
   if (statuses.includes("running")) return { status: "running" as TaskStatus, progress };
   if (statuses.every((status) => status === "completed")) return { status: "completed" as TaskStatus, progress };
   return { status: "unknown" as TaskStatus, progress };
 }
 
 function entryFromRecord(definition: SourceDefinition, record: Record<string, unknown>, sourceOrder: number, entryOrder: number): InternalTask {
-  const rawStatus = firstText(record, ["status", "aiStatus", "ai_status", "originalStatus", "original_status"]);
+  const rawStatus = firstText(record, ["status", "state", "effectiveStatus", "effective_status", "aiStatus", "ai_status", "originalStatus", "original_status"]);
   const directStatus = taskStatusFromServer(rawStatus);
   const video = definition.source === "script" ? historyVideoState(record) : { status: "unknown" as TaskStatus, progress: undefined };
   const status = definition.source === "script" && video.status !== "unknown" ? video.status : directStatus;
@@ -128,11 +167,61 @@ function entryFromRecord(definition: SourceDefinition, record: Record<string, un
     createdAt: firstText(record, ["updatedAt", "updated_at", "createdAt", "created_at"]),
     rawStatus,
     status,
-    progress: video.progress,
+    statusDetail: taskStatusDetail(rawStatus),
+    progress: video.progress || recordProgress(record),
     visualHint: firstText(record, ["kind", "type", "stage", "taskType", "task_type"]),
+    moduleKey: definition.source,
+    kind: firstText(record, ["kind", "type"]),
+    stage: firstText(record, ["stage", "progressPhase"]),
+    taskType: firstText(record, ["taskType", "task_type"]),
+    retryable: record.retryable === true || record.canRetry === true || record.can_retry === true,
     sourceOrder,
     entryOrder,
   };
+}
+
+function batchRuntimeRecords(batch: Record<string, unknown>, runtime: unknown) {
+  if (!isRecord(runtime)) throw new Error("批量工厂运行状态响应不完整");
+  const batchID = firstText(batch, ["id"]);
+  const batchTitle = firstText(batch, ["title", "name"]) || "批量任务";
+  const rows: Record<string, unknown>[] = [];
+  const push = (record: Record<string, unknown>, fallback: Record<string, unknown>) => rows.push({ moduleKey: "batch", batchId: batchID, ...fallback, ...record });
+
+  const automation = isRecord(runtime.automation) ? runtime.automation : undefined;
+  const automationState = automation && firstText(automation, ["state", "status"]);
+  if (automation && automationState && automationState !== "idle") {
+    const counts = isRecord(automation.counts) ? automation.counts : {};
+    push(automation, {
+      id: firstText(automation, ["id"]) || `${batchID || "batch"}-automation`, title: `${batchTitle} · 自动生产`,
+      kind: "automation", stage: "automation", status: automationState,
+      completed: numberValue(counts.ready), total: numberValue(counts.total), updatedAt: firstText(batch, ["updatedAt", "updated_at"]),
+    });
+  }
+
+  const production = isRecord(runtime.production) ? runtime.production : {};
+  const productionJobs = Array.isArray(production.jobs) ? production.jobs.filter(isRecord) : [];
+  productionJobs.forEach((job) => {
+    const tasks = Array.isArray(job.tasks) ? job.tasks.filter(isRecord) : [];
+    tasks.forEach((task) => push(task, {
+      title: `${batchTitle} · 视频生成`, kind: "video", stage: "video",
+      status: firstText(task, ["status"]) || firstText(job, ["status"]),
+      createdAt: firstText(task, ["updatedAt", "createdAt"]) || firstText(job, ["updatedAt", "createdAt"]),
+    }));
+  });
+
+  const merge = isRecord(runtime.merge) ? runtime.merge : {};
+  const mergeJobs = Array.isArray(merge.jobs) ? merge.jobs.filter(isRecord) : [];
+  mergeJobs.forEach((job) => push(job, { title: `${batchTitle} · 成片合成`, kind: "export", stage: "merge" }));
+
+  const stageSummaries = isRecord(runtime.stageSummaries) ? runtime.stageSummaries : {};
+  Object.values(stageSummaries).filter(isRecord).forEach((summary) => {
+    const runs = Array.isArray(summary.runs) ? summary.runs.filter(isRecord) : [];
+    runs.forEach((run) => {
+      const stage = firstText(run, ["stage"]) || "stage";
+      push(run, { title: `${batchTitle} · ${stage}`, kind: stage, stage });
+    });
+  });
+  return rows;
 }
 
 function timestamp(entry: AggregatedTask) {
@@ -163,6 +252,15 @@ export async function loadTaskSummary(request: TaskRequest, options: { projectsO
   const settled = await Promise.allSettled(TASK_SOURCE_DEFINITIONS.map(async (definition) => {
     const payload = await request(definition.path);
     if (!isRecord(payload) || !Array.isArray(payload[definition.collection])) throw new Error("服务端任务列表响应不完整");
+    if (definition.source === "batch") {
+      const batches = collectionFrom(payload, "batches");
+      const runtimeRows = await Promise.all(batches.map(async (batch) => {
+        const id = firstText(batch, ["id"]); if (!id) throw new Error("批量工厂批次缺少 ID");
+        const runtime = await request(`/api/batch-factory/v12/batches/${encodeURIComponent(id)}/runtime-summary`);
+        return batchRuntimeRecords(batch, runtime);
+      }));
+      return { batches: runtimeRows.flat() };
+    }
     if (definition.source !== "shuihuo") return payload;
     if (options.projectsOnly) return { projects: collectionFrom(payload, "projects").map(project => ({ ...project, projectId: textValue(project.id) })) };
     const projects = collectionFrom(payload, 'projects');
@@ -208,7 +306,7 @@ export function filterTaskEntries(entries: AggregatedTask[], filter: TaskFilter)
   if (filter === "全部") return entries;
   const expected: Record<Exclude<TaskFilter, "全部">, TaskStatus> = {
     "进行中": "running",
-    "待确认": "attention",
+    "需重试": "retry",
     "已完成": "completed",
   };
   return entries.filter((entry) => entry.status === expected[filter]);
@@ -217,10 +315,10 @@ export function filterTaskEntries(entries: AggregatedTask[], filter: TaskFilter)
 export function taskCounts(entries: AggregatedTask[]) {
   return entries.reduce((counts, entry) => {
     if (entry.status === "running") counts.running += 1;
-    if (entry.status === "attention") counts.attention += 1;
+    if (entry.status === "retry") counts.retry += 1;
     if (entry.status === "completed") counts.completed += 1;
     return counts;
-  }, { running: 0, attention: 0, completed: 0 });
+  }, { running: 0, retry: 0, completed: 0 });
 }
 
 export function taskDestination(entry: AggregatedTask) {
