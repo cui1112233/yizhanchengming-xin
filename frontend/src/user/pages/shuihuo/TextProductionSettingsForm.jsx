@@ -1,4 +1,5 @@
-import { Alert, Button, ColorPicker as ThemeColorPicker, ConfigProvider, Input, InputNumber, Select, Space, Switch, Tabs, Upload, message } from 'antd';
+import ColorPicker from './TextColorPicker.jsx';
+import { Alert, Button, Input, InputNumber, Select, Switch, Tabs, Upload, message } from 'antd';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { getAvailableModelCatalog, modelSelectOptions } from '../../../shared/api/modelCatalog';
 import { getN8ComicPublishStatus } from '../../../shared/api/batchFactoryV12';
@@ -14,25 +15,6 @@ import TextHighlightRuleSelect from './TextHighlightRuleSelect.jsx';
 
 const SharedImagePublishSettings = lazy(() => import('./BatchFactoryImagePublishSettingsForm').then(module => ({default:module.BatchFactoryComicPublishSettingsForm})));
 const SettingsPreview = lazy(()=>import('./TextSettingsPreview.jsx'));
-
-function ColorPicker({ label, value, onChange }) {
-  const [draft, setDraft] = useState(value);
-  useEffect(() => setDraft(value), [value]);
-  function edit(color) {
-    setDraft(color);
-    if (/^#[0-9a-f]{6}$/i.test(color)) onChange(color);
-  }
-  return <Space>
-    <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextSecondary:'var(--sh-muted)',colorBorder:'var(--sh-line)',colorPrimary:'var(--sh-accent)'}}}>
-      <ThemeColorPicker value={value} disabledAlpha format="hex" rootClassName="batch-factory-theme-color-picker"
-        getPopupContainer={trigger => trigger.parentElement} onChange={color => edit(color.toHexString())}>
-        <button type="button" className="batch-factory-color-trigger" aria-label={label} style={{'--selected-color':value}}><i /></button>
-      </ThemeColorPicker>
-    </ConfigProvider>
-    <Input aria-label={label+'色值'} value={draft} maxLength={7} style={{width: 100}}
-      onChange={event => edit(event.target.value)} onBlur={() => setDraft(value)} />
-  </Space>;
-}
 
 function BackgroundPicker({value,items,onChange,onUploaded}) {
   const [busy,setBusy]=useState(false);
@@ -120,7 +102,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
         disabled={field.key==='textPageTarget' && value.textPaginationMode!=='target'}
         value={percent ? Math.round(v*100) : v} onChange={n=>{if(n!=null)set(percent ? n/100 : n);}}/>;
     }
-    if(field.type==='input')return <Input {...attrs} value={v} placeholder={field.key==='textHighlightLines'?'如 1,3（每页重新计数）':undefined} disabled={field.key==='textHighlightLines' && !value.textHighlightRules?.split(',').includes('lines')} onChange={e=>set(e.target.value)}/>;
+    if(field.type==='input')return <Input {...attrs} value={v} placeholder={field.key==='textHighlightLines'?'如 1,3（定位整句）':undefined} disabled={field.key==='textHighlightLines' && !value.textHighlightRules?.split(',').includes('lines')} onChange={e=>set(e.target.value)}/>;
     const many=field.type==='models';
     const disabled=many && value.sensitiveMode!=='ai';
     return <Select {...attrs} showSearch optionFilterProp="label" style={{minWidth:150}} mode={many?'multiple':undefined}

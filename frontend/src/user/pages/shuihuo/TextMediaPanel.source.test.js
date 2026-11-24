@@ -114,6 +114,9 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         const area=()=>document.querySelector('textarea[aria-label="页面正文"]');
         await until(area);
         const originalDraft=area().value;
+        if(document.querySelector('.text-page-editor input[type=color]'))throw Error('颜色控件仍是原生横条');
+        const gallery=document.querySelector('.text-editor-gallery');
+        if(gallery.querySelector('.ant-btn').getBoundingClientRect().top<gallery.querySelector('span').getBoundingClientRect().bottom)throw Error('图库按钮挤在标题旁');
         for(const [label,fontSize,fontId] of [['舒适阅读',40,'noto-sans-sc'],['纸感手写',44,'long-cang'],['清晰黑体',46,'lxgw-wenkai']]){
           const count=previewBodies.length;button(label).click();
           await until(()=>previewBodies.length>count && previewBodies.at(-1).layout.fontSize===fontSize);
@@ -132,7 +135,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         if(previewBodies.at(-1).background.color!=='#F6EFDF')throw Error('深色字没有搭配浅色背景');
         button('浅色文字').click();await until(()=>previewBodies.at(-1)?.layout.textColor==='#FFFFFF');
         if(previewBodies.at(-1).background.color!=='#111318')throw Error('浅色字没有搭配深色背景');
-        const customColor=document.querySelector('.text-layout-fields input[type=color]');
+        const customColor=document.querySelector('[aria-label="文字颜色色值"]');
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(customColor,'#222222');customColor.dispatchEvent(new Event('input',{bubbles:true}));customColor.dispatchEvent(new Event('change',{bubbles:true}));
         await until(()=>previewBodies.at(-1)?.layout.textColor==='#222222' && button('一键调整文字颜色'));
         button('一键调整文字颜色').click();await until(()=>previewBodies.at(-1)?.layout.textColor==='#FFFFFF');

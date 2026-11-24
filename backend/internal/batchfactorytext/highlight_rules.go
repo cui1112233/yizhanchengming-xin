@@ -4,7 +4,35 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 )
+
+// A selected visual line locates its first visible character, then expands to
+// the enclosing dialogue or complete sentence. Source text is never changed.
+func sentenceHighlightAt(text string, anchor int, dialogue []HighlightRange) HighlightRange {
+	for _, span := range dialogue {
+		if anchor >= span.Start && anchor < span.End {
+			return span
+		}
+	}
+	rs := []rune(text)
+	start, end := 0, len(rs)
+	for _, boundary := range SentenceBreaks(text) {
+		if boundary <= anchor {
+			start = boundary
+		} else {
+			end = boundary
+			break
+		}
+	}
+	for start < end && unicode.IsSpace(rs[start]) {
+		start++
+	}
+	for end > start && unicode.IsSpace(rs[end-1]) {
+		end--
+	}
+	return HighlightRange{start, end}
+}
 
 func HighlightRuleEnabled(rules, rule string) bool {
 	for _, v := range strings.Split(rules, ",") {

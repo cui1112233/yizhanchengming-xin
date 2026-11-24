@@ -1,6 +1,7 @@
 package batchfactorytext
 
 import (
+	"bytes"
 	"context"
 	"image"
 	"image/color"
@@ -8,6 +9,21 @@ import (
 	"testing"
 	"unicode/utf8"
 )
+
+func TestSelectedWrappedDialogueHighlightsWholeQuote(t *testing.T) {
+	in := RenderInput{Text: "旁白。\n“" + strings.Repeat("完整的对话", 6) + "。”", Layout: LayoutConfig{FontSize: 64, HighlightRules: "lines", HighlightLines: "3"}}
+	_, selected := renderCard(t, Renderer{}, in)
+	in.Layout.HighlightRules = "dialogue"
+	_, dialogue := renderCard(t, Renderer{}, in)
+	if !bytes.Equal(selected, dialogue) {
+		t.Fatal("selecting the dialogue continuation line did not highlight the complete quote")
+	}
+	text := "第一句。第二句。"
+	r := sentenceHighlightAt(text, 1, nil)
+	if string([]rune(text)[r.Start:r.End]) != "第一句。" {
+		t.Fatal("sentence selection leaked into the next sentence", r)
+	}
+}
 
 func TestDialogueHighlightContinuesAcrossPagesAndDraftEdits(t *testing.T) {
 	source := "旁白：“第一句。\n第二句。\n最后一句。”尾声。"
@@ -58,11 +74,12 @@ func TestRenderedLineHighlightUsesVisualLinesAndResetsPerPage(t *testing.T) {
 	}
 	in.Text = strings.Repeat("完整文字", 16)
 	img, _ = renderCard(t, Renderer{}, in)
-	if len(redBands(img)) != 2 {
-		t.Fatal("wrapped visual lines were not selected")
+	if len(redBands(img)) <= 2 {
+		t.Fatal("wrapped sentence was only partially highlighted")
 	}
+	count := len(redBands(img))
 	img, _ = renderCard(t, Renderer{}, in)
-	if len(redBands(img)) != 2 {
+	if len(redBands(img)) != count {
 		t.Fatal("visual line numbers did not reset for a new page")
 	}
 	in.Layout.HighlightRules = "off"

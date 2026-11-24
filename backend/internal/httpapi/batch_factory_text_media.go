@@ -123,7 +123,7 @@ func (a textAPI) renderInput(x textRequest, d txt.Document, p txt.Page, cover bo
 	if cover {
 		in.Layout.HighlightRules = "off"
 	}
-	if !cover && txt.HighlightRuleEnabled(style.Layout.HighlightRules, "dialogue") {
+	if !cover && (txt.HighlightRuleEnabled(style.Layout.HighlightRules, "dialogue") || txt.HighlightRuleEnabled(style.Layout.HighlightRules, "lines")) {
 		version, err := a.repo.GetVersion(x, x.scope, d.ActiveVersionID)
 		if err != nil {
 			return in, txt.Renderer{}, err

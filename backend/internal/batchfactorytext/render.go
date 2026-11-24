@@ -481,11 +481,11 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 		}
 		ranges = mergeRanges(append([]HighlightRange(nil), ranges...))
 	}
+	dialogue := in.DialogueRanges
+	if !in.DialogueRangesSet {
+		dialogue = DialogueHighlightRanges(text)
+	}
 	if HighlightRuleEnabled(c.HighlightRules, "dialogue") {
-		dialogue := in.DialogueRanges
-		if !in.DialogueRangesSet {
-			dialogue = DialogueHighlightRanges(text)
-		}
 		limit := utf8.RuneCountInString(text)
 		for _, v := range dialogue {
 			v.Start = max(0, v.Start)
@@ -499,6 +499,23 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 	selectedLines := map[int]bool{}
 	if HighlightRuleEnabled(c.HighlightRules, "lines") {
 		selectedLines, _ = parseHighlightLines(c.HighlightLines)
+		visualLine := 0
+		_, err := layoutText(ctx, text, c, size, face, func(line lineGeometry, _, _ int) error {
+			for _, g := range line.glyphs {
+				if !unicode.IsSpace(g.r) {
+					visualLine++
+					if selectedLines[visualLine] {
+						ranges = append(ranges, sentenceHighlightAt(text, g.index, dialogue))
+					}
+					break
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, "", err
+		}
+		ranges = mergeRanges(ranges)
 	}
 	dst := image.NewRGBA(image.Rectangle{Max: size})
 	if err = drawBackground(dst, in.Background, in.BackgroundImage); err != nil {
@@ -507,20 +524,13 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 	fg, accent := image.NewUniform(normal), image.NewUniform(highlight)
 	rangeIndex := 0
 	spread := boldSpread(c)
-	visualLine := 0
 	paint := func(line lineGeometry, x, y int) error {
-		for _, g := range line.glyphs {
-			if !unicode.IsSpace(g.r) {
-				visualLine++
-				break
-			}
-		}
 		for _, g := range line.glyphs {
 			for rangeIndex < len(ranges) && ranges[rangeIndex].End <= g.index {
 				rangeIndex++
 			}
 			ink := fg
-			if selectedLines[visualLine] || (rangeIndex < len(ranges) && ranges[rangeIndex].Start <= g.index) {
+			if rangeIndex < len(ranges) && ranges[rangeIndex].Start <= g.index {
 				ink = accent
 			}
 			dot := fixed.P(x, y)
