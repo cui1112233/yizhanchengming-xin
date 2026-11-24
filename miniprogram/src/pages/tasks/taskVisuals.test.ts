@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { AggregatedTask, TaskSource } from "../../services/taskSummary";
 import { taskVisualAsset } from "./taskVisuals";
-import privateCustom from "../../assets/functions/private-custom-reference-3d.webp";
-import storyboardFilm from "../../assets/functions/comic-production-3d.webp";
+import privateCustom from "../../assets/functions/private-custom-reference-3d.png";
+import storyboardFilm from "../../assets/functions/comic-production-reference-3d.png";
 
 function task(source: TaskSource, title: string, visualHint?: string, patch: Partial<AggregatedTask> = {}): AggregatedTask {
   return { source, sourceLabel: source, id: title, title, createdAt: undefined, rawStatus: "running", status: "running", statusDetail: "进行中", progress: undefined, visualHint, moduleKey: source, kind: visualHint, stage: undefined, taskType: undefined, retryable: false, ...patch };

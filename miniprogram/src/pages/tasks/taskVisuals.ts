@@ -1,12 +1,12 @@
 import type { AggregatedTask, TaskSource } from "../../services/taskSummary";
-import privateCustom from "../../assets/functions/private-custom-reference-3d.webp";
-import agentCanvas from "../../assets/functions/cm-canvas-3d.webp";
-import novelBook from "../../assets/functions/novel-creation-3d.webp";
-import batchBooks from "../../assets/functions/batch-review-3d.webp";
+import privateCustom from "../../assets/functions/private-custom-reference-3d.png";
+import agentCanvas from "../../assets/functions/cm-canvas-3d.png";
+import novelBook from "../../assets/functions/novel-creation-3d.png";
+import batchBooks from "../../assets/functions/batch-review-3d.png";
 import comicStudio from "../../assets/functions/comic-studio-mobile.webp";
-import storyboardFilm from "../../assets/functions/comic-production-3d.webp";
-import videoClapper from "../../assets/functions/shuihuo-production-3d.webp";
-import aiCut from "../../assets/functions/ai-cut-3d.webp";
+import storyboardFilm from "../../assets/functions/comic-production-reference-3d.png";
+import videoClapper from "../../assets/functions/shuihuo-production-3d.png";
+import aiCut from "../../assets/functions/ai-cut-3d.png";
 
 const SOURCE_FALLBACK: Record<TaskSource, string> = {
   script: privateCustom,
