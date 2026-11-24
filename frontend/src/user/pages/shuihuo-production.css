@@ -4205,6 +4205,10 @@ body.shuihuo-reference-shell
   box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .18);
 }
 /* BF_AUTOMATION_PRESET_BUTTONS_END */
+/* Glass uses a translucent button surface, so use the theme's readable text. */
+html[data-scheme='glass'] .batch-factory-automation-preset-modal .ant-btn.ant-btn-primary:not(:disabled) {
+  color: var(--sh-text, var(--text-primary)) !important;
+}
 
 /* BF_BOOK_ROW_BOUNDARY_BEGIN */
 /* Draw the book-to-book separator on the row itself so it spans all visible
