@@ -1,0 +1,69 @@
+.cut-page {
+  --cut-bg: #171a1c; --cut-card: #24282b; --cut-edge: rgba(255,255,255,.09); --cut-text: #f3f6f6; --cut-muted: #9da7aa; --cut-accent: #48d2c5;
+  background: var(--cut-bg) !important; color: var(--cut-text); min-height: 100vh; padding: 0 0 calc(94px + env(safe-area-inset-bottom)); font-size: 14px;
+  button { margin: 0; border-radius: 12px; padding: 0 14px; min-height: 44px; line-height: 44px; font-size: 14px; font-weight: 500; background: var(--cut-card); color: var(--cut-text); border: 1px solid var(--cut-edge); }
+  button::after { border: 0; }
+  .cut-primary { background: var(--cut-accent); color: #092f2b; display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 650; }
+  button[disabled] { opacity: .42; }
+  .cut-link { background: transparent; border: 0; color: var(--cut-accent); font-size: 12px; padding: 0 6px; }
+}
+.mp-theme.mp-page.cut-page, .mp-theme .mp-page.cut-page { padding: 0 0 calc(94px + env(safe-area-inset-bottom)); }
+.mp-theme .cut-page .mp-brand-header, .mp-theme.cut-page .mp-brand-header { margin: 0; padding-left: 16px; padding-right: 16px; }
+.mp-theme-light .cut-page, .cut-page.mp-theme-light { --cut-bg: #f5f6f5; --cut-card: #fff; --cut-edge: rgba(25,45,43,.12); --cut-text: #202a29; --cut-muted: #727f7c; --cut-accent: #36c7b7; }
+.cut-content { padding: 16px; }
+.cut-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 18px; }
+.cut-heading > view { min-width: 0; }
+.cut-title { display: block; font-size: 18px; font-weight: 650; line-height: 1.4; }
+.cut-caption { display: block; color: var(--cut-muted); font-size: 12px; line-height: 1.6; font-weight: 400; }
+.cut-small { margin: 8px 0; font-size: 13px; min-height: 36px; }
+.cut-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 44px; border: 1px solid var(--cut-edge); background: var(--cut-card); border-radius: 12px; margin: 20px 0 12px; }
+.cut-search input { flex: 1; font-size: 14px; }
+.cut-projects { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.cut-project { min-width: 0; background: var(--cut-card); border: 1px solid var(--cut-edge); border-radius: 16px; overflow: hidden; }
+.cut-page .cut-cover { height: 120px; width: 100%; display: flex; justify-content: center; align-items: center; position: relative; border: 0; border-radius: 0; background: linear-gradient(145deg,rgba(70,180,170,.12),rgba(65,100,110,.06)); }
+.cut-ratio { position: absolute; top: 10px; right: 10px; font-size: 10px; line-height: 20px; padding: 0 6px; background: var(--cut-card); border-radius: 6px; }
+.cut-open { position: absolute; bottom: 7px; left: 12px; font-size: 11px; line-height: 22px; color: var(--cut-accent); }
+.cut-project-copy { padding: 9px 12px 4px; }
+.cut-page .cut-project-name { width: 100%; min-height: 28px; line-height: 28px; text-align: left; padding: 0; border: 0; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 14px; }
+.cut-empty { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; }
+.cut-error { display: block; font-size: 12px; color: #e68c85; line-height: 1.65; padding: 10px; background: rgba(215,100,90,.08); border-radius: 10px; margin: 8px 0; overflow-wrap: anywhere; }
+.cut-overlay { position: fixed; inset: 0; z-index: 120; display: flex; align-items: flex-end; }
+.cut-mask { position: absolute; inset: 0; background: rgba(0,0,0,.52); }
+.cut-sheet { position: relative; width: 100%; background: var(--cut-card); border-radius: 22px 22px 0 0; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; max-height: 85vh; }
+.cut-handle { width: 32px; height: 4px; border-radius: 8px; background: var(--cut-muted); opacity: .5; margin: 0 auto 16px; }
+.cut-sheet-scroll { max-height: 66vh; }
+.cut-input { border: 1px solid var(--cut-edge); border-radius: 12px; padding: 12px; min-height: 44px; width: 100%; box-sizing: border-box; font-size: 14px; background: var(--cut-bg); margin: 8px 0 16px; color: var(--cut-text); }
+.cut-textarea { min-height: 120px; }
+.cut-ratios,.cut-actions { display: flex; gap: 8px; margin: 12px 0; }
+.cut-ratios button,.cut-actions button { flex: 1; }
+.cut-ratios .is-active { border-color: var(--cut-accent); color: var(--cut-accent); }
+.cut-editor-header { padding: 12px 16px 4px; display: flex; align-items: center; gap: 10px; }
+.cut-editor-header > view { flex: 1; min-width: 0; }
+.cut-editor-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; }
+.cut-page .cut-icon { width: 40px; padding: 0; display: flex; justify-content: center; align-items: center; background: transparent; border: 0; }
+.cut-editor-content { padding-top: 10px; }
+.cut-preview { background: #0c0f10; border-radius: 14px; height: 230px; overflow: hidden; border: 1px solid var(--cut-edge); color: #fff; }
+.cut-preview video,.cut-preview image { width: 100%; height: 230px; }
+.cut-preview .cut-empty { min-height: 230px; box-sizing: border-box; }
+.cut-timeline-choice { padding: 8px 10px; border-radius: 8px; background: var(--cut-card); font-size: 12px; }
+.cut-timeline { background: var(--cut-card); border: 1px solid var(--cut-edge); border-radius: 14px; width: 100%; }
+.cut-track { padding: 10px 0; border-bottom: 1px solid var(--cut-edge); }
+.cut-track-label { color: var(--cut-muted); display: block; margin: 0 10px 7px; font-size: 11px; }
+.cut-track-lane { height: 50px; position: relative; margin: 0 10px; }
+.cut-page .cut-clip { position: absolute; top: 0; overflow: hidden; height: 50px; padding: 4px 6px; border-radius: 7px; text-align: left; background: #3d6865; border: 1px solid #527c78; color: #fff; }
+.cut-page .kind-audio { background: #475969; border-color: #667b91; }
+.cut-page .kind-subtitle { background: #6a6140; border-color: #8a7f54; }
+.cut-page .cut-clip.is-selected { border: 2px solid var(--cut-accent); }
+.cut-clip text { display: block; font-size: 11px; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cut-timeline-empty { min-height: 100px; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; }
+.cut-selected { border: 1px solid var(--cut-edge); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
+.cut-clip-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%; }
+.cut-editor-tip { margin-top: 16px; }
+.cut-dock { position: fixed; bottom: 0; left: 0; right: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--cut-bg); border-top: 1px solid var(--cut-edge); display: flex; gap: 12px; align-items: center; z-index: 10; }
+.cut-dock button { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 0 10px; }
+.cut-dock .cut-primary { flex: 1; }
+.cut-page .cut-asset-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; margin: 8px 0; padding: 10px; min-height: 64px; line-height: 22px; }
+.cut-asset-row > view { flex: 1; min-width: 0; }
+.cut-asset-row text { display: block; overflow-wrap: anywhere; }
+.cut-export-preset,.cut-job { border: 1px solid var(--cut-edge); padding: 12px; border-radius: 12px; margin-bottom: 12px; }
+.cut-export video { width: 100%; height: 220px; margin-top: 12px; }
