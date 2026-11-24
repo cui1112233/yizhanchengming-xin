@@ -128,10 +128,11 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
           await until(()=>previewBodies.length>count && previewBodies.at(-1).layout.fontSize===fontSize);
           if(previewBodies.at(-1).layout.fontId!==fontId)throw Error('预设没有更新实际预览字体');
         }
+        button('浅色文字').click();await until(()=>previewBodies.at(-1)?.layout.highlightRules==='dialogue');
         const highlightSelect=document.querySelector('[aria-label="标红规则"]');
         highlightSelect.closest('.ant-select').querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
         await until(()=>[...document.querySelectorAll('.ant-select-item-option-content')].some(el=>el.textContent==='对话'));
-        [...document.querySelectorAll('.ant-select-item-option-content')].find(el=>el.textContent==='对话').click();
+
         await until(()=>previewBodies.at(-1)?.layout.highlightRules?.includes('dialogue'));
         [...document.querySelectorAll('.ant-select-item-option-content')].find(el=>el.textContent==='指定行').click();
         await until(()=>previewBodies.at(-1)?.layout.highlightRules?.includes('dialogue') && previewBodies.at(-1)?.layout.highlightRules?.includes('lines'));

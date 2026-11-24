@@ -8,6 +8,10 @@ export const TEXT_LAYOUT_TEMPLATES = [
 export function textColorScheme(mode){
  return mode==='dark'?{textColor:'#222222',textBackground:{kind:'color',color:'#F6EFDF'}}:{textColor:'#FFFFFF',textBackground:{kind:'color',color:'#111318'}};
 }
+export function lightTextChanges(rules=''){
+ const selected=rules && rules!=='off'?rules.split(','):[];
+ return {...textColorScheme('light'),textHighlightRules:[...new Set([...selected,'dialogue'])].join(',')};
+}
 function luminance(hex){
  if(!/^#[0-9a-f]{6}$/i.test(hex || ''))return null;
  const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4);

@@ -3,7 +3,7 @@ import { ConfigProvider, Select } from 'antd';
 import * as api from '../../../shared/api/batchFactoryText.js';
 import {layoutFields,pageControls} from './textMediaActions.js';
 import TextBackgroundGallery from './TextBackgroundGallery.jsx';
-import {TEXT_LAYOUT_TEMPLATES,textColorScheme} from './textLayoutTemplates.js';
+import {TEXT_LAYOUT_TEMPLATES,textColorScheme,lightTextChanges} from './textLayoutTemplates.js';
 import TextContrastNotice from './TextContrastNotice.jsx';
 import TextHighlightRuleSelect from './TextHighlightRuleSelect.jsx';
 import TextColorPicker from './TextColorPicker.jsx';
@@ -52,7 +52,7 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
   },[batchId,bookId]);
   const setLayout=(key,value)=>onDraft(old=>({...old,layout:{...old.layout,[key]:value}}));
   const setBackground=background=>onDraft(old=>({...old,background}));
-  const setColors=changes=>onDraft(old=>({...old,layout:{...old.layout,textColor:changes.textColor},background:changes.textBackground || old.background}));
+  const setColors=changes=>onDraft(old=>({...old,layout:{...old.layout,textColor:changes.textColor,...(changes.textHighlightRules!==undefined?{highlightRules:changes.textHighlightRules}:{})},background:changes.textBackground || old.background}));
   const upload=async(file)=>{
     if(!file)return;
     onUploading(true);setFileBusy(true);setBgError('');
@@ -66,7 +66,7 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     <legend>{cover?'封面排版':'排版调整 · 仅本页'}</legend>
     {!cover && <small className="text-editor-scope">字号和段距只调整本页内容，放不下的句子会顺延；不会从下一页补字。整书重排请在统一配置或单书配置中调整后重新分页。</small>}
     {!cover && <label>页面正文<textarea aria-label="页面正文" rows={6} value={draft.text} onChange={e=>{const text=e.target.value;onDraft(old=>({...old,text}));}}/></label>}
-    {!cover && <div className="text-layout-presets">{TEXT_LAYOUT_TEMPLATES.map(preset=><button key={preset.id} type="button" onClick={()=>onDraft(old=>({...old,layout:{...old.layout,...Object.fromEntries(Object.entries(preset.values).filter(([key])=>layoutFields[key]).map(([key,value])=>[layoutFields[key],value]))},background:{...preset.values.textBackground}}))}>{preset.label}</button>)}<button type="button" onClick={()=>setColors(textColorScheme('dark'))}>深色文字</button><button type="button" onClick={()=>setColors(textColorScheme('light'))}>浅色文字</button></div>}
+    {!cover && <div className="text-layout-presets">{TEXT_LAYOUT_TEMPLATES.map(preset=><button key={preset.id} type="button" onClick={()=>onDraft(old=>({...old,layout:{...old.layout,...Object.fromEntries(Object.entries(preset.values).filter(([key])=>layoutFields[key]).map(([key,value])=>[layoutFields[key],value]))},background:{...preset.values.textBackground}}))}>{preset.label}</button>)}<button type="button" onClick={()=>setColors(textColorScheme('dark'))}>深色文字</button><button type="button" onClick={()=>setColors(lightTextChanges(draft.layout.highlightRules))}>浅色文字</button></div>}
     <div className="text-layout-fields">{pageControls.filter(f=>!cover || ['fontId','fontSize','fontWeight','align','textColor'].includes(layoutFields[f.key])).map(f=>{
       const key=layoutFields[f.key], value=draft.layout[key];
       if(f.type==='highlightRules')return <label key={key}>{f.label}<TextHighlightRuleSelect value={value} disabled={busy || fileBusy} onChange={next=>setLayout(key,next)}/></label>;

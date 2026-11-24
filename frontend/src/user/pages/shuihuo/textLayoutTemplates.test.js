@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores,textColorScheme,hasLowTextContrast,readableTextColor} from './textLayoutTemplates.js';
+import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores,textColorScheme,hasLowTextContrast,readableTextColor,lightTextChanges} from './textLayoutTemplates.js';
 import {applyTextProductionChanges,textProductionBookOverride} from './textProductionConfig.js';
+test('light text enables dialogue highlighting and retains chosen rules',()=>{
+ assert.equal(lightTextChanges('off').textHighlightRules,'dialogue');
+ assert.equal(lightTextChanges('').textHighlightRules,'dialogue');
+ assert.deepEqual(lightTextChanges('lines,dialogue').textHighlightRules.split(',').sort(),['dialogue','lines']);
+ assert.equal(lightTextChanges('keywords').textHighlightRules,'keywords,dialogue');
+ assert.equal(lightTextChanges('off').textColor,'#FFFFFF');
+ assert.equal(lightTextChanges('off').textBackground.color,'#111318');
+});
 test('handwriting uses Long Cang and paired colors remain readable',()=>{
  assert.equal(TEXT_LAYOUT_TEMPLATES.find(p=>p.id==='handwriting').values.textFontId,'long-cang');
  assert.equal(TEXT_LAYOUT_TEMPLATES.find(p=>p.id==='clear').values.textFontId,'lxgw-wenkai');

@@ -59,7 +59,7 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
           await waitFor(()=>document.querySelector('[aria-label="背景颜色色值"]')?.value==='#111318','readable dark background');
           const ruleInput=document.querySelector('[aria-label="标红规则"]');
           ruleInput.closest('.ant-select').querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-          (await waitFor(()=>byText('.ant-select-item-option-content','对话'),'dialogue option')).click();
+          await waitFor(()=>document.querySelector('.ant-select-selection-item[title="对话"]'),'default dialogue highlight');
           (await waitFor(()=>byText('.ant-select-item-option-content','指定行'),'line option')).click();
           await waitFor(()=>document.querySelector('[aria-label="标红行号"]')?.value==='1,3','default visual lines');
           document.body.click();
