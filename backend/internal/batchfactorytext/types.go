@@ -23,6 +23,8 @@ type LayoutConfig struct {
 	Align                           string  `json:"align"`
 	TextColor                       string  `json:"textColor"`
 	HighlightColor                  string  `json:"highlightColor"`
+	HighlightRules                  string  `json:"highlightRules,omitempty"`
+	HighlightLines                  string  `json:"highlightLines,omitempty"`
 	MaxHeightRatio                  float64 `json:"maxHeightRatio"`
 	paddingSet, paragraphSpacingSet bool
 }

@@ -21,6 +21,22 @@ type settingLibrary struct {
 	owners map[string]txt.LibraryBackground
 }
 
+func TestBatchFactoryTextHighlightSettingsSnapshot(t *testing.T) {
+	x := textRequest{book: batchfactoryv11.Book{Title: "测试书", SourceMetadata: map[string]any{"illustrationHighlightKeywords": []string{"关键词"}}}, settings: batchfactoryv11.SettingsPatch{"textHighlightRules": json.RawMessage(`"dialogue,lines,keywords"`), "textHighlightLines": json.RawMessage(`"1,3"`)}}
+	got, err := bookTextSnapshot(x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Layout.HighlightRules != "dialogue,lines,keywords" || got.Layout.HighlightLines != "1,3" || !got.HighlightReuseEnabled || len(got.HighlightWords) != 1 {
+		t.Fatal(got)
+	}
+	x.settings["textHighlightRules"] = json.RawMessage(`"off"`)
+	off, err := bookTextSnapshot(x)
+	if err != nil || off.HighlightReuseEnabled || off.CoverFingerprint != got.CoverFingerprint {
+		t.Fatal("body rules changed cover or failed to turn off", err)
+	}
+}
+
 func (lib settingLibrary) ListBackgrounds(_ context.Context, owner string) ([]txt.LibraryBackground, error) {
 	if bg, ok := lib.owners[owner]; ok {
 		return []txt.LibraryBackground{bg}, nil

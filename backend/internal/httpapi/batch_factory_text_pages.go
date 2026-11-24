@@ -156,7 +156,7 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 	var s textSnapshot
 	raw := map[string]json.RawMessage{}
 	raw["paginationMode"] = json.RawMessage(`"auto"`)
-	for k, d := range map[string]string{"textPaginationMode": "paginationMode", "textPageTarget": "targetCharacters", "imageAspectRatio": "aspectRatio", "textFontId": "fontId", "textFontSize": "fontSize", "textFontWeight": "fontWeight", "textLineHeight": "lineHeight", "textParagraphSpacing": "paragraphSpacing", "textPadding": "padding", "textAlign": "align", "textColor": "textColor", "textHighlightColor": "highlightColor", "textMaxHeightRatio": "maxHeightRatio"} {
+	for k, d := range map[string]string{"textPaginationMode": "paginationMode", "textPageTarget": "targetCharacters", "imageAspectRatio": "aspectRatio", "textFontId": "fontId", "textFontSize": "fontSize", "textFontWeight": "fontWeight", "textLineHeight": "lineHeight", "textParagraphSpacing": "paragraphSpacing", "textPadding": "padding", "textAlign": "align", "textColor": "textColor", "textHighlightColor": "highlightColor", "textHighlightRules": "highlightRules", "textHighlightLines": "highlightLines", "textMaxHeightRatio": "maxHeightRatio"} {
 		if v := x.settings[k]; len(v) > 0 {
 			raw[d] = v
 		}
@@ -220,6 +220,9 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 		_ = json.Unmarshal(x.settings["publishSettings"], &legacy)
 		s.HighlightReuseEnabled = legacy.Enabled
 	}
+	if s.Layout.HighlightRules != "" {
+		s.HighlightReuseEnabled = txt.HighlightRuleEnabled(s.Layout.HighlightRules, "keywords")
+	}
 	if s.HighlightReuseEnabled {
 		words, err := json.Marshal(x.book.SourceMetadata["illustrationHighlightKeywords"])
 		if err != nil {
@@ -235,6 +238,8 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 	if err != nil {
 		return s, err
 	}
+	coverStyle.Layout.HighlightRules = ""
+	coverStyle.Layout.HighlightLines = ""
 	fingerprint, err := json.Marshal([]any{s.Title, coverStyle.Layout, coverStyle.Background})
 	if err != nil {
 		return s, txt.ErrInvalid

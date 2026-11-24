@@ -7,6 +7,16 @@ test('文本单书配置固定分为引擎、排版、发布三个区块', () =>
   assert.deepEqual(TEXT_PRODUCTION_SECTIONS.map(section => section.label), ['引擎配置', '排版配置', '发布配置']);
 });
 
+test('标红规则、图片行号可以继承、单书覆盖和恢复',()=>{
+ const batch={textHighlightRules:'dialogue,lines',textHighlightLines:'1,3'};
+ assert.equal(textProductionBookOverride(batch,{}).value.textHighlightRules,'dialogue,lines');
+ const book=applyTextProductionChanges({},{textHighlightRules:'off'});
+ assert.equal(textProductionBookOverride(batch,book).value.textHighlightRules,'off');
+ const restored=applyTextProductionChanges(book,{textHighlightRules:undefined});
+ assert.equal(textProductionBookOverride(batch,restored).value.textHighlightRules,'dialogue,lines');
+ assert.equal(textProductionBookOverride(batch,restored).value.textHighlightLines,'1,3');
+});
+
 test('智能排版默认开启，目标字数保留但仅在目标模式生效，单书可独立覆盖',()=>{
   assert.equal(defaultTextProductionConfig().textPaginationMode,'auto');
   const batch=applyTextProductionChanges({textPageTarget:150},{textPaginationMode:'auto'});

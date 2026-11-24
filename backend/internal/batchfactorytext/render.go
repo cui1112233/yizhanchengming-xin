@@ -13,6 +13,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	xdraw "golang.org/x/image/draw"
@@ -93,6 +94,8 @@ type RenderInput struct {
 	// The caller resolves authenticated storage references into bytes.
 	BackgroundImage       []byte
 	HighlightReuseEnabled bool
+	DialogueRanges        []HighlightRange
+	DialogueRangesSet     bool
 	// Preview samples the actual cropped background behind the glyphs.
 	WarnLowContrast func()
 }
@@ -111,6 +114,9 @@ var canvasSizes = map[string]image.Point{
 }
 
 func resolveLayout(c LayoutConfig) (LayoutConfig, image.Point, error) {
+	if err := validateHighlightRules(c); err != nil {
+		return c, image.Point{}, err
+	}
 	defaults := DefaultRenderLayout()
 	if c.PaginationMode != "" && c.PaginationMode != "auto" && c.PaginationMode != "target" {
 		return c, image.Point{}, fmt.Errorf("不支持分页方式 %q", c.PaginationMode)
@@ -462,7 +468,7 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 		return nil, "", fmt.Errorf("本页排版超出文字区域，请调整字号、边距或重新分页")
 	}
 	var ranges []HighlightRange
-	if in.HighlightReuseEnabled && r.Highlights != nil {
+	if ((c.HighlightRules == "" && in.HighlightReuseEnabled) || HighlightRuleEnabled(c.HighlightRules, "keywords")) && r.Highlights != nil {
 		ranges, err = r.Highlights.Ranges(ctx, in.Owner, in.BookID, in.VersionID, text)
 		if err != nil {
 			return nil, "", err
@@ -475,6 +481,25 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 		}
 		ranges = mergeRanges(append([]HighlightRange(nil), ranges...))
 	}
+	if HighlightRuleEnabled(c.HighlightRules, "dialogue") {
+		dialogue := in.DialogueRanges
+		if !in.DialogueRangesSet {
+			dialogue = DialogueHighlightRanges(text)
+		}
+		limit := utf8.RuneCountInString(text)
+		for _, v := range dialogue {
+			v.Start = max(0, v.Start)
+			v.End = min(limit, v.End)
+			if v.Start < v.End {
+				ranges = append(ranges, v)
+			}
+		}
+		ranges = mergeRanges(ranges)
+	}
+	selectedLines := map[int]bool{}
+	if HighlightRuleEnabled(c.HighlightRules, "lines") {
+		selectedLines, _ = parseHighlightLines(c.HighlightLines)
+	}
 	dst := image.NewRGBA(image.Rectangle{Max: size})
 	if err = drawBackground(dst, in.Background, in.BackgroundImage); err != nil {
 		return nil, "", err
@@ -482,13 +507,20 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 	fg, accent := image.NewUniform(normal), image.NewUniform(highlight)
 	rangeIndex := 0
 	spread := boldSpread(c)
+	visualLine := 0
 	paint := func(line lineGeometry, x, y int) error {
+		for _, g := range line.glyphs {
+			if !unicode.IsSpace(g.r) {
+				visualLine++
+				break
+			}
+		}
 		for _, g := range line.glyphs {
 			for rangeIndex < len(ranges) && ranges[rangeIndex].End <= g.index {
 				rangeIndex++
 			}
 			ink := fg
-			if rangeIndex < len(ranges) && ranges[rangeIndex].Start <= g.index {
+			if selectedLines[visualLine] || (rangeIndex < len(ranges) && ranges[rangeIndex].Start <= g.index) {
 				ink = accent
 			}
 			dot := fixed.P(x, y)

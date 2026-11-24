@@ -46,6 +46,8 @@ func (a textAPI) prepareDrafts(x textRequest, d txt.Document, snap textSnapshot,
 				// Both colors affect pixels only and cannot change line breaks.
 				oldLayout.TextColor = style.Layout.TextColor
 				oldLayout.HighlightColor = style.Layout.HighlightColor
+				oldLayout.HighlightRules = style.Layout.HighlightRules
+				oldLayout.HighlightLines = style.Layout.HighlightLines
 				if oldLayout != style.Layout {
 					fits, _, err := measure(p.Text, style.Layout)
 					if err != nil {

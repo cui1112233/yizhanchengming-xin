@@ -120,7 +120,23 @@ func (a textAPI) renderInput(x textRequest, d txt.Document, p txt.Page, cover bo
 		return txt.RenderInput{}, txt.Renderer{}, err
 	}
 	in := txt.RenderInput{Owner: x.scope.Owner, BookID: x.scope.BookID, VersionID: d.ActiveVersionID, Text: content, Layout: style.Layout, Background: style.Background, BackgroundImage: bg, HighlightReuseEnabled: style.HighlightReuseEnabled && !cover}
-	renderer := txt.Renderer{Highlights: txt.KeywordHighlightSource(func(context.Context, string, string, string) ([]string, error) { return snap.HighlightWords, nil })}
+	if cover {
+		in.Layout.HighlightRules = "off"
+	}
+	if !cover && txt.HighlightRuleEnabled(style.Layout.HighlightRules, "dialogue") {
+		version, err := a.repo.GetVersion(x, x.scope, d.ActiveVersionID)
+		if err != nil {
+			return in, txt.Renderer{}, err
+		}
+		in.DialogueRanges, in.DialogueRangesSet = txt.DialoguePageRanges(version.ProductionText, content, p.StartOffset, p.EndOffset)
+	}
+	words := snap.HighlightWords
+	if len(words) == 0 {
+		if raw, err := json.Marshal(x.book.SourceMetadata["illustrationHighlightKeywords"]); err == nil {
+			_ = json.Unmarshal(raw, &words)
+		}
+	}
+	renderer := txt.Renderer{Highlights: txt.KeywordHighlightSource(func(context.Context, string, string, string) ([]string, error) { return words, nil })}
 	return in, renderer, nil
 }
 func (a textAPI) picture(w http.ResponseWriter, r *http.Request, x textRequest) error {

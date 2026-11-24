@@ -58,6 +58,7 @@ test('编辑正文和改变版心需要重算页界，仅更换颜色或背景�
   assert.equal(textPageDirtyImpact(a,{...a,background:{kind:'color',color:'#000'}}),'render');
   assert.equal(textPageDirtyImpact(a,{...a,highlightReuseEnabled:true}),'render');
   assert.equal(textPageDirtyImpact(a,{...a,layout:{...a.layout,textColor:'#fea'}}),'render');
+  assert.equal(textPageDirtyImpact(a,{...a,layout:{...a.layout,highlightRules:'dialogue,lines',highlightLines:'1,3'}}),'render');
   assert.equal(textPageDirtyImpact(a,{...a,layout:{...a.layout,padding:0,textColor:'#fea'}}),'reflow');
   for (const key of ['aspectRatio','targetCharacters','fontId','fontSize','fontWeight','lineHeight','paragraphSpacing','maxHeightRatio'])
     assert.equal(textPageDirtyImpact({layout:{}},{layout:{[key]:1}}),'reflow',key);

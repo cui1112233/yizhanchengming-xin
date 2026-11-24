@@ -5,6 +5,7 @@ import {layoutFields,pageControls} from './textMediaActions.js';
 import TextBackgroundGallery from './TextBackgroundGallery.jsx';
 import {TEXT_LAYOUT_TEMPLATES,textColorScheme} from './textLayoutTemplates.js';
 import TextContrastNotice from './TextContrastNotice.jsx';
+import TextHighlightRuleSelect from './TextHighlightRuleSelect.jsx';
 
 export function useDraftPreview(batchId,bookId,session) {
   const [view,setView]=useState({});
@@ -67,6 +68,8 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     {!cover && <div className="text-layout-presets">{TEXT_LAYOUT_TEMPLATES.map(preset=><button key={preset.id} type="button" onClick={()=>onDraft(old=>({...old,layout:{...old.layout,...Object.fromEntries(Object.entries(preset.values).filter(([key])=>layoutFields[key]).map(([key,value])=>[layoutFields[key],value]))},background:{...preset.values.textBackground}}))}>{preset.label}</button>)}<button type="button" onClick={()=>setColors(textColorScheme('dark'))}>深色文字</button><button type="button" onClick={()=>setColors(textColorScheme('light'))}>浅色文字</button></div>}
     <div className="text-layout-fields">{pageControls.filter(f=>!cover || ['fontId','fontSize','fontWeight','align','textColor'].includes(layoutFields[f.key])).map(f=>{
       const key=layoutFields[f.key], value=draft.layout[key];
+      if(f.type==='highlightRules')return <label key={key}>{f.label}<TextHighlightRuleSelect value={value} disabled={busy || fileBusy} onChange={next=>setLayout(key,next)}/></label>;
+      if(f.type==='input')return <label key={key}>{f.label}<input type="text" aria-label={f.label} placeholder="如 1,3（每页重新计数）" value={value || ''} disabled={!draft.layout.highlightRules?.split(',').includes('lines')} onChange={e=>setLayout(key,e.target.value)}/></label>;
       const opts=key==='fontId' && fonts?.length ? fonts.filter(v=>v.available!==false).map(v=>({value:v.id,label:f.options?.find(option=>option.value===v.id)?.label || v.name})) : f.options;
       return <label key={key}>{f.label}{opts ? <Select aria-label={f.label} disabled={busy || fileBusy} value={value} options={opts} getPopupContainer={trigger=>trigger.parentElement} onChange={next=>setLayout(key,typeof f.initial==='number'?Number(next):next)}/>
         : <input disabled={key==='targetCharacters' && draft.layout.paginationMode!=='target'} type={f.type==='color'?'color':'number'} min={f.min} max={f.max} step={f.step || 1} value={f.type==='percent'?Math.round(value*100):value}

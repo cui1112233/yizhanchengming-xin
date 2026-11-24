@@ -10,6 +10,7 @@ import TextBackgroundGallery from './TextBackgroundGallery.jsx';
 import './publish-settings.css';
 import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores,textColorScheme} from './textLayoutTemplates.js';
 import TextContrastNotice from './TextContrastNotice.jsx';
+import TextHighlightRuleSelect from './TextHighlightRuleSelect.jsx';
 
 const SharedImagePublishSettings = lazy(() => import('./BatchFactoryImagePublishSettingsForm').then(module => ({default:module.BatchFactoryComicPublishSettingsForm})));
 const SettingsPreview = lazy(()=>import('./TextSettingsPreview.jsx'));
@@ -109,6 +110,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
     const v=value[field.key];
     const set=next=>onChange(field.type==='profile' ? textProfileChanges(profiles,next) : {[field.key]:next});
     const attrs={'aria-label':field.label};
+    if(field.type==='highlightRules')return <TextHighlightRuleSelect value={v} legacyKeywords={value.highlightReuseEnabled} onChange={next=>onChange({textHighlightRules:next,...(next.split(',').includes('lines')?{textHighlightLines:value.textHighlightLines || '1,3'}:{})})}/>;
     if(field.type==='background')return <BackgroundPicker value={v} items={backgrounds} onChange={set} onUploaded={item=>setBackgrounds(old=>[item,...old.filter(x=>x.id!==item.id)])}/>;
     if(field.type==='switch')return <Switch {...attrs} checked={v} onChange={set}/>;
     if(field.type==='color')return <div><ColorPicker label={field.label} value={v} onChange={set}/>{field.key==='textColor' && <TextContrastNotice color={v} background={value.textBackground} onChange={onChange}/>}</div>;
@@ -118,7 +120,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
         disabled={field.key==='textPageTarget' && value.textPaginationMode!=='target'}
         value={percent ? Math.round(v*100) : v} onChange={n=>{if(n!=null)set(percent ? n/100 : n);}}/>;
     }
-    if(field.type==='input')return <Input {...attrs} value={v} onChange={e=>set(e.target.value)}/>;
+    if(field.type==='input')return <Input {...attrs} value={v} placeholder={field.key==='textHighlightLines'?'如 1,3（每页重新计数）':undefined} disabled={field.key==='textHighlightLines' && !value.textHighlightRules?.split(',').includes('lines')} onChange={e=>set(e.target.value)}/>;
     const many=field.type==='models';
     const disabled=many && value.sensitiveMode!=='ai';
     return <Select {...attrs} showSearch optionFilterProp="label" style={{minWidth:150}} mode={many?'multiple':undefined}
@@ -152,7 +154,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
   }}/></Suspense>}{section.key==='publish' && scope==='book' && <div className="text-publish-restores">{publishOverrideRestores(explicitKeys).map(group=><Button key={group.label} size="small" onClick={()=>onChange(Object.fromEntries(group.keys.map(key=>[key,undefined])))}>{group.label} · 恢复继承</Button>)}</div>}{section.key==='layout' && <div className="text-layout-presets"><b>排版预设</b>{TEXT_LAYOUT_TEMPLATES.map(preset=><Button key={preset.id} onClick={()=>onChange(structuredClone(preset.values))}>{preset.label}</Button>)}<Button onClick={()=>onChange(textColorScheme('dark'))}>深色文字</Button><Button onClick={()=>onChange(textColorScheme('light'))}>浅色文字</Button></div>}<div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
     {fieldGroups(section).map(group=><section className="batch-factory-engine-group" key={group.title || section.key}>
       {group.title ? <div className="batch-factory-engine-group-title">{group.title}</div> : null}
-      {group.fields.map(renderField)}
+      {group.fields.filter(field=>!field.hidden).map(renderField)}
     </section>)}
   </div></div></>;
   return <>{error && <Alert type="warning" showIcon message={error}/>}

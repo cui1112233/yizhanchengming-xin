@@ -5,6 +5,7 @@ export const layoutFields = {
   imageAspectRatio:'aspectRatio', textFontId:'fontId', textFontSize:'fontSize', textFontWeight:'fontWeight',
   textLineHeight:'lineHeight', textParagraphSpacing:'paragraphSpacing', textPadding:'padding',
   textAlign:'align', textColor:'textColor', textHighlightColor:'highlightColor', textMaxHeightRatio:'maxHeightRatio',
+  textHighlightRules:'highlightRules',textHighlightLines:'highlightLines',
 };
 export const pageControls = TEXT_PRODUCTION_SECTIONS.find(s=>s.key==='layout').fields.filter(f=>layoutFields[f.key]);
 
@@ -18,6 +19,7 @@ export function initialPageDraft(doc,page,cover=false) {
     layout[key]=actual || ((key==='padding'||key==='paragraphSpacing') && actual===0 ? 0 : f.initial);
   }
   layout.targetCharacters=source?.layout?.targetCharacters || snapshot.layout?.targetCharacters || 150;
+  if(!layout.highlightRules)layout.highlightRules=snapshot.highlightReuseEnabled?'keywords':'off';
   const bg=source?.background?.kind ? source.background : snapshot.background;
   return {text:cover ? snapshot.title || '' : page?.text || '', layout,
     background:bg?.kind ? {...bg} : {kind:'color',color:'#111318'}};

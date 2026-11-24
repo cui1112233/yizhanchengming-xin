@@ -111,6 +111,8 @@ func ValidateWorkflowStyle(s PageStyle) error {
 func geometry(layout LayoutConfig) LayoutConfig {
 	layout.TextColor = ""
 	layout.HighlightColor = ""
+	layout.HighlightRules = ""
+	layout.HighlightLines = ""
 	return layout
 }
 

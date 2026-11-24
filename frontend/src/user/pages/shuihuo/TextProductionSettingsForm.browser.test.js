@@ -39,7 +39,7 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
         async function run() {
           document.body.dataset.step='render';
           createRoot(document.querySelector('#root')).render(<Harness/>);
-          await waitFor(()=>document.body.textContent.includes('按关键词标红'),'engine fields');
+          await waitFor(()=>document.body.textContent.includes('文本模型'),'engine fields');
           if(document.body.textContent.includes('复用已有标红词，本地排版。')) throw Error('redundant highlight note');
           if(document.body.textContent.includes('系统优化在本地执行。')) throw Error('redundant sensitive-mode note');
           (await waitFor(()=>byText('[role=tab]','排版配置'),'layout tab')).click();
@@ -57,6 +57,12 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
           await waitFor(()=>document.querySelector('[aria-label="背景颜色色值"]')?.value==='#F6EFDF','readable light background');
           byText('button','浅色文字').click();
           await waitFor(()=>document.querySelector('[aria-label="背景颜色色值"]')?.value==='#111318','readable dark background');
+          const ruleInput=document.querySelector('[aria-label="标红规则"]');
+          ruleInput.closest('.ant-select').querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+          (await waitFor(()=>byText('.ant-select-item-option-content','对话'),'dialogue option')).click();
+          (await waitFor(()=>byText('.ant-select-item-option-content','指定行'),'line option')).click();
+          await waitFor(()=>document.querySelector('[aria-label="标红行号"]')?.value==='1,3','default visual lines');
+          document.body.click();
           const publish=()=>waitFor(()=>byText('[role=tab]','发布配置'),'publish tab');
           (await publish()).click();
           const publishGroup=await waitFor(()=>byText('.batch-factory-engine-group-title','发布映射'),'publish group');
@@ -79,6 +85,7 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
           document.body.dataset.step='reopened';
           await waitFor(()=>document.querySelector('.ant-select-selection-item[title="8个解压"]'),'label on reopen');
           const saved=JSON.parse(window.saved).publishSettings;
+          if(!JSON.parse(window.saved).textHighlightRules.includes('dialogue') || JSON.parse(window.saved).textHighlightLines!=='1,3')throw Error('highlight rules not persisted');
           if(saved.organization!=='7' || saved.websiteProfileId!=='121-8' || window.synced!==1) throw Error('saved mapping');
           document.body.dataset.result='passed';
         }

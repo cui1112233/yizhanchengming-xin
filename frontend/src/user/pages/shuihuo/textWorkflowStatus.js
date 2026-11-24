@@ -25,7 +25,7 @@ export function textUpdateState(snapshot={},collection){
  let reflow=false,repaint=false;
  if(next && old){
   const a=layout(old,true),b=layout(next);
-  const paintKeys=['align','textColor','highlightColor'];
+  const paintKeys=['align','textColor','highlightColor','highlightRules','highlightLines'];
   repaint=paintKeys.some(key=>a[key]!==b[key]) || !equal(background(old.background),background(next.background)) || Boolean(old.highlightReuseEnabled)!==Boolean(next.highlightReuseEnabled) || old.highlightRevision!==next.highlightRevision || old.coverFingerprint!==next.coverFingerprint;
   for(const key of paintKeys){delete a[key];delete b[key];}
   if(a.paginationMode==='auto' && b.paginationMode==='auto'){delete a.targetCharacters;delete b.targetCharacters;}

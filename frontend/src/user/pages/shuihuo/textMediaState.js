@@ -54,7 +54,7 @@ const geometryKeys = {
   fontSize: 'textFontSize', fontWeight: 'textFontWeight', lineHeight: 'textLineHeight',
   paragraphSpacing: 'textParagraphSpacing', padding: 'textPadding', maxHeightRatio: 'textMaxHeightRatio',
 };
-const paintKeys = { align: 'textAlign', textColor: 'textColor', highlightColor: 'textHighlightColor' };
+const paintKeys = { align: 'textAlign', textColor: 'textColor', highlightColor: 'textHighlightColor',highlightRules:'textHighlightRules',highlightLines:'textHighlightLines' };
 function layoutChanged(before, after, keys) {
   return Object.entries(keys).some(([key, formKey]) => {
     const value = page => page.layout?.[key] ?? page[key] ?? page[formKey];

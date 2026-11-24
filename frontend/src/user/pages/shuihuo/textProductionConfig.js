@@ -20,7 +20,7 @@ export const TEXT_PRODUCTION_SECTIONS = [
     field('sensitiveMode','敏感内容处理','choice','system',{options:SENSITIVE_MODE_OPTIONS,aiHint:'生产阶段会调用文本模型。AI 优化失败会停止生产并显示失败原因。'}),
     field('sensitiveAIModels','AI 修复模型','models',[]),
     field('sensitiveAIOnFailure','取文阶段未处理命中词','choice','review',{options:[{value:'review',label:'打码并标记待复核'},{value:'fail',label:'停止取文'}]}),
-    field('highlightReuseEnabled','按关键词标红','switch',false)
+    field('highlightReuseEnabled','按关键词标红','switch',false,{hidden:true})
   ]},
   { key:'layout', label:'排版配置', fields:[
     field('textPaginationMode','分页方式','choice','auto',{options:[{value:'auto',label:'智能排版'},{value:'target',label:'目标字数'}]}),
@@ -36,6 +36,8 @@ export const TEXT_PRODUCTION_SECTIONS = [
     field('textAlign','正文对齐','choice','left',{options:align}),
     field('textColor','文字颜色','color','#FFFFFF'),
     field('textHighlightColor','标红颜色','color','#E53935'),
+    field('textHighlightRules','标红规则','highlightRules',''),
+    field('textHighlightLines','标红行号','input','1,3'),
     field('textMaxHeightRatio','文字最大高度占比','percent',0.75,{min:1,max:100}),
     field('textBackground','整书背景','background',solid),
     field('textCover.layout.fontId','标题字体','choice',null,{options:fonts,from:'textFontId'}),
