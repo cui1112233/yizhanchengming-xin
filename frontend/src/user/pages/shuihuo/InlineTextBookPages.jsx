@@ -56,14 +56,14 @@ export default function InlineTextBookPages({ batchId, book, pageTarget = 150, a
   return <>
     <div className="shuihuo-workbench-cell batch-factory-text-page-cell is-copy">
       <div className="batch-factory-cell-shell">
-        <header className="batch-factory-text-page-head"><div><b>页面内容</b><small>{page ? `第 ${page.ordinal} 页 · ${String(page.text || '').length} 字` : `单页约 ${pageTarget} 字`}</small></div><span>{pages.length ? `${selectedIndex + 1}/${pages.length}` : '未分页'}</span></header>
+        <header className="batch-factory-text-page-head"><small>{page ? `第 ${page.ordinal} 页 · ${String(page.text || '').length} 字` : `单页约 ${pageTarget} 字`}</small><span>{pages.length ? `${selectedIndex + 1}/${pages.length}` : '未分页'}</span></header>
         <div className="batch-factory-text-page-content"><p>{page?.text || emptyText}</p></div>
         <PagePager selectedIndex={selectedIndex} total={pages.length} onMove={move} kind="copy" />
       </div>
     </div>
     <div className="shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell batch-factory-text-rendered-cell">
       <div className="batch-factory-cell-shell">
-        <header className="batch-factory-text-page-head"><div><b>文字页</b><small>{page ? `第 ${page.ordinal} 页` : `目标 ${pageTarget} 字/页`}</small></div><button type="button" className="batch-factory-text-page-open" disabled={!page} onClick={() => page && onOpen?.(page.id)}>查看 / 调整</button></header>
+        <header className="batch-factory-text-page-head"><small>{page ? `第 ${page.ordinal} 页` : `目标 ${pageTarget} 字/页`}</small><button type="button" className="batch-factory-text-page-open" disabled={!page} onClick={() => page && onOpen?.(page.id)}>查看 / 调整</button></header>
         <button type="button" className="batch-factory-text-page-image" disabled={!page} onClick={() => page && onOpen?.(page.id)}>
           {activeArtifact?.contentUrl
             ? <AuthenticatedTextPageImage passive contentUrl={activeArtifact.contentUrl} alt={`文字页 ${page.ordinal}`} />

@@ -11,8 +11,6 @@ test('inline text workbench keeps assigned copy and rendered image on one page i
   assert.match(source, /const \[selectedIndex, setSelectedIndex\] = useState\(0\)/);
   assert.match(source, /item\.id === page\?\.activeArtifactId/);
   assert.match(source, /<AuthenticatedTextPageImage/);
-  assert.match(source, />页面内容</);
-  assert.match(source, />文字页</);
   assert.match(source, /page\?\.text/);
   assert.match(source, /onOpen\?\.\(page\.id\)/);
   assert.match(source, /'上一文字页'/);

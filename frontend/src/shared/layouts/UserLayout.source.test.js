@@ -61,8 +61,8 @@ test('keeps the collapsed sidebar free of a standalone theme entry while theme c
   assert.doesNotMatch(stylesheet, /^\.theme-picker-trigger/m);
   assert.match(stylesheet, /\.admin-sidebar-footer \.theme-picker-trigger\s*\{[^}]*color:\s*var\(--text-secondary\)/s);
   assert.doesNotMatch(stylesheet, /\.legacy-theme-switch/);
-  assert.match(source, /className="legacy-sidebar-logout"/);
-  assert.match(source, /<LogOut/);
+  assert.doesNotMatch(source, /className="legacy-sidebar-logout"/);
+  assert.doesNotMatch(source, /legacy-sidebar-logout-label/);
   assert.match(source, /const nextThemeId = persistCachedTheme\(themeId\)/);
   assert.match(source, /updateMemberProfile\(\{ themeId: nextThemeId \}\)/);
   assert.match(source, /主题已在本机切换，但未同步到账号/);

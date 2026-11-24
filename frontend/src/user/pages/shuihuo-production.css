@@ -3341,6 +3341,8 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-inline-merge-status.is-succeeded{color:var(--sh-text);border-color:color-mix(in srgb,var(--sh-accent) 38%,var(--sh-line))}
 .batch-factory-inline-merge-status.is-failed{color:var(--sh-danger)}
 .batch-factory-text-page-cell{padding:0!important}
+.batch-factory-text-page-cell,.batch-factory-text-rendered-cell{display:grid!important;grid-template-rows:minmax(0,1fr)!important;align-content:stretch!important;align-items:stretch}
+.batch-factory-text-page-cell>.batch-factory-cell-shell,.batch-factory-text-rendered-cell>.batch-factory-cell-shell{align-self:stretch;height:100%!important}
 .batch-factory-text-page-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-bottom:1px solid var(--sh-line);background:var(--sh-panel-strong)}
 .batch-factory-text-page-head>div{display:grid;gap:1px;min-width:0}
 .batch-factory-text-page-head b{color:var(--sh-text);font-size:12px}
