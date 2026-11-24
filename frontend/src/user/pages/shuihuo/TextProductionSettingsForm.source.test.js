@@ -4,10 +4,11 @@ import test from 'node:test';
 
 const source = fs.readFileSync(new URL('./TextProductionSettingsForm.jsx', import.meta.url), 'utf8');
 
-test('text settings form keeps inherited and book override markers in every section', () => {
+test('text settings form stays quiet for inherited fields and marks only real book overrides', () => {
   assert.match(source, /TEXT_PRODUCTION_SECTIONS\.map/);
   assert.match(source, /scope==='book'/);
-  assert.match(source, /own\?' · 本书覆盖':' · 继承'/);
+  assert.doesNotMatch(source, /' · 继承'/);
+  assert.match(source, /own && <small> · 本书覆盖<\/small>/);
   assert.match(source, /onRestore\(field\.key\)/);
 });
 

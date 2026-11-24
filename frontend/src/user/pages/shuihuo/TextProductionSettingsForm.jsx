@@ -118,7 +118,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
     {section.fields.map(field=>{
       const own=explicitKeys.includes(field.key);
       return <div className="batch-factory-engine-field" key={field.key}>
-        <span><b>{field.label}</b>{scope==='book' && <small>{own?' · 本书覆盖':' · 继承'}</small>}</span>
+        <span><b>{field.label}</b>{scope==='book' && own && <small> · 本书覆盖</small>}</span>
         {control(field)}
         {scope==='book' && own && <Button size="small" type="link" onClick={()=>onRestore(field.key)}>恢复继承</Button>}
         {field.key==='sensitiveMode' && <small>{value.sensitiveMode==='ai'?field.aiHint:value.sensitiveMode==='off'?'直接使用生产稿。':'系统优化在本地执行。'}</small>}
