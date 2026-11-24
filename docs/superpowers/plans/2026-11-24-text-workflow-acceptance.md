@@ -28,7 +28,7 @@
   Files: `backend/internal/batchfactorytext/render.go`, renderer tests.
 - [x] Collections/connection: show collection version, page count and outdated status; require explicit confirmation for historical uploads; show a review of selected target and page range. Add N8 directory refresh/status without exposing tokens or adding passwords to the UI.
   Files: `TextMediaPanel.jsx`, `textWorkflowStatus.js`, `BatchFactoryImagePublishSettingsForm.jsx`.
-- [ ] Verify and deliver: execute focused Go packages and browser/state tests; build frontend, rebuild embedded Go, restart only confirmed 4001 binary, verify health/build identity. Commit only task files.
+- [x] Verify and deliver: execute focused Go packages and browser/state tests; build frontend, rebuild embedded Go, restart only confirmed 4001 binary, verify health/build identity. Commit only task files.
 
 ## Verification commands
 
@@ -40,3 +40,12 @@ npm run build
 go test ./internal/batchfactorytext ./internal/renderfont -count=1
 go test ./internal/httpapi -run TestBatchFactoryText -count=1
 ```
+
+## Verification evidence
+
+- 18 focused frontend checks passed, including real Chrome settings preview, draft updates, collection upload review and repeated-upload cancellation.
+- Go text renderer and embedded font packages passed; focused text HTTP checks passed. The disposable-MySQL lifecycle test requires TEXT_REPO_TEST_DSN and remains skipped in this run.
+- Local 4001 was rebuilt and restarted. Health is OK; frontend and Go manifest identities match the local commit.
+- Existing acceptance book: 3 ready pages with 152/144/137 characters. Authenticated live preview returned a PNG, without modifying pages or publishing.
+- Live N8 directory returned 72 accounts and 12 organizations without warnings.
+- No remote push or public deployment. Paper background candidates remain unselected.

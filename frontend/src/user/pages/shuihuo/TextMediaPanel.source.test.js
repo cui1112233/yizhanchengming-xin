@@ -44,7 +44,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
       let confirmRestore=false, confirmCount=0, releaseSave, single=true;
       let bookRevision=7, bookWrites=0, ready=false, collection, publishes=0;
       let uploadSummary='';
-      window.confirm=message=>{if(message.startsWith('上传确认')){uploadSummary=message;return true}confirmCount++;return confirmRestore};
+      window.confirm=message=>{if(message.startsWith('上传确认')){uploadSummary=message;if(!message.includes('确认再次上传？'))return true}confirmCount++;return confirmRestore};
       window.fetch=async(path,opts)=>{
         requests.push([path,opts.method]); if(opts.method==='POST')mutations.push([path,opts.body]);
         let items=[];

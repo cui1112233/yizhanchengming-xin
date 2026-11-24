@@ -140,14 +140,15 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
     if (upload.disabled || actionLock.current) return;
     const historical=collectionIsOutdated(currentCollection,doc,pages) || workflow.settingsChanged;
     const targets=settings.comicPublishSettings || {};
-    if(!window.confirm(`上传确认\n作品：${title}\n合集：${collection.id}\n页数：${collectionItems.length || '请核对合集预览'}\n组织：${targets.organizationName || targets.organizationId || '按发布配置'}\n上传人：${targets.producerAdminName || '按发布配置'}${historical?'\n注意：当前合集或排版已变化，本次将上传所选历史合集。':''}`))return;
+    const summary=`上传确认\n作品：${title}\n合集：${collection.id}\n页数：${collectionItems.length || '请核对合集预览'}\n组织：${targets.organizationName || targets.organizationId || '按发布配置'}\n上传人：${targets.producerAdminName || '按发布配置'}${historical?'\n注意：当前合集或排版已变化，本次将上传所选历史合集。':''}`;
+    if(!upload.force && !window.confirm(summary))return;
     let requestKey = upload.requestKey;
     let confirmation;
     if (upload.force) {
       try {
         confirmation = textRetryConfirmation(batchId, book.id, collection.id);
         requestKey = await confirmation.authorize(
-          () => window.confirm('这个文本合集已上传，确认再次上传？'),
+          () => window.confirm(summary+'\n这个文本合集已上传，确认再次上传？'),
           () => window.confirm('上次重传尚未收到回复，要继续同一次上传吗？')
         );
         if (!requestKey) return;
