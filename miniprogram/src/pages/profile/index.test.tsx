@@ -167,8 +167,7 @@ test("identity atmosphere preserves the real avatar and renders seven reducible 
   expect(identity.props.className.split(" ")).toContain("is-reduced-motion");
   expect(findByClass(identity, "profile-space-avatar-image").props.src).toContain("/media/avatar.webp");
   const background = findByClass(identity, "profile-space-identity-background");
-  expect(background.props.src).toContain("profile-identity-sunset-v2");
-  expect(background.props.src).not.toContain("avatar");
+  expect(background.props.src).toBeUndefined();
   const petals = findAllByClass(identity, "profile-space-petal");
   expect(petals).toHaveLength(7);
   expect(new Set(petals.map(node => node.props.src)).size).toBe(1);

@@ -61,9 +61,12 @@ test('profile applies glass to grouped surfaces rather than every setting row', 
   expect(style).toMatch(/\.profile-space-metric-value\s*\{[^}]*font-size:\s*18PX/);
   expect(source).toContain('profile-space-identity-glass');
   expect(style).toContain('.profile-space-identity-background');
+  expect(style).toContain('url("../../assets/profile/profile-identity-sunset-v2.webp")');
   expect(style).toContain('.profile-space-identity-glass');
   expect(style).toContain('linear-gradient(115deg');
   expect(style).toContain('inset 0 1PX 0 rgba(255,255,255');
+  expect(style).toContain('backdrop-filter: blur(2PX) saturate(132%)');
+  expect(style).toContain('inset 0 0 0 1PX rgba(236,205,255,.54)');
 });
 
 test('profile detail opts summary cards into secondary glass explicitly', () => {

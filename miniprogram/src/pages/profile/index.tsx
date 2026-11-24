@@ -24,7 +24,6 @@ import securityIcon from "../../assets/profile/profile-security-v1.webp";
 import helpIcon from "../../assets/profile/profile-help-v1.webp";
 import transparencyIcon from "../../assets/profile/profile-transparency-v1.webp";
 import petalIcon from "../../assets/profile/profile-petal-v1.webp";
-import profileIdentityBackground from "../../assets/profile/profile-identity-sunset-v2.webp";
 import "./parity.scss";
 
 const PROFILE_PETALS = ["one", "two", "three", "four", "five", "six", "seven"] as const;
@@ -193,7 +192,7 @@ export default function ProfilePage() {
         {!loading && !memberLoaded ? <View className="mp-card mp-profile-state"><Text className="mp-row-title">无法读取当前账号资料</Text><Text className="mp-error">{failureLabels[diagnostic.failure]}</Text><View className="mp-profile-actions"><Button className="mp-primary mp-profile-retry" onClick={load}>重新读取</Button><Button className="mp-secondary mp-profile-cancel" onClick={cancelAndLogin}>返回登录</Button></View></View> : null}
         {memberLoaded ? <>
           <View className={`profile-space-identity mp-profile-hero liquid-glass--primary${reducedGlass ? " is-reduced-motion" : ""}`} data-glass-role="primary">
-            <Image className="profile-space-identity-background" src={profileIdentityBackground} mode="aspectFill" />
+            <View className="profile-space-identity-background" ariaHidden />
             <View className="profile-space-identity-glass" ariaHidden />
             <View className="profile-space-particles" ariaHidden>{PROFILE_PETALS.map(name => <Image key={name} className={`profile-space-petal is-${name}`} src={petalIcon} mode="aspectFit" />)}</View>
             <View className="profile-space-avatar" onClick={chooseAvatar}>{facts.avatarUrl ? <Image className="profile-space-avatar-image" src={apiUrl(facts.avatarUrl)} mode="aspectFill" /> : <Text>{displayName ? displayName.slice(0, 1).toUpperCase() : "?"}</Text>}<View className="profile-space-camera">{uploading ? <Text>上传中</Text> : <AppIcon name="camera" size={13} />}</View></View>
