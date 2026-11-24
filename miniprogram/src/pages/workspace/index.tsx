@@ -1,4 +1,4 @@
-import Taro, { useDidShow } from "@tarojs/taro";
+import Taro, { useDidHide, useDidShow } from "@tarojs/taro";
 import { Button, Image, Text, View } from "@tarojs/components";
 import { useEffect, useRef, useState } from "react";
 import { readAccountSession, hasAccountSession } from "../../services/session";
@@ -12,7 +12,7 @@ import { getModule, moduleRoute } from "../../config/modules";
 import { FUNCTION_VISUALS } from "../functions/functionVisuals";
 import { ThemedPage } from "../../theme";
 import { isLocalAccountLogin } from "../../config/localAuth";
-import { selectCurrentTask, workbenchProgress, workbenchStatus } from "./workbenchState";
+import { taskSourceForModule, selectCurrentTask, workbenchProgress, workbenchStatus } from "./workbenchState";
 import "./studio.scss";
 
 const ACTIVE_MODULE_KEY = "yzcm.mobile.activeModule";
@@ -39,16 +39,17 @@ export default function WorkspacePage() {
   const progress = workbenchProgress(currentTask);
   const visual = FUNCTION_VISUALS[activeModule.key];
 
-  const loadSummary = () => {
-    const version = readVersion.current;
+  const loadSummary = (moduleKey=activeModule.key) => {
+    const version = ++readVersion.current;
+    const source=taskSourceForModule(moduleKey);
     setSummaryLoading(true);
     setSummaryError("");
     setSummaryWarning("");
-    void loadTaskSummary(apiRequest)
+    void loadTaskSummary(apiRequest,{sources:moduleKey==='shuihuo'?['shuihuo','batch']:source?[source]:[],shouldContinue:()=>version===readVersion.current})
       .then((summary) => {
         if (version !== readVersion.current) return;
         const unavailable = summary.sources.filter((source) => source.state === "error");
-        if (unavailable.length === summary.sources.length) throw new Error("最近记录暂不可读取");
+        if (summary.sources.length && unavailable.length === summary.sources.length) throw new Error("最近记录暂不可读取");
         setRecords(summary.entries.filter((entry) => entry.id));
         setSummaryWarning(unavailable.length ? `${unavailable.map((source) => source.sourceLabel).join("、")}暂未同步` : "");
       })
@@ -75,7 +76,7 @@ export default function WorkspacePage() {
       if (version !== readVersion.current) return;
       const gate = resolveSessionGate(session);
       setStatus(gate.status);
-      if (gate.status === "ready") loadSummary();
+      if (gate.status === "ready") loadSummary(selected.key);
     }).catch((cause) => {
       if (version !== readVersion.current) return;
       const next = resolveSessionGate(cause);
@@ -85,6 +86,7 @@ export default function WorkspacePage() {
   };
 
   useDidShow(connectSession);
+  useDidHide(()=>{readVersion.current++;setSummaryLoading(false);});
 
   const openCurrent = () => {
     if (currentTask) {
@@ -118,7 +120,7 @@ export default function WorkspacePage() {
       </View>
 
       {summaryLoading ? <View className="workbench-loading" ariaLabel="正在读取当前执行"><View /><View /><View /></View> : null}
-      {!summaryLoading && summaryError ? <View className="workbench-error liquid-glass--secondary"><View><Text className="workbench-section-title">执行信息暂不可读取</Text><Text className="workbench-note">{summaryError}</Text></View><Button className="workbench-retry" onClick={loadSummary}>重新读取</Button></View> : null}
+      {!summaryLoading && summaryError ? <View className="workbench-error liquid-glass--secondary"><View><Text className="workbench-section-title">执行信息暂不可读取</Text><Text className="workbench-note">{summaryError}</Text></View><Button className="workbench-retry" onClick={()=>loadSummary()}>重新读取</Button></View> : null}
 
       {!summaryLoading && !summaryError && currentTask ? <>
         <View className="workbench-project-card liquid-glass--secondary" data-glass-role="secondary">
@@ -144,7 +146,7 @@ export default function WorkspacePage() {
         <Text className="workbench-note">{activeModule.key==='novel'?'进入小说创作，打开作品查看讨论、写作阶段和已保存章节。':`点击“开始配置”进入 ${visual.label}，真正提交后任务会同步到这里。`}</Text>
       </View> : null}
 
-      {summaryWarning ? <View className="workbench-warning"><Text>{summaryWarning}</Text><Button className="workbench-retry" onClick={loadSummary}>重试</Button></View> : null}
+      {summaryWarning ? <View className="workbench-warning"><Text>{summaryWarning}</Text><Button className="workbench-retry" onClick={()=>loadSummary()}>重试</Button></View> : null}
     </View> : null}
   </ThemedPage>;
 }

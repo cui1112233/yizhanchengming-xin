@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 const h=vi.hoisted(()=>({slots:[] as any[],cursor:0,show:undefined as any,load:vi.fn(),navigate:vi.fn()}));
 vi.mock('react',()=>({useState:(initial:any)=>{const i=h.cursor++;if(!(i in h.slots))h.slots[i]=typeof initial==='function'?initial():initial;return [h.slots[i],(next:any)=>{h.slots[i]=typeof next==='function'?next(h.slots[i]):next;}];},useRef:(initial:any)=>{const i=h.cursor++;if(!(i in h.slots))h.slots[i]={current:initial};return h.slots[i];},useEffect:vi.fn()}));
-vi.mock('@tarojs/taro',()=>({default:{navigateTo:h.navigate},useDidShow:(fn:any)=>{h.show=fn;}}));
+vi.mock('@tarojs/taro',()=>({default:{navigateTo:h.navigate},useDidShow:(fn:any)=>{h.show=fn;},useDidHide:vi.fn()}));
 vi.mock('@tarojs/components',()=>({View:'View',Text:'Text',Button:'Button',Image:'Image'}));
 vi.mock('../../services/api',()=>({apiRequest:vi.fn()}));
 vi.mock('../../config/runtime',()=>({isApiOriginConfigured:()=>true,API_ORIGIN_CONFIGURATION_ERROR:''}));
@@ -61,6 +61,11 @@ test('hero aggregate progress is rendered as live UI text instead of baked into 
  expect(tree.find(n=>n.props?.className==='task-studio-hero-art')?.props.src).not.toContain('68');
 });
 test('hero never combines unrelated active tasks into one misleading percentage',async()=>{h.load.mockResolvedValue({sources:[{source:'batch',state:'ready'}],entries:[{source:'batch',id:'a',status:'running',progress:{completed:1,total:2}},{source:'aicut',id:'b',status:'running',progress:{completed:90,total:100}}]});const tree=await ready();expect(tree.filter(n=>n.props?.className==='task-studio-hero-progress-value')).toHaveLength(0);});
+test('ready records render during sync with an explicit incomplete-statistics notice',async()=>{
+ let finish!:(value:any)=>void;h.load.mockImplementation((_request:any,options:any)=>{options.onProgress({sources:[{source:'fetch',state:'ready'}],entries:[{id:'fast',source:'fetch',title:'先显示',status:'completed'}]});return new Promise(resolve=>{finish=resolve;});});
+ const tree=await ready();expect(tree.map(content).join('')).toContain('先显示');expect(tree.map(content).join('')).toContain('统计尚未完整');
+ finish({sources:[{source:'fetch',state:'ready'}],entries:[]});for(let i=0;i<12;i++)await Promise.resolve();expect(render().map(content).join('')).not.toContain('统计尚未完整');
+});
 test('flat record opens the existing encoded module destination',async()=>{
  const tree=await ready();expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row'))).toHaveLength(4);
  tree.find(n=>n.props?.className?.split(' ').includes('task-studio-row')&&content(n).includes('失败项目')).props.onClick();

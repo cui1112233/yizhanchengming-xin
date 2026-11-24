@@ -136,14 +136,12 @@ export function FetchWorkspaceBody({title="小说获取",compact=false,initialTa
     setRefreshing(true);
     setTasksRead("loading");
     setError("");
-    Promise.allSettled([
+    const failures: string[] = [];
+    const failure = (label: string, reason: unknown) => {failures.push(`${label}：${reason instanceof Error ? reason.message : "读取失败"}`);if(refreshId===refreshVersion.current)setError(failures.join('；'));};
+    const configRead=Promise.allSettled([
       apiRequest<unknown>("/api/batch-rewrite/config"),
       apiRequest<unknown>("/api/models?kind=text"),
-      apiRequest<{ tasks?: unknown }>("/api/batch-rewrite/tasks"),
-      apiRequest<{ schedules?: Schedule[] }>("/api/batch-rewrite/schedules"),
-    ]).then(([configResult, modelResult, taskResult, scheduleResult]) => {
-      const failures: string[] = [];
-      const failure = (label: string, reason: unknown) => failures.push(`${label}：${reason instanceof Error ? reason.message : "读取失败"}`);
+    ]).then(([configResult, modelResult]) => {
       if (configResult.status === "rejected") failure("配置", configResult.reason);
       if (modelResult.status === "rejected") failure("模型", modelResult.reason);
       if (requestGuard.current("config", version) && configResult.status === "fulfilled") {
@@ -160,16 +158,20 @@ export function FetchWorkspaceBody({title="小说获取",compact=false,initialTa
       setSensitiveAiEnabled(state.sensitiveAiEnabled);
       formUnknown.current = false;
       }
+    });
+    const taskRead=apiRequest<{tasks?:unknown}>("/api/batch-rewrite/tasks").then(payload=>{
       if (requestGuard.current("tasks", snapshot.tasks)) {
-        if (taskResult.status === "fulfilled" && Array.isArray(taskResult.value?.tasks)) { setTasks(normalizeFetchTasks(taskResult.value.tasks)); setTasksRead("ready"); unknownOutcome.current = false; }
-        else {setTasksRead("error");failure("任务", taskResult.status === "rejected" ? taskResult.reason : new Error("响应格式无效"));}
+        if(!Array.isArray(payload?.tasks))throw Error('响应格式无效');
+        setTasks(normalizeFetchTasks(payload.tasks));setTasksRead('ready');unknownOutcome.current=false;
       }
+    }).catch(cause=>{if(requestGuard.current('tasks',snapshot.tasks)){setTasksRead('error');failure('任务',cause);}});
+    const scheduleRead=apiRequest<{schedules?:Schedule[]}>("/api/batch-rewrite/schedules").then(payload=>{
       if (requestGuard.current("schedules", snapshot.schedules)) {
-        if (scheduleResult.status === "fulfilled" && Array.isArray(scheduleResult.value?.schedules)) setSchedules(scheduleResult.value.schedules);
-        else failure("定时任务", scheduleResult.status === "rejected" ? scheduleResult.reason : new Error("响应格式无效"));
+        if(!Array.isArray(payload?.schedules))throw Error('响应格式无效');
+        setSchedules(payload.schedules);
       }
-      if (refreshId === refreshVersion.current) setError(failures.join("；"));
-    }).catch((cause: Error) => { if (refreshId === refreshVersion.current) setError(cause.message || "工作台刷新失败"); })
+    }).catch(cause=>{if(requestGuard.current('schedules',snapshot.schedules))failure('定时任务',cause);});
+    Promise.all([configRead,taskRead,scheduleRead]).catch((cause: Error) => { if (refreshId === refreshVersion.current) setError(cause.message || "工作台刷新失败"); })
       .finally(() => { if (refreshId === refreshVersion.current) setRefreshing(false); });
   };
 

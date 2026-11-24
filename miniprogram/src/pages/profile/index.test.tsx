@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   cursor: 0,
   effects: [] as Array<() => void | (() => void)>,
   shows: [] as Array<() => void>,
+  hide: (()=>{}) as ()=>void,
   read: vi.fn(),
   loadTasks: vi.fn(),
   getStorageSync: vi.fn(),
@@ -47,7 +48,7 @@ vi.mock("@tarojs/taro", () => ({
     eventCenter: { trigger: vi.fn() },
   },
   useDidShow: (callback: () => void) => { h.shows.push(callback); },
-  useDidHide: vi.fn(),
+  useDidHide: (callback:()=>void)=>{h.hide=callback;},
 }));
 vi.mock("@tarojs/components", () => ({ Button: "Button", Image: "Image", ScrollView: "ScrollView", Switch: "Switch", Text: "Text", View: "View" }));
 vi.mock("../../components/BrandHeader", () => ({ default: "Header" }));
@@ -122,6 +123,17 @@ function mount() {
   render();
   h.effects.forEach(effect => effect());
 }
+
+test('returning while member profile is pending restarts the independent task sync',async()=>{
+ h.hasSession=true;const pending=deferred();h.read.mockReturnValue(pending.promise);
+ mount();expect(h.loadTasks).toHaveBeenCalledTimes(1);
+ const first=h.loadTasks.mock.calls[0][1];expect(first.shouldContinue()).toBe(true);
+ h.hide();expect(first.shouldContinue()).toBe(false);
+ render();h.shows.forEach(show=>show());
+ expect(h.read).toHaveBeenCalledTimes(1);expect(h.loadTasks).toHaveBeenCalledTimes(2);
+ expect(h.loadTasks.mock.calls[1][1].shouldContinue()).toBe(true);
+ pending.resolve({member:{username:'creator'}});await flush();
+});
 
 test("appearance settings stay in a dismissible sheet and keep real theme switching", async () => {
   h.hasSession = true;

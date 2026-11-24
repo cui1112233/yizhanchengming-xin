@@ -31,6 +31,13 @@ beforeEach(() => {
 });
 
 describe("FetchWorkspace deferred requests", () => {
+  test('slow history and schedules do not block ready creation options',async()=>{
+    const slow=deferred();
+    harness.api.mockImplementation((path:string)=>path.endsWith('/tasks')||path.endsWith('/schedules')?slow.promise:Promise.resolve(path.includes('/models')?models:config));
+    render();harness.show();await flush();
+    expect(pickers()[0].props.range).toEqual(['一','二']);
+    slow.resolve({tasks:[],schedules:[]});await flush();
+  });
   test("compact rows open one book detail without showing actions in the list", async () => {
     harness.api.mockImplementation((path: string) => Promise.resolve(path.includes("/models") ? models : path.endsWith("/config") ? config : path.endsWith("/tasks") ? { tasks: [{ book_id: "first", book_name: "小说甲" }, { book_id: "second", book_name: "小说乙" }] } : path.endsWith("/first") ? { original: "第一本正文" } : { schedules: [] }));
     render(); harness.show(); await flush(); click("任务"); await flush();

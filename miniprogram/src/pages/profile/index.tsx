@@ -41,7 +41,9 @@ function hasMember(center: PublicMemberCenter | null) {
 export default function ProfilePage() {
   const { preference, setTheme } = useMobileTheme();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
-  useDidHide(() => setAppearanceOpen(false));
+  const summaryVisible=useRef(true);
+  const summaryEpoch=useRef(0);
+  useDidHide(() => {summaryVisible.current=false;summaryEpoch.current++;setAppearanceOpen(false);});
   useEffect(() => {
     if (appearanceOpen) hideStudioNavigation(true);
     return () => { if (appearanceOpen) hideStudioNavigation(false); };
@@ -68,7 +70,15 @@ export default function ProfilePage() {
   }, []);
 
   const load = () => {
-    if (!mounted.current || activeAttempt.current !== null) return;
+    if (!mounted.current) return;
+    // Summary reads have their own lifetime: a returning page can restart them
+    // even while the independent member-profile request is still in flight.
+    if(hasAccountSession()){
+      const summaryTicket=++summaryEpoch.current,summaryRevision=sessionRevision();
+      const taskCurrent=()=>summaryVisible.current&&summaryTicket===summaryEpoch.current&&mounted.current&&summaryRevision===sessionRevision();
+      void loadTaskSummary(apiRequest,{shouldContinue:taskCurrent}).then(result=>{if(taskCurrent())setTaskSummary(result);}).catch(()=>{if(taskCurrent())setTaskSummary(undefined);});
+    }
+    if(activeAttempt.current!==null)return;
     const attempt = ++nextAttempt.current;
     const revision = sessionRevision();
     const startedAt = Date.now();
@@ -84,8 +94,6 @@ export default function ProfilePage() {
     setLoading(true);
     setDiagnostic({ phase: "request-started", failure: "none", elapsedMs: 0 });
     const current = () => mounted.current && activeAttempt.current === attempt && sessionRevision() === revision;
-    const taskCurrent = () => mounted.current && nextAttempt.current === attempt && sessionRevision() === revision;
-    void loadTaskSummary(apiRequest).then(result => { if (taskCurrent()) setTaskSummary(result); }).catch(() => { if (taskCurrent()) setTaskSummary(undefined); });
     clearTimeout(watchdog.current);
     watchdog.current = setTimeout(() => {
       if (!current()) return;
@@ -123,7 +131,7 @@ export default function ProfilePage() {
       });
   };
 
-  useDidShow(load);
+  useDidShow(()=>{summaryVisible.current=true;load();});
   useEffect(() => { if (nextAttempt.current === 0) load(); }, []);
 
   const cancelAndLogin = () => {
