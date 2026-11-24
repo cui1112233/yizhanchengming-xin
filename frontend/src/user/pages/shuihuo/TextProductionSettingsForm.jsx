@@ -5,7 +5,7 @@ import { getN8ComicPublishStatus } from '../../../shared/api/batchFactoryV12';
 import { syncWebSubmitConfigs } from '../../../shared/api/novelFetch';
 import { listPersonalTextBackgrounds, uploadPersonalTextBackground } from '../../../shared/api/batchFactoryText';
 import { producerAccountOptions } from './batchFactoryComicPublishAccounts';
-import { TEXT_PRODUCTION_SECTIONS, textProfileChanges } from './textProductionConfig';
+import { TEXT_PRODUCTION_SECTIONS, textProductionInitialSection, textProfileChanges } from './textProductionConfig';
 
 function ColorPicker({ label, value, onChange }) {
   const [draft, setDraft] = useState(value);
@@ -44,8 +44,8 @@ function BackgroundPicker({value,items,onChange,onUploaded}) {
 
 // All three entry points render this form. value is the resolved display
 // model while changes contain only the path the person actually touched.
-export default function TextProductionSettingsForm({value, explicitKeys=[], onChange, onRestore, scope='batch', open=true}) {
-  const [tab,setTab]=useState('models');
+export default function TextProductionSettingsForm({value, explicitKeys=[], onChange, onRestore, scope='batch', open=true, activeSection='models'}) {
+  const [tab,setTab]=useState(()=>textProductionInitialSection(activeSection));
   const [directory,setDirectory]=useState({});
   const [models,setModels]=useState([]);
   const [backgrounds,setBackgrounds]=useState([]);

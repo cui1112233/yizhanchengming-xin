@@ -340,7 +340,7 @@ function ConstraintLayers({ value, records, personalPrompts, loading, saving, ed
   </div>;
 }
 
-function TextBookSettingsModal({batch,book,onClose,onSaved}) {
+function TextBookSettingsModal({batch,book,activeRegion='models',onClose,onSaved}) {
   const [changes,setChanges]=useState({});
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
@@ -363,7 +363,7 @@ function TextBookSettingsModal({batch,book,onClose,onSaved}) {
   }
   return <Modal open title={`单书配置 · ${book.title || '文本'}`} width={980} onCancel={onClose} onOk={save} confirmLoading={saving} okText="保存当前书配置" cancelText="取消" className="batch-factory-unified-settings-modal">
     {error && <Alert type="error" showIcon message={error}/>}
-    <TextProductionSettingsForm scope="book" value={value} explicitKeys={explicitKeys} onChange={change} onRestore={key=>change({[key]:undefined})}/>
+    <TextProductionSettingsForm scope="book" activeSection={activeRegion} value={value} explicitKeys={explicitKeys} onChange={change} onRestore={key=>change({[key]:undefined})}/>
   </Modal>;
 }
 

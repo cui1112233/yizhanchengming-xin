@@ -54,6 +54,7 @@ import {
 } from 'antd';
 import { UploadSentButton, useUploadSentState } from '../../../shared/components/UploadSentButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { TEXT_PRODUCTION_BOOK_REGIONS } from './textProductionConfig';
 
 const InputNumber = NativeInputNumber;
 import {
@@ -6270,7 +6271,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                 </div>
                 <div className="shuihuo-workbench-cell batch-factory-book-config-cell">
                   <div className="batch-factory-book-config-regions">
-                    {productionMode === "text" ? <button type="button" className="batch-factory-book-config-region" onClick={() => setConfigTarget({ book, region: "engine" })}><b>单书配置</b><small>排版、模型与发布</small></button> : batchFactoryWorkbenchConfigRegions(book).map((region) => {
+                    {productionMode === "text" ? TEXT_PRODUCTION_BOOK_REGIONS.map(region => <button type="button" key={region.key} className="batch-factory-book-config-region" onClick={() => setConfigTarget({ book, region: region.key })}><b>{region.label}</b><small>{region.detail}</small></button>) : batchFactoryWorkbenchConfigRegions(book).map((region) => {
                       const status =
                         region.combinedStatus ||
                         bookConfigRegionStatus(book, region.key, batch?.settingsState?.patch || {});

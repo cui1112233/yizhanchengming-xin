@@ -1,10 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TEXT_PRODUCTION_CONFIG_KEYS, TEXT_PRODUCTION_SECTIONS, applyTextProductionChanges, defaultTextProductionConfig, normalizeTextProductionConfig, textProductionBookOverride, updateTextProductionSettings, textProfileChanges } from './textProductionConfig.js';
+import { TEXT_PRODUCTION_BOOK_REGIONS, TEXT_PRODUCTION_CONFIG_KEYS, TEXT_PRODUCTION_SECTIONS, applyTextProductionChanges, defaultTextProductionConfig, normalizeTextProductionConfig, textProductionBookOverride, textProductionInitialSection, updateTextProductionSettings, textProfileChanges } from './textProductionConfig.js';
 
 test('文本单书配置固定分为引擎、排版、发布三个区块', () => {
   assert.deepEqual(TEXT_PRODUCTION_SECTIONS.map(section => section.label), ['引擎配置', '排版配置', '发布配置']);
+});
+
+test('工作台单书配置显示三个入口并分别打开对应页签', () => {
+  assert.deepEqual(TEXT_PRODUCTION_BOOK_REGIONS.map(region => [region.key,region.label]), [
+    ['models','引擎配置'],
+    ['layout','排版配置'],
+    ['publish','发布配置']
+  ]);
+  assert.equal(textProductionInitialSection('models'),'models');
+  assert.equal(textProductionInitialSection('layout'),'layout');
+  assert.equal(textProductionInitialSection('publish'),'publish');
+  assert.equal(textProductionInitialSection('unknown'),'models');
 });
 
 test('新建及统一保存配置档后重新打开有名称、组织、分类及发布参数，单书覆盖可独立还原', () => {

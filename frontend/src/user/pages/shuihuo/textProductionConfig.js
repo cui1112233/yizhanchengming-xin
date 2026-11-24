@@ -47,6 +47,14 @@ export const TEXT_PRODUCTION_SECTIONS = [
     field('textUploadRetryLimit','上传失败重试次数','number',3,{min:0,max:10})
   ]}
 ];
+export const TEXT_PRODUCTION_BOOK_REGIONS = Object.freeze([
+  {key:'models',label:'引擎配置',detail:'模型与敏感处理'},
+  {key:'layout',label:'排版配置',detail:'字体、颜色与背景'},
+  {key:'publish',label:'发布配置',detail:'上传人与发布规则'}
+]);
+export function textProductionInitialSection(value) {
+  return TEXT_PRODUCTION_SECTIONS.some(section=>section.key===value) ? value : 'models';
+}
 const fields = TEXT_PRODUCTION_SECTIONS.flatMap(section => section.fields);
 const profileId = 'publishSettings.websiteProfileId';
 const profileCatalog = 'publishSettings.websiteProfiles';
