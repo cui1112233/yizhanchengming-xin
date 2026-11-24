@@ -7,7 +7,7 @@ import { deriveTaskPageState } from "../../services/taskPageState";
 import { filterTaskEntries, loadTaskSummary, taskCounts, taskDestination, type AggregatedTask, type TaskFilter, type TaskSummary } from "../../services/taskSummary";
 import BrandHeader from "../../components/BrandHeader";
 import AppIcon from "../../components/AppIcon";
-import taskHeroArt from "../../assets/tasks/task-center-runtime-hero-v2.png";
+import taskHeroArt from "../../assets/tasks/task-center-runtime-hero-v2.webp";
 import taskRunningArt from "../../assets/functions/clapper-play-v2.webp";
 import taskAttentionArt from "../../assets/tasks/task-attention-clock.webp";
 import taskCompletedArt from "../../assets/tasks/task-completed-check.webp";
