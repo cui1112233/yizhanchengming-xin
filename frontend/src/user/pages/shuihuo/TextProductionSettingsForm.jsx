@@ -7,6 +7,7 @@ import { listPersonalTextBackgrounds, uploadPersonalTextBackground } from '../..
 import { producerAccountOptions } from './batchFactoryComicPublishAccounts';
 import { TEXT_PRODUCTION_SECTIONS, textProductionInitialSection, textProfileChanges } from './textProductionConfig';
 import TextBackgroundGallery from './TextBackgroundGallery.jsx';
+import './publish-settings.css';
 
 const SharedImagePublishSettings = lazy(() => import('./BatchFactoryImagePublishSettingsForm').then(module => ({default:module.BatchFactoryComicPublishSettingsForm})));
 

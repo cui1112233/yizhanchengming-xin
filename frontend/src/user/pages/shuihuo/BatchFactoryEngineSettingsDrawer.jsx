@@ -9,6 +9,7 @@ import { modelOptionsForProvider, providerForCatalogModel, providerModelSettings
 import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { listLocalExecutors } from '../../../shared/api/batchFactory';
 import { IMAGE_ASPECT_RATIOS } from '../../../shared/imageAspectRatios';
+import './publish-settings.css';
 
 const TARGET_ADMIN_URL = 'http://two.121w.com/tttadmin/index.php';
 const N8_MATERIAL_ALBUM_URL = 'https://n8-view.hnqingyuwen.top/#/material/album';
@@ -293,7 +294,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
       {
         key: 'publish',
         label: '发布统一',
-        children: <div className="batch-factory-engine-drawer batch-factory-engine-publish-final">
+        children: <div className="batch-factory-engine-drawer batch-factory-engine-publish-final batch-factory-publish-layout">
           <Alert type="info" showIcon message="批量默认发布规则" description="这里维护视频管理系统连接、网站配置映射和上传素材规则；不会直接提交小说。真正上传仍从顶部“上传网络”发起，单书配置可以覆盖本页默认值。" />
 
           <section className="batch-factory-vms-connection-card">

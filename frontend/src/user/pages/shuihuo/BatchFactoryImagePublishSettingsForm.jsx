@@ -1,5 +1,6 @@
 import { Alert, Button, Segmented, Select, Space, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
+import './publish-settings.css';
 import { getN8ComicPublishStatus, getN8ComicPublishAudios } from '../../../shared/api/batchFactory';
 import { audioMatchingModeOptions } from './batchFactoryAudioCategory';
 import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts';
@@ -95,13 +96,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
     || directoryFailureMessage
     || (directoryFailureKind === 'auth' ? '登录已失效，请重新登录' : '')
     || (directoryAvailable === false ? 'N8 目录服务未配置（服务器缺少 N8 后台登录令牌）' : '');
-  return <Space direction="vertical" size={16} style={{ width: '100%' }}>
-    <Alert
-      type="info"
-      showIcon
-      message={productionMode === 'text' ? (singleBook ? '当前书文本发布配置' : '文本发布默认设置') : (singleBook ? '当前书漫画发布配置' : '漫画发布默认设置')}
-      description={singleBook ? '当前书未单独修改的项目继续继承批次默认值；这里只保存本书的差异。图片顺序、宽高、格式、签名和上传重试由系统自动处理。' : '这里只设置一次，当前批次的每本漫画都会自动继承。图片顺序、宽高、格式、签名和上传重试由系统自动处理。'}
-    />
+  return <Space className="batch-factory-publish-layout" direction="vertical" size={16} style={{ width: '100%' }}>
     {publishKeyConfigured === false
       ? <Alert type="info" showIcon message="发布密钥未配置：目录可以读取，但发布/上传不可用。请配置服务器环境变量 QIANTIE_N8_COMIC_OPEN_API_KEY 后重启服务。" />
       : null}
@@ -117,7 +112,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
           <Select value={comicPublishSettings.materialSource || 'ORIGINAL'} options={[{ value: 'ORIGINAL', label: '原创制作' }, { value: 'ORIGINAL_TEXT', label: '原文制作' }, { value: 'DERIVATIZATION', label: '衍生制作' }, { value: 'AI_PRE', label: 'AI前帖' }, { value: 'AUTOMATED_CLIPPING', label: '自动化剪辑' }, { value: 'AUTOMATED_CLIPPING_A', label: '自动化剪辑AI文案' }, { value: 'AUTOMATED_CLIPPING_AI_PRE', label: '自动化剪辑AI前贴' }, { value: 'MANGA_VIDEO_AUTOMATED_CLIPPING', label: '漫剧自动化剪辑' }, { value: 'THIRD_PARTY', label: '第三方' }, { value: 'THIRD_PARTY_REMOVE_WATERMARKS', label: '第三方去水印' }, { value: 'TOOL', label: '素材工具' }, { value: 'GROUP_AI', label: '自动化AI' }, { value: 'AUTOMATED_CLIPPING_BLAZING_FAST', label: '自动化3分钟' }, { value: 'AUTOMATED_CLIPPING_MANGA', label: '自动化漫改' }]} onChange={materialSource => patchComicPublishSettings({ materialSource })} />
         </label>
         <div className="batch-factory-engine-field">
-          <span><b>制作者管理员账号（创意者）</b><HelpTip title="制作者管理员账号（创意者）">这就是 N8 素材库里的创意者，不再单独保存第二个账号。</HelpTip></span>
+          <span><b>制作者账号</b><HelpTip title="制作者管理员账号（创意者）">这就是 N8 素材库里的创意者，不再单独保存第二个账号。</HelpTip></span>
           <Select showSearch optionFilterProp="label" loading={producerAccountsLoading} placement="bottomLeft" value={comicPublishSettings.producerAdminName || undefined} options={producerAccountOptions(producerAccounts, comicPublishSettings.producerAdminName, comicPublishSettings.organizationId, producerAccountOrganizations, producerAccountsLoading)} placeholder="请选择制作者管理员账号" getPopupContainer={() => document.body} onChange={producerAdminName => patchComicPublishSettings({ producerAdminName, creativeAdminName: producerAdminName })} />
           {!accountDirectoryHint && producerAccountOptions(producerAccounts, comicPublishSettings.producerAdminName, comicPublishSettings.organizationId, producerAccountOrganizations).length === 0 ? <small>当前组织没有可用的制作者账号，请先选择正确的组织。</small> : null}
           {accountDirectoryHint ? <small className="batch-factory-engine-note">{accountDirectoryHint}</small> : null}
@@ -132,7 +127,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
     <section className="batch-factory-engine-card">
       <header><b>发布账号与作品匹配</b><HelpTip title="漫画发布统一">账号必须与漫画后台中已启用的管理员账号完全一致。找不到同名作品时，发布前会让你选择一次。</HelpTip></header>
       <div className="batch-factory-engine-card-body batch-factory-engine-grid">
-		<label className="batch-factory-engine-field" style={{ gridColumn: '1 / -1' }}>
+		<label className="batch-factory-engine-field">
 		  <span className="batch-factory-field-title-inline"><b>音频匹配方式</b><HelpTip title="音频匹配方式">发布时按每本书的男女频和风格自动匹配并随机选择音频；重试会继续使用第一次选中的音频。</HelpTip></span>
 		  <Segmented block value={manualAudioMode ? 'manual' : 'auto'} options={audioMatchingModeOptions(singleBook)} onChange={audioCategorySelectionMode => patchComicPublishSettings(audioCategorySelectionMode === 'manual' ? { audioCategorySelectionMode: 'manual' } : { audioCategorySelectionMode: 'auto', audioCategoryId: null, audioCategoryName: '', audioCandidates: [], specifiedAudioId: '', specifiedAudioName: '' })} />
 		</label>
@@ -175,7 +170,6 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
         </label>
       </div>
     </section>
-    <Alert type="success" showIcon message={productionMode === 'text' ? '发布时确认文本合集和匹配到的作品。' : (singleBook ? '当前书发布时，只需要确认漫画合集和匹配到的作品。' : '以后发布时，你只需要确认漫画合集和匹配到的作品。')} />
   </Space>;
 }
 

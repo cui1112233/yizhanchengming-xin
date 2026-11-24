@@ -789,7 +789,7 @@ function MediaBookSettingsModal({ open, batch, book, activeRegion = 'engine', on
         label: '发布统一',
         children: productionMode === 'comic' ? <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
           <BatchFactoryComicPublishSettingsForm value={form} onChange={patch} singleBook />
-        </div> : <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
+        </div> : <div className="batch-factory-engine-drawer batch-factory-book-engine-content batch-factory-publish-layout">
           <Alert type="info" showIcon message="当前书独立发布配置" description="发布目录仍来自账号和批量作品；这里只保存当前书的差异值。" />
           <ConfigCard title="发布映射" description="网站风格继续读取本书 AI 判断结果。">
             <InheritedField label="网站配置档" value={publish.websiteProfileId} inherited={inheritedPublish.websiteProfileId} options={profiles.map(profile => ({ value: profile.id, label: profile.name || profile.id }))} loading={false} explicit={Object.hasOwn(bookPatch.publishSettings || {}, 'websiteProfileId')} onChange={websiteProfileId => { const profile = profiles.find(item => item.id === websiteProfileId) || {}; patch({ publishSettings: { ...publish, websiteProfileId, versionProfile: profile.name || '' } }); }} />

@@ -1,0 +1,38 @@
+/* Shared publishing form: video, comic and text, batch and per-book. */
+.batch-factory-publish-layout { width:100%; min-width:0; color:var(--sh-text); font:inherit; }
+.batch-factory-publish-layout .ant-space-item { min-width:0; }
+.batch-factory-publish-layout .batch-factory-engine-card { padding:16px; border:1px solid var(--sh-line); border-radius:12px; background:var(--sh-panel); box-shadow:none; }
+.batch-factory-publish-layout .batch-factory-engine-card>header { display:flex; align-items:center; gap:8px; padding:0 0 12px; margin:0 0 16px; border-bottom:1px solid var(--sh-line); }
+.batch-factory-publish-layout .batch-factory-engine-card>header b { color:var(--sh-text); font-size:13px; }
+.batch-factory-publish-layout .batch-factory-engine-card-body,
+.batch-factory-publish-layout .batch-factory-engine-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px 24px; align-items:start; min-width:0; }
+:is(.batch-factory-publish-layout,.batch-factory-settings-card.is-publish) .batch-factory-engine-field { display:grid; grid-template-columns:minmax(0,1fr)!important; align-content:start; align-items:start; align-self:start; gap:8px; min-width:0; margin:0; }
+:is(.batch-factory-publish-layout,.batch-factory-settings-card.is-publish) .batch-factory-engine-field>span:first-child { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; min-height:24px; color:var(--sh-text); }
+:is(.batch-factory-publish-layout,.batch-factory-settings-card.is-publish) .batch-factory-engine-field>span b { font-size:12px; line-height:20px; }
+:is(.batch-factory-publish-layout,.batch-factory-settings-card.is-publish) .batch-factory-engine-field>:is(.ant-select,.ant-input,.ant-input-number,.ant-segmented) { width:100%!important; max-width:none!important; min-width:0; }
+:is(.batch-factory-publish-layout,.batch-factory-settings-card.is-publish) .batch-factory-engine-field>:is(.ant-select-single,.ant-input,.ant-input-number) { height:36px; }
+:is(.batch-factory-publish-layout,.batch-factory-settings-card.is-publish) .ant-input-number-input { height:34px; }
+:is(.batch-factory-publish-layout,.batch-factory-settings-card.is-publish) .batch-factory-engine-field>.ant-segmented { display:block; min-height:36px; }
+.batch-factory-publish-layout .ant-segmented-group { display:flex; }
+.batch-factory-publish-layout .ant-segmented-item { flex:1; min-width:0; }
+.batch-factory-publish-layout .ant-segmented-item-label { white-space:normal; line-height:20px; padding:4px 8px; }
+:is(.batch-factory-publish-layout,.batch-factory-settings-card.is-publish) .batch-factory-engine-field>small { grid-column:1/-1; width:100%; line-height:1.6; overflow-wrap:anywhere; color:var(--sh-muted); font-size:11px; }
+.batch-factory-publish-layout .batch-factory-publish-two-column { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
+.batch-factory-publish-layout :is(.batch-factory-style-catalog,.batch-factory-publish-ai-note,.batch-factory-env-status-row,.batch-factory-engine-card-body>.ant-alert,.batch-factory-engine-card-body>.batch-factory-engine-grid,.batch-factory-publish-rule-list) { grid-column:1/-1; min-width:0; }
+.batch-factory-publish-layout .batch-factory-publish-sync-row { display:flex; flex-wrap:wrap; align-self:end; gap:8px; padding:0; margin:0; }
+.batch-factory-publish-layout .batch-factory-publish-rule-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.batch-factory-publish-layout .batch-factory-publish-rule-list>section { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; min-height:48px; padding:12px; border:1px solid var(--sh-line); border-radius:8px; background:var(--sh-panel-strong); }
+.batch-factory-publish-layout .batch-factory-publish-rule-list .ant-switch { flex:none; }
+.batch-factory-publish-layout .batch-factory-vms-connection-card { margin:0; padding:16px; border-radius:12px; box-shadow:none; }
+.batch-factory-publish-layout .batch-factory-vms-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.batch-factory-publish-layout .batch-factory-env-status-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) auto; gap:12px; align-items:center; }
+.batch-factory-publish-layout .batch-factory-engine-card-body>.batch-factory-engine-note { grid-column:1/-1; }
+.batch-factory-settings-card.is-publish .batch-factory-engine-field.is-switch-row { grid-template-columns:minmax(0,1fr) auto!important; align-items:center; min-height:48px; }
+.batch-factory-settings-card.is-publish .batch-factory-field-restore { grid-column:1/-1; }
+@media(max-width:780px) {
+ .batch-factory-publish-layout .batch-factory-engine-card-body,
+ .batch-factory-publish-layout .batch-factory-engine-grid,
+ .batch-factory-publish-layout .batch-factory-publish-rule-list,
+ .batch-factory-publish-layout .batch-factory-env-status-row { grid-template-columns:minmax(0,1fr); }
+ .batch-factory-publish-layout .batch-factory-vms-connection-card { display:flex; flex-direction:column; align-items:stretch; gap:12px; }
+}

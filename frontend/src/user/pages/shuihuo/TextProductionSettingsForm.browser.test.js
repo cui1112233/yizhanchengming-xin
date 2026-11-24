@@ -91,9 +91,9 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
             return {groups:[{id:'121-8',name:'8个解压',organization:'7',advanced:{jieyaNum:8}}]};};
         `}));
       }}],
-      bundle:true,jsx:'automatic',write:false,format:'iife',minify:true,define:{'process.env.NODE_ENV':'"production"'}
+      bundle:true,loader:{'.css':'empty'},jsx:'automatic',write:false,format:'iife',minify:true,define:{'process.env.NODE_ENV':'"production"'}
     });
-    writeFileSync(join(dir,'styles.css'),readFileSync(fileURLToPath(new URL('../shuihuo-production.css',import.meta.url))));
+    writeFileSync(join(dir,'styles.css'),readFileSync(new URL('../shuihuo-production.css',import.meta.url),'utf8')+'\n'+readFileSync(new URL('./publish-settings.css',import.meta.url),'utf8'));
     const html = join(dir,'index.html');
     const script=bundle.outputFiles[0].text.replaceAll('</script','<\\/script');
     writeFileSync(html,`<meta charset="utf-8"><link rel="stylesheet" href="styles.css"><div id="root"></div><script>${script}</script>`);
