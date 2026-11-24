@@ -3208,6 +3208,50 @@ function mergeBookExecutionLogs(previousLogs, nextLogs) {
   return Array.from(merged.values()).slice(-300);
 }
 
+function DeferredInlineTextPages({ batchId, bookId, pageTarget = 150, automationActive = false }) {
+  const [pages, setPages] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    let timer;
+    const read = async () => {
+      try {
+        const result = await textApi.listTextPages(batchId, bookId, { signal: controller.signal, suppressGlobalError: true });
+        if (controller.signal.aborted) return;
+        setPages(Array.isArray(result?.pages) ? result.pages : []);
+        setError('');
+      } catch (readError) {
+        if (!controller.signal.aborted) setError(readError?.message || '页面内容读取失败');
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          if (automationActive) timer = setTimeout(read, 2000);
+        }
+      }
+    };
+    setLoading(true);
+    void read();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [batchId, bookId, automationActive]);
+  useEffect(() => {
+    setSelectedIndex(current => Math.max(0, Math.min(current, Math.max(0, pages.length - 1))));
+  }, [pages.length]);
+  const page = pages[selectedIndex];
+  return <div className="shuihuo-workbench-cell batch-factory-text-page-cell">
+    <div className="batch-factory-cell-shell">
+      <header className="batch-factory-text-page-head"><div><b>页面内容</b><small>{page ? `第 ${page.ordinal} 页 · ${String(page.text || '').length} 字` : `单页约 ${pageTarget} 字`}</small></div><span>{pages.length ? `${selectedIndex + 1}/${pages.length}` : '未分页'}</span></header>
+      <div className="batch-factory-text-page-content"><p>{page?.text || (loading ? '正在读取分配内容…' : error || '尚未分配页面内容')}</p></div>
+      <div className="batch-factory-cell-pager">
+        <button type="button" aria-label="上一文字页" disabled={selectedIndex <= 0} onClick={() => setSelectedIndex(index => Math.max(0, index - 1))}><LeftOutlined /></button>
+        <span>{page ? `第 ${page.ordinal} 页` : `目标 ${pageTarget} 字/页`}</span>
+        <button type="button" aria-label="下一文字页" disabled={!pages.length || selectedIndex >= pages.length - 1} onClick={() => setSelectedIndex(index => Math.min(pages.length - 1, index + 1))}><RightOutlined /></button>
+      </div>
+    </div>
+  </div>;
+}
+
 function DeferredInlineComicLibrary(props) {
   const placeholderRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
@@ -6296,7 +6340,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     })}
                   </div>
                 </div>
-                {productionMode === "text" ? <div className="shuihuo-workbench-cell"><b>页面内容</b><p>单页约 {settings.textPageTarget || 150} 字</p></div> : <DeferredInlineBookPrompts
+                {productionMode === "text" ? <DeferredInlineTextPages batchId={batch?.id} bookId={book.id} pageTarget={settings.textPageTarget || 150} automationActive={Boolean(automationRunningStage)} /> : <DeferredInlineBookPrompts
                   batch={batch}
                   book={book}
                   batchId={batch?.id}

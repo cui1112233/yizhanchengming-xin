@@ -3340,6 +3340,14 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-inline-merge-status b{flex:none;color:var(--sh-accent);font-size:9px}
 .batch-factory-inline-merge-status.is-succeeded{color:var(--sh-text);border-color:color-mix(in srgb,var(--sh-accent) 38%,var(--sh-line))}
 .batch-factory-inline-merge-status.is-failed{color:var(--sh-danger)}
+.batch-factory-text-page-cell{padding:0!important}
+.batch-factory-text-page-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-bottom:1px solid var(--sh-line);background:var(--sh-panel-strong)}
+.batch-factory-text-page-head>div{display:grid;gap:1px;min-width:0}
+.batch-factory-text-page-head b{color:var(--sh-text);font-size:12px}
+.batch-factory-text-page-head small,.batch-factory-text-page-head>span{color:var(--sh-muted);font-size:10px;white-space:nowrap}
+.batch-factory-text-page-content{min-height:0;padding:8px 10px;overflow:auto}
+.batch-factory-text-page-content p{margin:0;color:var(--sh-text);font-size:12px!important;font-weight:500!important;line-height:1.65!important;white-space:pre-wrap}
+.batch-factory-text-page-cell .batch-factory-cell-pager span{overflow:hidden;color:var(--sh-muted);font-size:10px;text-align:center;text-overflow:ellipsis;white-space:nowrap}
 
 /* Compact novel list: selection + publish essentials only. */
 .batch-factory-novel-list-view{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;padding:20px 24px 32px}

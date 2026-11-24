@@ -9,8 +9,8 @@ import (
 	"qiantie/backend/internal/prompt"
 )
 
-func TestNormalizeBatchFactoryProductionModeAcceptsComicAndLegacyDirectorModes(t *testing.T) {
-	for _, mode := range []string{"", "video", "comic", "original", "viral"} {
+func TestNormalizeBatchFactoryProductionModeAcceptsTextComicAndLegacyDirectorModes(t *testing.T) {
+	for _, mode := range []string{"", "video", "comic", "text", "original", "viral"} {
 		if _, err := normalizeBatchFactoryProductionMode(mode); err != nil {
 			t.Fatalf("mode %q rejected: %v", mode, err)
 		}

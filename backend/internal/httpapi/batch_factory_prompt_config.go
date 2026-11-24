@@ -19,7 +19,7 @@ const (
 func normalizeBatchFactoryProductionMode(value string) (string, error) {
 	mode := strings.TrimSpace(value)
 	switch mode {
-	case "", "video", "comic", "original", "viral", "original_direct", "viral_hook":
+	case "", "video", "comic", "text", "original", "viral", "original_direct", "viral_hook":
 		return mode, nil
 	default:
 		return "", fmt.Errorf("生产模式无效")
