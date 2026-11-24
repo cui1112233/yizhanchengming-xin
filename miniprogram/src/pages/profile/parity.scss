@@ -10,10 +10,12 @@
   .profile-space-subtitle { margin-top: 5PX; color: var(--liquid-muted); font-size: 13PX; line-height: 20PX; letter-spacing: 3PX; }
 
   .mp-profile-state { margin: 0 14PX 14PX; }
-  .profile-space-identity { position: relative; display: flex; align-items: center; min-height: 132PX; margin: 0 14PX 14PX; padding: 15PX 16PX; box-sizing: border-box; overflow: hidden; isolation: isolate; border: 1PX solid rgba(210, 147, 255, .84); border-radius: 21PX; background: linear-gradient(125deg, rgba(80, 62, 153, .74), rgba(18, 48, 76, .86)); box-shadow: inset 0 1PX 0 rgba(255,255,255,.22), 0 0 18PX rgba(178,91,236,.2), 0 12PX 32PX rgba(3,16,34,.3); }
-  .profile-space-identity::before { content: ""; position: absolute; z-index: 0; inset: 0; background-image: url("../../assets/glass/wallpaper-dark.webp"); background-size: 132% auto; background-position: center 72%; background-repeat: no-repeat; opacity: .58; pointer-events: none; }
-  .profile-space-identity::after { content: ""; position: absolute; z-index: 1; inset: auto -18PX -34PX 20PX; height: 74PX; opacity: .68; background: radial-gradient(ellipse at center, rgba(248,105,210,.58), rgba(55,224,224,.14) 42%, transparent 70%); filter: blur(12PX); pointer-events: none; }
-  .profile-space-particles { position: absolute; z-index: 2; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+  .profile-space-identity { position: relative; display: flex; align-items: center; min-height: 132PX; margin: 0 14PX 14PX; padding: 15PX 16PX; box-sizing: border-box; overflow: hidden; isolation: isolate; border: 1PX solid transparent; border-radius: 21PX; background: linear-gradient(125deg, rgba(54, 38, 112, .36), rgba(20, 42, 85, .28)) padding-box, linear-gradient(115deg, rgba(255, 225, 255, .9), rgba(187, 135, 255, .76) 38%, rgba(109, 240, 247, .72) 68%, rgba(246, 124, 224, .9)) border-box; box-shadow: inset 0 1PX 0 rgba(255,255,255,.5), inset 0 -1PX 0 rgba(255,137,229,.28), 0 0 22PX rgba(190,91,245,.28), 0 12PX 32PX rgba(3,16,34,.3); }
+  .profile-space-identity-background { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; opacity: .94; pointer-events: none; }
+  .profile-space-identity-glass { position: absolute; z-index: 1; inset: 0; background: linear-gradient(115deg, rgba(116,91,188,.42), rgba(38,70,130,.28) 55%, rgba(227,102,217,.2)); box-shadow: inset 0 1PX 0 rgba(255,255,255,.42), inset 0 -18PX 34PX rgba(232,85,214,.13), inset 18PX 0 34PX rgba(93,229,245,.08); backdrop-filter: blur(5PX) saturate(132%); pointer-events: none; }
+  .profile-space-identity::before { content: ""; position: absolute; z-index: 2; left: 4%; right: 22%; top: -43PX; height: 82PX; border-radius: 0 0 52% 48%; opacity: .62; background: linear-gradient(180deg, rgba(255,255,255,.38), rgba(218,211,255,.12) 52%, transparent 86%); transform: rotate(-2deg); filter: blur(1PX); pointer-events: none; }
+  .profile-space-identity::after { content: ""; position: absolute; z-index: 2; inset: auto -18PX -36PX 10PX; height: 82PX; opacity: .84; background: radial-gradient(ellipse at center, rgba(248,105,210,.64), rgba(126,98,244,.22) 45%, rgba(55,224,224,.08) 61%, transparent 72%); filter: blur(10PX); pointer-events: none; }
+  .profile-space-particles { position: absolute; z-index: 3; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
   .profile-space-petal { position: absolute; width: 18PX; height: 18PX; opacity: 0; will-change: transform, opacity; pointer-events: none; }
   .profile-space-petal.is-one { left: 35%; top: 66%; width: 13PX; height: 13PX; animation: profile-petal-drift-a 11s linear -4s infinite; }
   .profile-space-petal.is-two { left: 52%; top: 19%; width: 19PX; height: 19PX; animation: profile-petal-drift-b 15s ease-in-out -10s infinite; }
@@ -22,10 +24,10 @@
   .profile-space-petal.is-five { right: 28%; bottom: 9%; width: 16PX; height: 16PX; animation: profile-petal-drift-a 14s ease-in-out -8s infinite; }
   .profile-space-petal.is-six { right: 3%; bottom: 26%; width: 12PX; height: 12PX; animation: profile-petal-drift-c 10s linear -5s infinite; }
   .profile-space-petal.is-seven { left: 44%; top: 42%; width: 9PX; height: 9PX; animation: profile-petal-drift-a 12s ease-in-out -1s infinite; }
-  .profile-space-avatar { position: relative; z-index: 3; display: flex; align-items: center; justify-content: center; width: 82PX; height: 82PX; flex: 0 0 82PX; border-radius: 50%; color: #fff; font-size: 27PX; font-weight: 750; background: linear-gradient(145deg, #6d70dc, #23cfd6); border: 2PX solid rgba(211,249,255,.98); box-shadow: 0 0 0 3PX rgba(193,111,255,.42), 0 0 24PX rgba(72,235,232,.52), 0 0 38PX rgba(220,101,255,.22); overflow: hidden; animation: profile-avatar-breathe 4.6s ease-in-out infinite; }
+  .profile-space-avatar { position: relative; z-index: 4; display: flex; align-items: center; justify-content: center; width: 82PX; height: 82PX; flex: 0 0 82PX; border-radius: 50%; color: #fff; font-size: 27PX; font-weight: 750; background: linear-gradient(145deg, #6d70dc, #23cfd6); border: 2PX solid rgba(211,249,255,.98); box-shadow: 0 0 0 3PX rgba(193,111,255,.42), 0 0 24PX rgba(72,235,232,.52), 0 0 38PX rgba(220,101,255,.22); overflow: hidden; animation: profile-avatar-breathe 4.6s ease-in-out infinite; }
   .profile-space-avatar-image { width: 100%; height: 100%; }
   .profile-space-camera { position: absolute; right: -1PX; bottom: -1PX; display: flex; align-items: center; justify-content: center; min-width: 23PX; height: 23PX; padding: 0 4PX; border-radius: 12PX; background: rgba(8,25,41,.92); border: 1PX solid rgba(255,255,255,.4); color: #fff; box-sizing: border-box; font-size: 8PX; }
-  .profile-space-identity-copy { position: relative; z-index: 3; min-width: 0; flex: 1; padding-left: 16PX; }
+  .profile-space-identity-copy { position: relative; z-index: 4; min-width: 0; flex: 1; padding-left: 16PX; }
   .profile-space-name-line { display: flex; align-items: center; gap: 7PX; min-width: 0; }
   .profile-space-name { max-width: 150PX; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 21PX; line-height: 28PX; font-weight: 780; }
   .profile-space-badge { flex-shrink: 0; padding: 3PX 7PX; border-radius: 10PX; color: #d9d6ff; background: rgba(137,93,224,.42); font-size: 10PX; line-height: 14PX; text-transform: uppercase; }
@@ -36,6 +38,7 @@
   .profile-space-metric-value { margin-left: 1PX; color: #fff; font-size: 18PX; line-height: 22PX; font-weight: 760; }
   .profile-space-metric-divider { width: 1PX; height: 23PX; margin: 0 8PX; background: rgba(214,230,244,.36); }
   .profile-space-identity.is-reduced-motion { background: rgba(25, 45, 78, .94); }
+  .profile-space-identity.is-reduced-motion .profile-space-identity-glass { background: rgba(28, 45, 82, .7); backdrop-filter: none; }
   .profile-space-identity.is-reduced-motion .profile-space-petal { animation: none; opacity: .38; }
   .profile-space-identity.is-reduced-motion .profile-space-avatar { animation: none; }
 
@@ -78,7 +81,7 @@
   --profile-panel-soft: rgba(235,245,249,.76);
   --profile-line: rgba(50,91,112,.14);
   .profile-space-list, .profile-space-transparency { background: rgba(241,248,251,.76); }
-  .profile-space-identity::before { background-image: url("../../assets/glass/wallpaper-light.webp"); opacity: .52; }
+  .profile-space-identity-glass { background: linear-gradient(115deg, rgba(247,232,255,.48), rgba(180,209,244,.28) 55%, rgba(255,190,235,.24)); }
   .profile-space-row-arrow { color: rgba(29,62,77,.65); }
 }
 

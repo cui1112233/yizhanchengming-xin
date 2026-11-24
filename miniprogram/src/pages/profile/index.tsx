@@ -194,6 +194,7 @@ export default function ProfilePage() {
         {memberLoaded ? <>
           <View className={`profile-space-identity mp-profile-hero liquid-glass--primary${reducedGlass ? " is-reduced-motion" : ""}`} data-glass-role="primary">
             <Image className="profile-space-identity-background" src={profileIdentityBackground} mode="aspectFill" />
+            <View className="profile-space-identity-glass" ariaHidden />
             <View className="profile-space-particles" ariaHidden>{PROFILE_PETALS.map(name => <Image key={name} className={`profile-space-petal is-${name}`} src={petalIcon} mode="aspectFit" />)}</View>
             <View className="profile-space-avatar" onClick={chooseAvatar}>{facts.avatarUrl ? <Image className="profile-space-avatar-image" src={apiUrl(facts.avatarUrl)} mode="aspectFill" /> : <Text>{displayName ? displayName.slice(0, 1).toUpperCase() : "?"}</Text>}<View className="profile-space-camera">{uploading ? <Text>上传中</Text> : <AppIcon name="camera" size={13} />}</View></View>
             <View className="profile-space-identity-copy">
