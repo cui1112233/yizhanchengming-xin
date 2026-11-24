@@ -221,6 +221,14 @@ func layoutText(ctx context.Context, text string, c LayoutConfig, size image.Poi
 	m := MeasureResult{Fits: true, MaxHeight: float64(limit), Width: size.X, Height: size.Y}
 	metrics := face.Metrics()
 	baselineTop := (size.Y - limit) / 2
+	if paint != nil {
+		measured, err := layoutText(ctx, text, c, size, face, nil)
+		if err != nil {
+			return measured, err
+		}
+		baselineTop = (size.Y - int(measured.UsedHeight)) / 2
+	}
+	reading := readingBreaks(text, c, width)
 	spread := boldSpread(c)
 	step := int(math.Ceil(c.FontSize * c.LineHeight))
 	var line lineGeometry
@@ -257,6 +265,12 @@ func layoutText(ctx context.Context, text string, c LayoutConfig, size image.Poi
 	}
 	runeIndex := 0
 	for _, r := range text {
+		if reading[runeIndex] && hasGlyph && r != '\n' {
+			if err := flush(); err != nil {
+				return m, err
+			}
+			top += max(lastHeight, step) + max(int(math.Round(c.ParagraphSpacing)), step/2)
+		}
 		if runeIndex%256 == 0 {
 			if err := ctx.Err(); err != nil {
 				return m, err

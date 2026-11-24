@@ -78,9 +78,19 @@ func Paginate(ctx context.Context, input PaginationInput, measure MeasureFunc) (
 		input.Layout.TargetCharacters = DefaultTargetCharacters
 	}
 	p := pagePacker{ctx: ctx, runes: []rune(NormalizeLineEndings(input.Text)), layout: input.Layout, measure: measure}
+	reading := map[int]bool{}
+	if resolved, size, err := resolveLayout(input.Layout); err == nil {
+		reading = readingBreaks(string(p.runes), resolved, size.X-2*resolved.Padding)
+	}
 	var quotes straightQuotes
 	for start := 0; start < len(p.runes); {
 		end := paragraphEnd(p.runes, start)
+		for offset := start + 1; offset < end; offset++ {
+			if reading[offset] {
+				end = offset
+				break
+			}
+		}
 		fits, _, err := p.accept(end)
 		if err != nil {
 			return nil, err

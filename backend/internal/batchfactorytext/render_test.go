@@ -120,7 +120,7 @@ func TestRenderCanonicalPixels(t *testing.T) {
 	if n < 100 {
 		t.Fatal("text missing")
 	}
-	if got := fmt.Sprintf("%x", sha256.Sum256(data)); got != "504e9f866a3920baed3ce8743b95927cf46317fbe76f006d712768c2e066d10e" {
+	if got := fmt.Sprintf("%x", sha256.Sum256(data)); got != "52d47df288b85009aff4b40c74f890e56b975b9e9e78e64441a80cfbadc1c89d" {
 		t.Fatalf("Noto card SHA-256 %s", got)
 	}
 }
@@ -176,7 +176,7 @@ func TestRenderAlignmentAndSpacing(t *testing.T) {
 		c.Align = align
 		img, _ := renderCard(t, r, RenderInput{Text: "字", Layout: c})
 		left[i] = img.Rect.Dx()
-		for y := 180; y < 260; y++ {
+		for y := 0; y < img.Rect.Dy(); y++ {
 			for x := 0; x < img.Rect.Dx(); x++ {
 				if img.RGBAAt(x, y) != img.RGBAAt(0, 0) {
 					left[i] = min(left[i], x)
@@ -255,7 +255,7 @@ func TestRenderHighlightRuneGeometry(t *testing.T) {
 		t.Fatal(ranges)
 	}
 	count := 0
-	for y := 180; y < 300; y++ {
+	for y := 0; y < img.Rect.Dy(); y++ {
 		for x := 0; x < 1080; x++ {
 			if img.RGBAAt(x, y) == (color.RGBA{229, 57, 53, 255}) {
 				if x < 180 {
