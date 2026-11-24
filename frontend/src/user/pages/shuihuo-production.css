@@ -3369,12 +3369,12 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-text-page-content{min-height:0;padding:8px 10px;overflow:auto}
 .batch-factory-text-page-content p{margin:0;color:var(--sh-text);font-size:12px!important;font-weight:500!important;line-height:1.65!important;white-space:pre-wrap}
 .batch-factory-text-page-cell .batch-factory-cell-pager span{overflow:hidden;color:var(--sh-muted);font-size:10px;text-align:center;text-overflow:ellipsis;white-space:nowrap}
-.batch-factory-text-rendered-cell{padding:0!important}
+.batch-factory-text-rendered-cell{padding:0!important;grid-template-columns:minmax(0,1fr)!important;gap:0}
 .batch-factory-text-page-open{padding:0;border:0;background:transparent;color:var(--sh-accent);font-size:10px;cursor:pointer;white-space:nowrap}
 .batch-factory-text-page-open:disabled{color:var(--sh-muted);cursor:default}
-.batch-factory-text-page-image{display:grid;place-items:center;width:100%;height:100%;min-height:0;padding:2px;border:0;background:color-mix(in srgb,var(--sh-panel-strong) 82%,#000);cursor:pointer;overflow:hidden}
+.batch-factory-text-page-image{position:relative;display:grid;place-items:center;width:100%;height:100%;min-height:0;padding:2px;border:0;background:color-mix(in srgb,var(--sh-panel-strong) 82%,#000);cursor:pointer;overflow:hidden}
 .batch-factory-text-page-image:disabled{cursor:default}
-.batch-factory-text-page-image img{display:block;width:min(100%,180px);height:auto;max-height:100%;object-fit:contain;aspect-ratio:3/4;border-radius:6px;background:#111827}
+.batch-factory-text-page-image img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;width:auto;height:calc(100% - 4px);max-width:calc(100% - 4px);object-fit:contain;aspect-ratio:3/4;border-radius:6px;background:#111827}
 .batch-factory-text-page-empty{display:grid;place-items:center;gap:7px;min-height:134px;color:var(--sh-muted);font-size:11px;text-align:center}
 .batch-factory-text-page-empty .anticon{font-size:24px;color:color-mix(in srgb,var(--sh-accent) 55%,var(--sh-muted))}
 .batch-factory-text-rendered-cell .batch-factory-cell-pager span{overflow:hidden;color:var(--sh-muted);font-size:10px;text-align:center;text-overflow:ellipsis;white-space:nowrap}

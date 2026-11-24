@@ -50,6 +50,8 @@ async function renderFixture() {
             const labels = [...document.querySelectorAll('.shuihuo-workbench-head > div')];
             const preview = document.querySelector('.batch-factory-text-page-image').getBoundingClientRect();
             const image = document.querySelector('.batch-factory-text-page-image img').getBoundingClientRect();
+            const cell = document.querySelector('.batch-factory-text-rendered-cell').getBoundingClientRect();
+            document.body.dataset.previewShellWidthDelta = String(Math.abs(preview.width - cell.width));
             document.body.dataset.duplicateTitles = String(headers.some(header => /页面内容|文字页/.test(header.textContent)));
             document.body.dataset.pagerDelta = String(Math.abs(pagers[0].getBoundingClientRect().bottom - pagers[1].getBoundingClientRect().bottom));
             document.body.dataset.pageInfo = headers.map(header => header.textContent).join('|');
@@ -117,6 +119,8 @@ test('rendered text page preview is centered, enlarged, contained, and keeps 3:4
   const width = Number(dom.match(/data-preview-width="([^"]+)"/)?.[1]);
   const ratio = Number(dom.match(/data-preview-ratio="([^"]+)"/)?.[1]);
   assert.ok(centerDelta <= 1, `preview center delta ${centerDelta}`);
+  const shellDelta = Number(dom.match(/data-preview-shell-width-delta="([^"]+)"/)?.[1]);
+  assert.ok(shellDelta <= 2, `preview shell must fill its column, width delta ${shellDelta}`);
   assert.ok(width > 120, `preview width ${width}`);
   assert.match(dom, /data-preview-contained="true"/);
   assert.ok(Math.abs(ratio - 0.75) < 0.02, `preview ratio ${ratio}`);
