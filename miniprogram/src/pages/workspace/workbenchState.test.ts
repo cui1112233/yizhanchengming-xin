@@ -17,6 +17,7 @@ function task(source: TaskSource, id: string, overrides: Partial<AggregatedTask>
     rawStatus: "running",
     status: "running" as TaskStatus,
     progress: undefined,
+    statusDetail:"",visualHint:undefined,moduleKey:source,kind:undefined,stage:undefined,taskType:undefined,retryable:false,
     ...overrides,
   };
 }
@@ -52,7 +53,8 @@ describe("workspace current task state", () => {
   test("derives concise UI status from the real task state", () => {
     expect(workbenchStatus()).toEqual({ label: "待开始", tone: "idle" });
     expect(workbenchStatus(task("script", "a"))).toEqual({ label: "执行中", tone: "running" });
-    expect(workbenchStatus(task("script", "b", { status: "failed" }))).toEqual({ label: "执行异常", tone: "failed" });
+    expect(workbenchStatus(task("script", "b", { status: "retry" }))).toEqual({ label: "需重试", tone: "failed" });
+    expect(workbenchStatus(task("script", "e", { status: "attention",statusDetail:'待确认' }))).toEqual({label:'待确认',tone:'idle'});
     expect(workbenchStatus(task("script", "c", { status: "completed" }))).toEqual({ label: "已完成", tone: "completed" });
     expect(workbenchStatus(task("script", "d", { status: "unknown" }))).toEqual({ label: "状态同步中", tone: "unknown" });
   });

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { waterImageModels, createProductionClients, latestRequestGuard } from "./productionClients";
+import { waterVideoScope,waterImageModels, createProductionClients, latestRequestGuard } from "./productionClients";
 
 test('water projects become available even while the model request remains pending', async()=>{
   let complete!:(value:any)=>void;
@@ -97,4 +97,19 @@ test('segment prompt edits and asset edits keep established manual mutation cont
 
 test('image catalog rejects missing provider ids and ambiguous channels',()=>{
  expect(waterImageModels([{id:'missing',kind:'image'},{id:'a',kind:'image',modelId:'same'},{id:'b',kind:'image',modelId:'same'},{id:'c',kind:'image',modelId:'unique'},{id:'d',kind:'image',modelId:'unique',enabled:false}]).map(item=>item.id)).toEqual(['c']);
+});
+
+test('water audio uses service configuration while video submits the whole project with a stable request id',async()=>{
+ const calls:any[]=[];const client=createProductionClients(async(path,options)=>{calls.push([path,options]);return{tasks:[{id:'real-task'}],job:{requestId:'stable-video'}};});
+ await client.waterAudio('p1','s1');await client.waterVideo('p1','stable-video');
+ expect(calls).toEqual([
+ ['/api/shuihuo-production/projects/p1/tasks',{method:'POST',data:{kind:'audio',segmentId:'s1'},timeout:180000}],
+ ['/api/shuihuo-production/projects/p1/tasks',{method:'POST',data:{kind:'video',requestId:'stable-video'},timeout:180000}],
+ ]);
+ await expect(createProductionClients(async()=>({})).waterVideo('p1','stable-video')).rejects.toThrow('提交结果未确认');
+});
+
+test('video scope comes from the actual director revision and production videos instead of manual segments',()=>{
+ expect(waterVideoScope({project:{books:[]},segments:[{id:'manual'}]})).toBeNull();
+ expect(waterVideoScope({project:{books:[{directorRevision:{id:'director-2'},videos:[{id:'v1'},{id:'v2'}]}]},segments:[{id:'manual'}]})).toEqual({revision:'director-2',count:2});
 });

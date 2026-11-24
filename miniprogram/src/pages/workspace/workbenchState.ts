@@ -35,7 +35,8 @@ export function workbenchProgress(task?: AggregatedTask) {
 export function workbenchStatus(task?: AggregatedTask): { label: string; tone: WorkbenchStatusTone } {
   if (!task) return { label: "待开始", tone: "idle" };
   if (task.status === "running") return { label: "执行中", tone: "running" };
-  if (task.status === "failed") return { label: "执行异常", tone: "failed" };
+  if (task.status === "retry") return { label: "需重试", tone: "failed" };
+  if (task.status === "attention") return {label:task.statusDetail||"待确认",tone:"idle"};
   if (task.status === "completed") return { label: "已完成", tone: "completed" };
   return { label: "状态同步中", tone: "unknown" };
 }

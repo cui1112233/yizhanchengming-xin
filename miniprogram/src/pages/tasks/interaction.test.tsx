@@ -37,7 +37,7 @@ test('task center renders real counters, approved filters, and one shared list s
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-list'))).toHaveLength(1);
  expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row'))).toHaveLength(4);
  expect(tree.filter(n=>n.props?.className==='task-studio-row-art').map(n=>n.props.src)).toEqual(['visual-run.webp','visual-review.webp','visual-done.webp','visual-a/b.webp']);
- expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row')).at(-1)?.props.className).toContain('is-last');
+ expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row')).slice(-1)[0]?.props.className).toContain('is-last');
 });
 test('hero and three status counters use four purpose-specific illustrations',async()=>{
  const tree=await ready();

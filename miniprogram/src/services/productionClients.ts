@@ -55,8 +55,11 @@ export function createProductionClients(request: ProductionRequest) {
       return request(asset.id ? `/api/shuihuo-production/assets/${encodeURIComponent(asset.id)}` : `${waterPath(id)}/assets`, { method: asset.id ? 'PUT' : 'POST', data });
     },
     async waterTask(id: string, segmentId: string, modelId: string, kind: string) { return request(`${waterPath(id)}/tasks`, { method: 'POST', data: { segmentId: required(segmentId), modelId: required(modelId), kind }, timeout: 180000 }); },
+    async waterAudio(id:string,segmentId:string) {const r=await request(`${waterPath(id)}/tasks`,{method:'POST',data:{kind:'audio',segmentId:required(segmentId)},timeout:180000});return waterReceipt(r);},
+    async waterVideo(id:string,requestId:string) {const r=await request(`${waterPath(id)}/tasks`,{method:'POST',data:{kind:'video',requestId:required(requestId)},timeout:180000});return waterReceipt(r);},
   };
 }
+function waterReceipt(value:Row){if(!value?.task?.id&&!value?.tasks?.some((task:Row)=>task.id)&&!value?.job?.id&&!value?.job?.requestId)throw Error('提交结果未确认，请核对项目任务，勿重复提交');return value;}
 export function latestRequestGuard() { let sequence = 0; return { begin: () => ++sequence, current: (id: number) => id === sequence, invalidate: () => { sequence += 1; } }; }
 
 // This endpoint resolves provider modelId, not the catalog entry id. Ambiguous channels cannot be selected safely.
@@ -64,3 +67,4 @@ export function waterImageModels(models:Row[]){
  const enabled=models.filter(item=>item.kind==='image'&&item.enabled!==false&&String(item.modelId||'').trim());
  return enabled.filter(item=>enabled.filter(other=>other.modelId===item.modelId).length===1);
 }
+export function waterVideoScope(detail:Row){const book=detail?.project?.books?.[0];if(!book?.directorRevision?.id||!Array.isArray(book.videos)||!book.videos.length)return null;return{revision:String(book.directorRevision.id),count:book.videos.length};}
