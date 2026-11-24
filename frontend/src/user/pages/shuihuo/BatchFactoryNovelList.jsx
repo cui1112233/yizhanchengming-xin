@@ -6030,7 +6030,6 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                         }
                         aria-label="全选小说"
                       />
-                      <span>序号</span>
                     </>
                   ) : (
                     columnLabel
