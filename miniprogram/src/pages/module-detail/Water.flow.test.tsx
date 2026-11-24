@@ -12,6 +12,7 @@ vi.mock('../../components/AppIcon',()=>({default:()=>null}));
 vi.mock('../../components/BrandHeader',()=>({default:()=>null}));
 vi.mock('../../components/AmbientStarfield',()=>({default:()=>null}));
 vi.mock('../batch/BatchCover',()=>({default:()=>null}));
+vi.mock('../../services/waterMedia',()=>({pickWaterMedia:vi.fn(async()=>({kind:'image',name:'photo.png',dataUrl:'data:image/png;base64,cGlj'}))}));
 import Workspace from './ShuihuoWorkspace';
 import {invalidateSessionResources} from '../../services/sessionBoundary';
 let root:Root,container:HTMLDivElement;
@@ -81,3 +82,12 @@ test('a timed-out source save that already persisted is recovered by reading it 
  const normal=h.api.getMockImplementation()!;h.api.mockImplementation(async(p,o)=>{if(p.endsWith('/p2/source'))throw Error('响应超时');if(p.endsWith('/projects/p2')){const next=doc('p2');next.project.sourceText='实际已保存原文';return next;}return normal(p,o);});
  await mount();await click('新建漫剧');await input('water-create-name','恢复项目');await input('water-create-source','实际已保存原文');await click('保存项目');await click('打开已创建项目');await click('返回作品库');await click('新建漫剧');expect(container.textContent).not.toContain('打开已创建项目');await input('water-create-name','第二部');await input('water-create-source','第二部原文');expect(button('保存项目').disabled).toBe(false);expect(h.api.mock.calls.filter(([p,o])=>p.endsWith('/projects')&&o?.method==='POST')).toHaveLength(1);
 });
+
+test('asset reference tools read without writing and generate only selected asset using provider model id',async()=>{
+ const normal=h.api.getMockImplementation()!;let imageModelId='',imageAspectRatio='';h.api.mockImplementation(async(p,o)=>{if(p.endsWith('/assets/a1')&&o?.method==='PUT'){imageModelId=o.data.imageModelId;imageAspectRatio=o.data.imageAspectRatio;return{asset:{imageModelId,imageAspectRatio}};}if(p.endsWith('/projects/p1')){const d=doc();d.assets[0]={...d.assets[0],imageModelId,imageAspectRatio} as any;return d;}return p.endsWith('/a1/images')?{images:[]}:p.endsWith('/assets/generate')?{images:[{id:'img'}]}:normal(p,o);});await mount();await openProject();await click('素材');await click('参考图片库');expect(h.api.mock.calls.some(([,o])=>o?.method==='POST')).toBe(false);
+ const select=container.querySelector('#water-asset-image-model-select') as HTMLSelectElement;await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});await click('生成参考图');expect(h.api.mock.calls.find(([p])=>p.endsWith('/assets/generate'))?.[1].data).toEqual({assetIds:['a1'],modelId:'provider-image-2',aspectRatio:'1:1'});
+});
+test('cancelled reference generation sends no chargeable write; imported album image uses asset replacement endpoint',async()=>{
+ const normal=h.api.getMockImplementation()!;h.api.mockImplementation(async(p,o)=>p.endsWith('/a1/images')?{images:[]}:normal(p,o));await mount();await openProject();await click('素材');await click('参考图片库');const select=container.querySelector('#water-asset-image-model-select') as HTMLSelectElement;await act(async()=>{select.value='0';select.dispatchEvent(new Event('change',{bubbles:true}));});h.modal.mockResolvedValueOnce({confirm:false});await click('生成参考图');expect(h.api.mock.calls.some(([p])=>p.endsWith('/assets/generate'))).toBe(false);await click('从相册导入参考图');expect(h.api.mock.calls.find(([p,o])=>p.endsWith('/assets/a1/image')&&o?.method==='PUT')?.[1].data.dataUrl).toBe('data:image/png;base64,cGlj');
+});
+test('project media import carries explicitly selected segment without generating AI work',async()=>{await mount();await openProject();await click('素材');await click('导入素材');const select=container.querySelector('#water-media-segment-select') as HTMLSelectElement;await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});await click('相册图片');const write=h.api.mock.calls.find(([p,o])=>p.endsWith('/p1/media')&&o?.method==='POST');expect(write?.[1].data).toEqual({kind:'image',filename:'photo.png',dataUrl:'data:image/png;base64,cGlj',segmentId:'s1'});expect(h.api.mock.calls.some(([p])=>p.endsWith('/tasks')&&p.includes('generate'))).toBe(false);});

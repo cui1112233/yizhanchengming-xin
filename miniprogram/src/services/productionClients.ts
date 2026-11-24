@@ -1,3 +1,4 @@
+import {waterAssetRecords,waterAssetPatch} from './waterAssets';
 export type Row = Record<string, any>;
 export type ProductionRequest = (path: string, options?: { method?: "GET" | "POST" | "PUT"; data?: unknown; timeout?: number }) => Promise<any>;
 export function rows(payload: Row, key: string): Row[] {
@@ -39,7 +40,7 @@ export function createProductionClients(request: ProductionRequest) {
     async waterDetail(id: string) {
       const [detail, tasks] = await Promise.all([request(waterPath(id)), request(`${waterPath(id)}/tasks`)]);
       if (!detail?.project?.id) throw new Error('水货项目响应不完整');
-      return { ...detail, segments: rows(detail, 'segments'), assets: rows(detail, 'assets'), media: rows(detail, 'media'), tasks: rows(tasks, 'tasks') } as Row;
+      return { ...detail, segments: rows(detail, 'segments'), assets: waterAssetRecords({...detail,assets:rows(detail,'assets')}), media: rows(detail, 'media'), tasks: rows(tasks, 'tasks') } as Row;
     },
     saveWaterSource(id: string, sourceText: string) { return request(`${waterPath(id)}/source`, { method: 'PUT', data: { sourceText: required(sourceText) } }); },
     async waterCandidates(id: string) { return rows(await request(`${waterPath(id)}/segmentation/paragraphs`, { method: 'POST', data: {} }), 'candidates'); },
@@ -51,7 +52,7 @@ export function createProductionClients(request: ProductionRequest) {
     },
     saveWaterSegment(segment: Row) { return request(`/api/shuihuo-production/segments/${encodeURIComponent(required(String(segment.id || '')))}`, { method: 'PUT', data: segment }); },
     saveWaterAsset(id: string, asset: Row) {
-      const data = { ...asset, name: required(asset.name), source: 'manual', manuallyEdited: true };
+      const data = { ...waterAssetPatch(asset), name: required(asset.name), category:asset.category||asset.kind||'character' };
       return request(asset.id ? `/api/shuihuo-production/assets/${encodeURIComponent(asset.id)}` : `${waterPath(id)}/assets`, { method: asset.id ? 'PUT' : 'POST', data });
     },
     async waterTask(id: string, segmentId: string, modelId: string, kind: string) { return request(`${waterPath(id)}/tasks`, { method: 'POST', data: { segmentId: required(segmentId), modelId: required(modelId), kind }, timeout: 180000 }); },

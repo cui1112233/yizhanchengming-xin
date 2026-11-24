@@ -1,0 +1,16 @@
+export function waterAssetRecords(detail:any){const records=detail?.project?.books?.[0]?.assetRecords||[];return(detail.assets||[]).map((asset:any)=>({...asset,...records.find((r:any)=>r.id===asset.id),category:asset.category||asset.kind}));}
+export function waterAssetPatch(asset:any){return {name:asset.name,formalName:asset.formalName||'',facts:asset.facts||'',appearance:asset.appearance??asset.description??'',relationships:asset.relationships||'',prompt:asset.prompt||'',imageModelId:asset.imageModelId||'',imageAspectRatio:asset.imageAspectRatio||'',expectedRevision:asset.revision};}
+export function createWaterAssets(request:(p:string,o?:any)=>Promise<any>){const root='/api/shuihuo-production',id=(v:string)=>{if(!v)throw Error('请选择有效的项目或资产');return encodeURIComponent(v);};return {
+ configureImage:async(project:string,asset:any,model:string,ratio:string)=>{const detail=await request(`${root}/projects/${id(project)}`);const fresh=waterAssetRecords(detail).find((v:any)=>v.id===asset.id);if(!fresh||fresh.revision!==asset.revision)throw Error('资产已更新，请关闭面板刷新后再选择生成');const result=await request(`${root}/assets/${id(String(asset.id))}`,{method:'PUT',data:waterAssetPatch({...fresh,imageModelId:model,imageAspectRatio:ratio})});if(result?.asset?.imageModelId!==model||result?.asset?.imageAspectRatio!==ratio)throw Error('模型与画幅保存未确认，尚未开始生图');const verify=await request(`${root}/projects/${id(project)}`);const saved=waterAssetRecords(verify).find((v:any)=>v.id===asset.id);if(saved?.imageModelId!==model||saved?.imageAspectRatio!==ratio)throw Error('资产参数读回不一致，尚未开始生图');return saved;},
+ images:async(asset:string)=>{const r=await request(`${root}/assets/${id(asset)}/images`);if(!Array.isArray(r.images))throw Error('图片库读取失败');return r.images;},
+ generate:async(project:string,assetIds:string[],modelId:string,aspectRatio:string)=>{if(!assetIds.length||!modelId)throw Error('请选择资产和图片模型');const r=await request(`${root}/projects/${id(project)}/assets/generate`,{method:'POST',data:{assetIds,modelId,aspectRatio},timeout:600000});if(!r?.images?.length&&!r?.tasks?.length)throw Error('生成回执没有图片或任务，请刷新资产库核对，勿重复生成');return r;},
+ bind:async(segment:string,assetIds:string[],owned:any[])=>{if(assetIds.some(a=>!owned.some(v=>v.id===a)))throw Error('只能引用当前项目的资产');return request(`${root}/segments/${id(segment)}/assets`,{method:'PUT',data:{assetIds}});},
+ primary:(image:string)=>request(`${root}/asset-images/${id(image)}/primary`,{method:'PUT'}),
+ replace:(asset:string,dataUrl:string)=>request(`${root}/assets/${id(asset)}/image`,{method:'PUT',data:{dataUrl},timeout:180000}),
+ upload:(project:string,kind:string,filename:string,dataUrl:string,segmentId='')=>request(`${root}/projects/${id(project)}/media`,{method:'POST',data:{kind,filename,dataUrl,...(segmentId?{segmentId}:{})},timeout:180000}),
+ attach:(media:string,segmentId:string)=>request(`${root}/media/${id(media)}/segment`,{method:'PUT',data:{segmentId}}),
+ primaryMedia:(media:string)=>request(`${root}/media/${id(media)}/primary`,{method:'PUT'}),
+ removeMedia:(media:string)=>request(`${root}/media/${id(media)}`,{method:'DELETE'}),
+ removeAsset:(asset:string)=>request(`${root}/assets/${id(asset)}`,{method:'DELETE'}),
+ analyze:(project:string)=>request(`${root}/projects/${id(project)}/analysis/assets/and-bindings`,{method:'POST',data:{},timeout:180000}),
+ };}
