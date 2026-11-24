@@ -40,11 +40,11 @@ export const TEXT_PRODUCTION_SECTIONS = [
     field('textHighlightLines','标红行号','input','1,3'),
     field('textMaxHeightRatio','文字最大高度占比','percent',0.75,{min:1,max:100}),
     field('textBackground','整书背景','background',solid),
-    field('textCover.layout.fontId','标题字体','choice',null,{options:fonts,from:'textFontId'}),
-    field('textCover.layout.fontSize','标题字号','number',null,{min:1,max:256,from:'textFontSize'}),
-    field('textCover.layout.fontWeight','标题字重','choice',null,{options:options([100,200,300,400,500,600,700,800,900]),from:'textFontWeight'}),
-    field('textCover.layout.align','标题对齐','choice',null,{options:align,from:'textAlign'}),
-    field('textCover.layout.textColor','标题颜色','color',null,{from:'textColor'})
+    field('textCover.layout.fontId','标题字体','choice','noto-sans-sc',{options:fonts}),
+    field('textCover.layout.fontSize','标题字号','number',64,{min:1,max:256}),
+    field('textCover.layout.fontWeight','标题字重','choice',600,{options:options([100,200,300,400,500,600,700,800,900])}),
+    field('textCover.layout.align','标题对齐','choice','center',{options:align}),
+    field('textCover.layout.textColor','标题颜色','color','#123040')
   ]},
   {key:'publish',label:'发布配置',fields:[
     field('comicPublishSettings.producerAdminName','上传人','producer',''),

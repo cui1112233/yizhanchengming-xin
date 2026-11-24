@@ -14,7 +14,7 @@ test('项目和书目将文本交给文字媒体库', () => {
   assert.match(list, /mediaMode === 'text' \? <TextMediaDialog\b/);
   assert.match(list, /mediaMode === 'comic' \? <ComicMediaPanel/);
   const library = readFileSync(new URL('./ProjectsView.jsx', import.meta.url), 'utf8');
-  assert.match(library, /project.factoryMode === 'text'.*<AuthenticatedTextPageImage/);
+  assert.match(library, /project.factoryMode === 'text'[\s\S]*?<AuthenticatedTextPageImage/);
   assert.match(library, /value:'text',label:'文本'/);
 });
 

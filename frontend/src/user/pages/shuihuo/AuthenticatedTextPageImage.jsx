@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { apiRequest } from '../../../shared/api/client.js';
 
 const bookImage = /^\/api\/batch-factory\/v12\/batches\/([^/?#\\]+)\/books\/([^/?#\\]+)\/text-(?:artifacts|backgrounds)\/([^/?#\\]+)\/content$/;
 const personalBackground = /^\/api\/batch-factory\/v12\/text-backgrounds\/([^/?#\\]+)\/content$/;
+const projectCover = /^\/api\/batch-factory\/v12\/batches\/([^/?#\\]+)\/books\/([^/?#\\]+)\/text-cover\/display$/;
 function isTextMediaURL(url) {
-  const match = bookImage.exec(url) || personalBackground.exec(url);
+  const match = bookImage.exec(url) || personalBackground.exec(url) || projectCover.exec(url);
   if (!match) return false;
   try {
     return match.slice(1).every(segment => {
@@ -17,10 +18,19 @@ function isTextMediaURL(url) {
 }
 
 function ImageRequest({ contentUrl, alt, className, passive }) {
+  const lazy=projectCover.test(contentUrl),holder=useRef(null);
+  const [visible,setVisible]=useState(!lazy);
+  useEffect(()=>{
+    if(!lazy || typeof IntersectionObserver==='undefined'){setVisible(true);return;}
+    const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'200px'});
+    if(holder.current)observer.observe(holder.current);
+    return ()=>observer.disconnect();
+  },[lazy]);
   const [image, setImage] = useState('');
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    if(!visible)return;
     const controller = new AbortController();
     let ownedUrl = '';
     async function load() {
@@ -39,7 +49,7 @@ function ImageRequest({ contentUrl, alt, className, passive }) {
       controller.abort();
       if (ownedUrl) URL.revokeObjectURL(ownedUrl);
     };
-  }, [contentUrl, attempt]);
+  }, [contentUrl, attempt, visible]);
   if (failed && passive) return <span>图片读取失败</span>;
   if (failed) return <button type="button" onClick={() => {
     setImage('');
@@ -48,7 +58,7 @@ function ImageRequest({ contentUrl, alt, className, passive }) {
   }}>图片读取失败，重试</button>;
   return image
     ? <img className={className} src={image} alt={alt} onError={() => setFailed(true)} />
-    : <span role="status">正在读取图片…</span>;
+    : <span ref={holder} role="status">正在读取图片…</span>;
 }
 
 // Only send the session token to the authenticated text-media content routes.

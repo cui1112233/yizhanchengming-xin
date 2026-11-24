@@ -126,6 +126,7 @@ func registerBatchTextRoutes(m *http.ServeMux, opt RouterOptions, c *BatchAutoma
 		{"GET", "backgrounds", a.backgrounds}, {"POST", "backgrounds", a.upload}, {"GET", "backgrounds/{backgroundId}/content", a.content},
 		{"GET", "artifacts/{artifactId}/content", a.content}, {"GET", "collections", a.collections}, {"POST", "collections", a.collections}, {"GET", "collections/{collectionId}", a.collections},
 		{"GET", "collections/{collectionId}/download", a.downloadCollection},
+		{"GET", "cover/display", a.displayCover},
 	} {
 		m.HandleFunc(route.method+" "+base+route.path, a.scoped(route.fn))
 	}
@@ -182,6 +183,15 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 			s.Background.Kind = bg.Type
 		}
 	}
+	coverLayout := txt.DefaultCoverLayout(s.Layout.AspectRatio)
+	coverRaw := map[string]json.RawMessage{}
+	coverEncoded, err := json.Marshal(coverLayout)
+	if err != nil {
+		return s, err
+	}
+	if err = json.Unmarshal(coverEncoded, &coverRaw); err != nil {
+		return s, err
+	}
 	if v := x.settings["textCover"]; len(v) > 0 {
 		if err := json.Unmarshal(v, &s.Cover); err != nil {
 			return s, txt.ErrInvalid
@@ -194,9 +204,9 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 				return s, txt.ErrInvalid
 			}
 			for k, val := range cover.Layout {
-				raw[k] = val
+				coverRaw[k] = val
 			}
-			encoded, err := json.Marshal(raw)
+			encoded, err := json.Marshal(coverRaw)
 			if err != nil {
 				return s, txt.ErrInvalid
 			}
@@ -207,7 +217,10 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 			s.Cover.Layout = &merged
 		}
 	}
-	// Cover and body share the book background; ignore legacy cover overrides.
+	if s.Cover.Layout == nil {
+		s.Cover.Layout = &coverLayout
+	}
+	// System covers use the built-in illustration; body backgrounds remain independent.
 	s.Cover.Background = nil
 	s.Cover.ClearBackground = false
 	if v := x.settings["highlightReuseEnabled"]; len(v) > 0 {
@@ -241,7 +254,7 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 	}
 	coverStyle.Layout.HighlightRules = ""
 	coverStyle.Layout.HighlightLines = ""
-	fingerprint, err := json.Marshal([]any{s.Title, coverStyle.Layout, coverStyle.Background})
+	fingerprint, err := json.Marshal([]any{s.Title, coverStyle.Layout, "builtin-text-cover-v1"})
 	if err != nil {
 		return s, txt.ErrInvalid
 	}

@@ -13,6 +13,12 @@ test('project-video covers seek a first frame instead of leaving a metadata-only
   assert.match(source, /ProductionMediaBoundary showDownload=\{false\}/);
 });
 
+test('text cards have a default book cover and a consistent type badge',()=>{
+ assert.match(source,/text-cover\/display/);
+ assert.match(source,/firstBook\?\.title \|\| project.name/);
+ assert.match(source,/\{batchProject \? <span className="shuihuo-project-card-kind">/);
+});
+
 test('private batch merge covers are fetched with the logged-in API client instead of a bare image request', () => {
   assert.match(source, /getBatchFactoryMergeCoverBlob/);
   assert.match(source, /AuthenticatedProjectCover/);

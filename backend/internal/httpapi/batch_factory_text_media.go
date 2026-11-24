@@ -106,18 +106,31 @@ func (a textAPI) renderInput(x textRequest, d txt.Document, p txt.Page, cover bo
 	content := p.Text
 	if cover {
 		prior = txt.PageDraft{Layout: snap.Cover.Layout, Background: snap.Cover.Background}
-		content = snap.Title
+		content = x.book.Title
 		if content == "" {
-			content = x.book.Title
+			content = snap.Title
+		}
+		if content == "" {
+			content = "未命名作品"
+		}
+		if prior.Layout == nil {
+			defaults := txt.DefaultCoverLayout(snap.Layout.AspectRatio)
+			prior.Layout = &defaults
 		}
 	}
 	_, style, err := txt.ResolvePageStyle(snap.PageStyle, prior, patch)
 	if err != nil {
 		return txt.RenderInput{}, txt.Renderer{}, err
 	}
-	bg, err := a.bgData(x, style.Background)
-	if err != nil {
-		return txt.RenderInput{}, txt.Renderer{}, err
+	var bg []byte
+	if cover {
+		bg = txt.DefaultCoverImage()
+		style.Background = txt.Background{Kind: "image", ID: "builtin-text-cover-v1"}
+	} else {
+		bg, err = a.bgData(x, style.Background)
+		if err != nil {
+			return txt.RenderInput{}, txt.Renderer{}, err
+		}
 	}
 	in := txt.RenderInput{Owner: x.scope.Owner, BookID: x.scope.BookID, VersionID: d.ActiveVersionID, Text: content, Layout: style.Layout, Background: style.Background, BackgroundImage: bg, HighlightReuseEnabled: style.HighlightReuseEnabled && !cover}
 	if cover {

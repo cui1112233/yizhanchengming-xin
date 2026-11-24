@@ -203,8 +203,12 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
 
   function projectCover(project) {
     const media = project?.coverMedia;
+    if (project.factoryMode === 'text') {
+      const firstBook=project.batch?.books?.[0];
+      const src=firstBook?.id?`/api/batch-factory/v12/batches/${encodeURIComponent(project.batchId)}/books/${encodeURIComponent(firstBook.id)}/text-cover/display`:media?.url;
+      return src?<AuthenticatedTextPageImage passive contentUrl={src} alt={`${firstBook?.title || project.name} 文本封面`} className="shuihuo-project-card-cover-media"/>:null;
+    }
     if (!media?.url) return null;
-    if (project.factoryMode === 'text') return <AuthenticatedTextPageImage passive contentUrl={media.url} alt={`${project.name} 文本封面`} className="shuihuo-project-card-cover-media"/>;
     return media.kind === 'video'
       ? <ProductionMediaBoundary showDownload={false}><video className="shuihuo-project-card-cover-media" src={media.url} muted playsInline preload="auto" onLoadedMetadata={event => { event.currentTarget.currentTime = 0.001; }} aria-label={`${project.name} 封面视频`} /></ProductionMediaBoundary>
       : <AuthenticatedProjectCover src={media.url} alt={`${project.name} 封面`} batchId={project.batchId} />;
@@ -234,7 +238,7 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
         <button type="button" className="shuihuo-project-card-open" onClick={() => onOpen(project)} aria-label={`打开${project.name}`}>
           <div className="shuihuo-project-card-cover">
             {cover || <><span className={`shuihuo-project-card-mode ${batchProject ? 'is-batch-factory' : ''}`}>{batchProject ? '批量工厂' : '水货生产'}</span><span>{batchProject ? `${batchKindLabel(project)} · 小说列表` : projectCount(project)}</span></>}
-            {cover && batchProject ? <span className="shuihuo-project-card-kind">{batchKindLabel(project)}</span> : null}
+            {batchProject ? <span className="shuihuo-project-card-kind">{batchKindLabel(project)}</span> : null}
           </div>
           <div className="shuihuo-project-card-meta"><strong>{project.name}</strong><span>{formatTime(project.updatedAt || project.createdAt)}</span>{retentionHint(project) ? <em className="shuihuo-project-card-retention">{retentionHint(project)}</em> : null}</div>
         </button>
