@@ -37,6 +37,11 @@ describe("workspace current task state", () => {
     expect(selectCurrentTask("comic", entries)).toBeUndefined();
   });
 
+  test("water production resumes either real production source in newest-first order", () => {
+    expect(selectCurrentTask("shuihuo", [task("script", "other"), task("batch", "batch-work"), task("shuihuo", "manual")])?.id).toBe("batch-work");
+    expect(selectCurrentTask("shuihuo", [task("shuihuo", "manual"), task("batch", "batch-work")])?.id).toBe("manual");
+  });
+
   test("does not invent progress when the server did not provide totals", () => {
     expect(workbenchProgress(task("script", "a"))).toBeUndefined();
     expect(workbenchProgress(task("script", "b", { progress: { completed: 3, total: 4 } })))

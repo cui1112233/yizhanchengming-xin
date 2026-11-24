@@ -17,6 +17,7 @@ export function taskSourceForModule(key: ModuleKey) {
 }
 
 export function selectCurrentTask(key: ModuleKey, entries: AggregatedTask[]) {
+  if (key === 'shuihuo') return entries.find(entry => entry.source === 'shuihuo' || entry.source === 'batch');
   const source = taskSourceForModule(key);
   return source ? entries.find((entry) => entry.source === source) : undefined;
 }
