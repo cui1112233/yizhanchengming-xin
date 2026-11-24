@@ -41,11 +41,11 @@ function BackgroundPicker({value,items,onChange,onUploaded}) {
     } catch(error) {message.error(error.message || '背景上传失败');}
     finally {setBusy(false);}
   };
-  return <Space wrap>
+  return <div className="batch-factory-background-controls">
     <ColorPicker label="背景颜色" value={value?.color || '#111318'} onChange={color=>onChange({kind:'color',color})}/>
     <TextBackgroundGallery value={value} items={items} onChange={onChange}/>
     <Upload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={file=>{void upload(file);return false;}}><Button loading={busy}>上传背景</Button></Upload>
-  </Space>;
+  </div>;
 }
 
 // All three entry points render this form. value is the resolved display
@@ -137,7 +137,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
       return <div className={`batch-factory-engine-field${field.type==='switch' ? ' is-switch-row' : ''}`} key={field.key}>
         <span><b>{field.label}</b>{scope==='book' && own && <small> · 本书覆盖</small>}</span>
         {action ? <div className="batch-factory-engine-control-with-action">{control(field)}{action}</div> : control(field)}
-        {scope==='book' && own && <Button size="small" type="link" onClick={()=>onRestore(field.key)}>恢复继承</Button>}
+        {scope==='book' && own && <Button className="batch-factory-field-restore" size="small" type="link" onClick={()=>onRestore(field.key)}>恢复继承</Button>}
       </div>;
   };
   const sharedPublishValue = Object.fromEntries(Object.entries(value).filter(([key])=>key.startsWith('comicPublishSettings.')).map(([key,v])=>[key.slice('comicPublishSettings.'.length),v]));

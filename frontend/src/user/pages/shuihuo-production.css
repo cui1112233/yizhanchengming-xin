@@ -776,6 +776,10 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-engine-group+.batch-factory-engine-group{padding-top:14px;margin-top:14px;border-top:1px solid var(--sh-line)}
 .batch-factory-engine-group-title{grid-column:1/-1;color:var(--sh-muted);font-size:11px;font-weight:800;letter-spacing:.08em}
 .batch-factory-settings-card .batch-factory-engine-field{grid-template-columns:132px minmax(0,1fr);gap:10px}
+.batch-factory-settings-card .batch-factory-engine-field{align-self:start}
+.batch-factory-background-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.batch-factory-background-controls>.ant-space{flex:0 0 100%;min-width:0}
+.batch-factory-settings-card .batch-factory-field-restore{grid-column:2;justify-self:start;padding:0;height:22px}
 .batch-factory-settings-card .batch-factory-engine-field>span b{font-size:12px}
 .batch-factory-settings-card .batch-factory-engine-field>.ant-select,
 .batch-factory-settings-card .batch-factory-engine-field>.ant-input,
