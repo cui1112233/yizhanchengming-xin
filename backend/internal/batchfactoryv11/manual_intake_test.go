@@ -25,6 +25,41 @@ func TestParseManualBookListUsesPresetAndRetainsNovelFetchMetadata(t *testing.T)
 	}
 }
 
+// 手动导入的正文常常直接放在 txtText 里（没有 originalRaw）。txtText 本身就是
+// 完整原文，录入边界必须补记来源，否则自动化预检会一直判「缺少完整原文」。
+func TestNormalizeNovelFetchBookMarksClientTxtTextAsVerifiedOriginal(t *testing.T) {
+	book := normalizeNovelFetchBook(CreateBookInput{
+		ID: "11010585524", Title: "宫墙埋旧梦", TxtText: "大雍所有人都知道……",
+		SourceText:     "大雍所有人都知道……",
+		SourceMetadata: map[string]any{"sourceMode": "manual_original"},
+	})
+	if book.SourceMetadata["rawSourceStatus"] != "verified" || book.SourceMetadata["rawSourceOrigin"] != "manual_txt" {
+		t.Fatalf("metadata=%#v", book.SourceMetadata)
+	}
+	if book.TxtText != "大雍所有人都知道……" {
+		t.Fatalf("txtText=%q", book.TxtText)
+	}
+}
+
+func TestNormalizeNovelFetchBookKeepsExcerptAndExplicitStatus(t *testing.T) {
+	// 视频截取稿不是完整原文，不能因为带了 txtText 就被当成已核实。
+	excerpt := normalizeNovelFetchBook(CreateBookInput{
+		Title: "截取稿", TxtText: "视频字幕片段",
+		SourceMetadata: map[string]any{"sourceMode": "giant_material", "sourceCompleteness": "video_excerpt"},
+	})
+	if excerpt.SourceMetadata["rawSourceStatus"] == "verified" {
+		t.Fatalf("excerpt metadata=%#v", excerpt.SourceMetadata)
+	}
+	// 已经显式判定为 unverified 的（例如改过来源书号）保持原状。
+	unverified := normalizeNovelFetchBook(CreateBookInput{
+		Title: "待核实", TxtText: "旧正文",
+		SourceMetadata: map[string]any{"sourceMode": "manual_original", "rawSourceStatus": "unverified"},
+	})
+	if unverified.SourceMetadata["rawSourceStatus"] != "unverified" {
+		t.Fatalf("explicit unverified metadata=%#v", unverified.SourceMetadata)
+	}
+}
+
 func TestParseManualBookListRetainsFullMetadataPreset(t *testing.T) {
 	books, err := ParseManualBookList(ManualIntakeInput{
 		PlatformID:     "15",

@@ -20,6 +20,24 @@ func AcceptExternalOriginals(books []CreateBookInput, origin string) {
 	}
 }
 
+// isExcerptSource 判断一本书的正文是不是视频截取/OCR 稿而不是完整原文。
+// 这类正文允许存在（先登记、后回填），但不能当作「已核实完整原文」。
+func isExcerptSource(metadata map[string]any) bool {
+	if metadata == nil {
+		return false
+	}
+	if strings.TrimSpace(fmt.Sprint(metadata["sourceMode"])) == "giant_material" {
+		return true
+	}
+	if value, ok := metadata["sourceCompleteness"]; ok {
+		switch strings.TrimSpace(fmt.Sprint(value)) {
+		case "video_excerpt", "excerpt", "partial":
+			return true
+		}
+	}
+	return false
+}
+
 // normalizeNovelFetchIntake keeps the first occurrence of each explicit source
 // Book ID. Empty IDs are retained because they do not provide a stable
 // deduplication identity.
@@ -42,6 +60,15 @@ func normalizeNovelFetchBook(book CreateBookInput) CreateBookInput {
 		} else {
 			book.SourceMetadata = sourceReadMetadata(book.SourceMetadata)
 		}
+	}
+	// 部分调用方（手动导入、自定义文案）直接把完整原文放在 txtText 里，而
+	// 不是 originalRaw。txtText 本身就是原始正文，与 originalRaw 属于同一类
+	// 证据；这类录入过去没有写 rawSourceStatus，自动化预检就一直判定
+	// 「缺少完整原文」并永久阻塞（2026-11-24 jiansen 批次事故）。这里在录入
+	// 边界补记来源。视频截取稿（giant_material / video_excerpt）不是完整原文，
+	// 必须排除，保持待校对状态。
+	if strings.TrimSpace(book.TxtText) != "" && book.SourceMetadata["rawSourceStatus"] == nil && !isExcerptSource(book.SourceMetadata) {
+		book.SourceMetadata = sourceWriteMetadata(book.SourceMetadata, nil, book.TxtText, "manual_txt")
 	}
 	book.OriginalRaw = ""
 	if book.TxtFileName == "" && book.BookID != "" {
