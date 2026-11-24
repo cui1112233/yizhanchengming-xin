@@ -76,7 +76,7 @@ func TestBatchFactoryTextCoverSparseSettings(t *testing.T) {
 	batch := batchfactoryv11.SettingsPatch{"textFontSize": json.RawMessage("56"), "textPadding": json.RawMessage("0"), "textCover": json.RawMessage(`{"layout":{"fontId":"ma-shan-zheng"},"background":{"kind":"color","color":"#123456"}}`)}
 	book := batchfactoryv11.SettingsPatch{"textCover": json.RawMessage(`{"layout":{"align":"right"}}`)}
 	snap, err := bookTextSnapshot(textRequest{settings: effectiveTextSettings(batch, book)})
-	if err != nil || snap.Cover.Layout.FontID != "ma-shan-zheng" || snap.Cover.Layout.FontSize != 56 || snap.Cover.Layout.Align != "right" || snap.Cover.Layout.Padding != 0 || snap.Cover.Background.Color != "#123456" {
+	if err != nil || snap.Cover.Layout.FontID != "ma-shan-zheng" || snap.Cover.Layout.FontSize != 56 || snap.Cover.Layout.Align != "right" || snap.Cover.Layout.Padding != 0 || snap.Cover.Background != nil {
 		t.Fatalf("cover resolved to %+v, error %v", snap, err)
 	}
 }

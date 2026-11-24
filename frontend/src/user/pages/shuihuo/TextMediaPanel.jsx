@@ -227,7 +227,6 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
     const changes=pageChanges(session.base,session.draft,session.rev,session.docRev);
     if(cover) {
       const config={};
-      if(changes.background)config['textCover.background']=changes.background;
       if(changes.layout)for(const key of ['fontId','fontSize','fontWeight','align','textColor']){
         if(changes.layout[key]!==session.base.layout[key])config['textCover.layout.'+key]=changes.layout[key];
       }

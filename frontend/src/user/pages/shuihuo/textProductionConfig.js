@@ -30,7 +30,6 @@ export const TEXT_PRODUCTION_SECTIONS = [
     field('textHighlightColor','标红颜色','color','#E53935'),
     field('textMaxHeightRatio','文字最大高度占比','percent',0.75,{min:1,max:100}),
     field('textBackground','整书背景','background',solid),
-    field('textCover.background','封面背景','background',null,{from:'textBackground'}),
     field('textCover.layout.fontId','标题字体','choice',null,{options:fonts,from:'textFontId'}),
     field('textCover.layout.fontSize','标题字号','number',null,{min:1,max:256,from:'textFontSize'}),
     field('textCover.layout.fontWeight','标题字重','choice',null,{options:options([100,200,300,400,500,600,700,800,900]),from:'textFontWeight'}),

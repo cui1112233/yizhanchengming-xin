@@ -65,11 +65,11 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
         : <input type={f.type==='color'?'color':'number'} min={f.min} max={f.max} step={f.step || 1} value={f.type==='percent'?Math.round(value*100):value}
             onChange={e=>setLayout(key,f.type==='color'?e.target.value:Number(e.target.value)/(f.type==='percent'?100:1))}/>}</label>;
     })}</div>
-    <div className="text-layout-fields">
+    {!cover && <><div className="text-layout-fields">
       <label>背景色<input type="color" value={draft.background.color || '#111318'} onChange={e=>setBackground({kind:'color',color:e.target.value})}/></label>
       <div><span>背景图库</span><TextBackgroundGallery value={draft.background} items={items} loading={bgLoading} disabled={busy || fileBusy} onChange={setBackground}/></div>
     </div>
-    <label className="text-upload-input">上传背景图<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files[0];e.target.value='';void upload(file);}}/></label>
+    <label className="text-upload-input">上传背景图<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files[0];e.target.value='';void upload(file);}}/></label></>}
     {bgError && <p role="alert">{bgError}</p>}
     {stale && <p role="alert">此页版本已更新。请复制需要保留的修改，再重新打开排版调整。</p>}
     <div className="text-editor-actions">

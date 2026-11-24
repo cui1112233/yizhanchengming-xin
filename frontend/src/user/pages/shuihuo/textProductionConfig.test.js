@@ -57,7 +57,8 @@ test('取文失败策略和生产失败说明分开，修改生产模式保留�
 });
 
 test('同一套字段覆盖三个表单，实际边距、段距和标红保留零值', () => {
-  for (const key of ['textModelId','sensitiveMode','sensitiveAIModels','sensitiveAIOnFailure','highlightReuseEnabled','contentRange','textPageTarget','imageAspectRatio','textFontId','textFontSize','textFontWeight','textLineHeight','textParagraphSpacing','textPadding','textAlign','textColor','textHighlightColor','textMaxHeightRatio','textBackground','textCover.background','textCover.layout.fontId','textCover.layout.fontSize','textCover.layout.align','comicPublishSettings.producerAdminName','comicPublishSettings.organizationId','publishSettings.websiteProfileId','publishSettings.bookCategory','textAutoCollection','textAutoUpload','textUploadRetryLimit']) assert.ok(TEXT_PRODUCTION_CONFIG_KEYS.includes(key),key);
+  for (const key of ['textModelId','sensitiveMode','sensitiveAIModels','sensitiveAIOnFailure','highlightReuseEnabled','contentRange','textPageTarget','imageAspectRatio','textFontId','textFontSize','textFontWeight','textLineHeight','textParagraphSpacing','textPadding','textAlign','textColor','textHighlightColor','textMaxHeightRatio','textBackground','textCover.layout.fontId','textCover.layout.fontSize','textCover.layout.align','comicPublishSettings.producerAdminName','comicPublishSettings.organizationId','publishSettings.websiteProfileId','publishSettings.bookCategory','textAutoCollection','textAutoUpload','textUploadRetryLimit']) assert.ok(TEXT_PRODUCTION_CONFIG_KEYS.includes(key),key);
+  assert.ok(!TEXT_PRODUCTION_CONFIG_KEYS.includes('textCover.background'));
   const d=defaultTextProductionConfig();
   assert.deepEqual([d.textPageTarget,d.contentRange,d.imageAspectRatio,d.textMaxHeightRatio],[150,4000,'3:4',0.75]);
   const off=normalizeTextProductionConfig({textPadding:0,textParagraphSpacing:0,highlightReuseEnabled:false,publishSettings:{biaohongReuse:true}});

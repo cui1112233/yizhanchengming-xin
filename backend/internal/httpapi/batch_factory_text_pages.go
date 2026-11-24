@@ -205,6 +205,9 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 			s.Cover.Layout = &merged
 		}
 	}
+	// Cover and body share the book background; ignore legacy cover overrides.
+	s.Cover.Background = nil
+	s.Cover.ClearBackground = false
 	if v := x.settings["highlightReuseEnabled"]; len(v) > 0 {
 		if err := json.Unmarshal(v, &s.HighlightReuseEnabled); err != nil {
 			return s, txt.ErrInvalid
