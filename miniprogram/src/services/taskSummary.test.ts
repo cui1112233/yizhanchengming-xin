@@ -16,6 +16,7 @@ function source(summary: Awaited<ReturnType<typeof loadTaskSummary>>, name: stri
 }
 
 describe("真实任务汇总", () => {
+  it('keeps real novel writing stages running and explicit confirmation states separate',()=>{expect(['planning','normalizing','auditing','settling','indexing'].map(taskStatusFromServer)).toEqual(Array(5).fill('running'));expect(taskStatusFromServer('succeeded_with_warnings')).toBe('completed');expect(taskStatusFromServer('awaiting_confirmation')).toBe('attention');});
   it("识别后端当前真实状态，不再把等待重试显示成未知", () => {
     expect(taskStatusFromServer("waiting_retry")).toBe("retry");
     expect(taskStatusFromServer("failed")).toBe("retry");
@@ -71,9 +72,9 @@ describe("真实任务汇总", () => {
           },
         }],
       },
-      "/api/studio/runs": {
-        runs: [{ id: "agent-1", title: "修订对白", status: "completed", created_at: "2026-10-12T08:00:00.000Z" }],
-      },
+      "/api/agent/tasks": {tasks:[{id:"cm-project",title:"CM"}]},
+      "/api/agent/tasks/cm-project/generations":{tasks:[{id:"agent-1",title:"修订对白",status:"completed",created_at:"2026-10-12T08:00:00.000Z"}]},
+      "/api/agent/tasks/cm-project/video-jobs":{jobs:[]},
       "/api/batch-rewrite/tasks": {
         tasks: [
           { id: "fetch-1", bookName: "原著 A", status: "failed", createdAt: "2026-10-11T08:00:00.000Z" },
@@ -105,7 +106,7 @@ describe("真实任务汇总", () => {
   it("保留成功来源，并将单个请求失败限定在所属来源", async () => {
     const summary = await loadTaskSummary(requestFrom({
       "/api/history": { entries: [{ id: "script-1", preview: "第一集", status: "completed" }] },
-      "/api/studio/runs": new Error("Agent 服务暂不可用"),
+      "/api/agent/tasks": new Error("Agent 服务暂不可用"),
       "/api/batch-rewrite/tasks": { tasks: [{ id: "fetch-1", bookName: "原著 A", status: "running" }] },
     }));
 
@@ -118,7 +119,7 @@ describe("真实任务汇总", () => {
   it("不把缺失字段伪造成完成任务、标题、时间或进度", async () => {
     const summary = await loadTaskSummary(requestFrom({
       "/api/history": { entries: [{ id: "script-unknown" }] },
-      "/api/studio/runs": { runs: [] },
+      "/api/agent/tasks": { tasks: [] },
       "/api/batch-rewrite/tasks": { tasks: [] },
     }));
 

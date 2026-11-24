@@ -21,10 +21,10 @@ const uid=()=>`mobile-${Date.now().toString(36)}-${Math.random().toString(36).sl
 const names:CmRow={text:'文本',script:'剧本',image:'图片',video:'视频',audio:'音频',director:'导演'};
 const statuses:CmRow={queued:'排队中',running:'生成中',awaiting_confirmation:'待确认',completed:'已完成',applied:'已采用',failed:'失败',cancelled:'已取消',canceled:'已取消',preparing:'准备中',submitting:'提交中',result_ready:'结果就绪',ingesting:'保存结果中',canceling:'取消中',draft:'未执行'};
 const active=(v:CmRow)=>['queued','running','preparing','submitting','result_ready','ingesting','canceling'].includes(v.state||v.status);
-function CmWorkspace({taskId='',projectId=''}:{taskId?:string;projectId?:string}){
+function CmWorkspace({taskId='',projectId='',initialTab=''}:{taskId?:string;projectId?:string;initialTab?:string}){
  const initial=taskId||projectId;
  const [projects,setProjects]=useState<CmRow[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busy,setBusy]=useState(''),[notice,setNotice]=useState('');
- const [selected,setSelected]=useState(initial),[project,setProject]=useState<CmRow|null>(null),[canvas,setCanvas]=useState<CmRow|null>(null),[dirty,setDirty]=useState(false),[tab,setTab]=useState('chat');
+ const [selected,setSelected]=useState(initial),[project,setProject]=useState<CmRow|null>(null),[canvas,setCanvas]=useState<CmRow|null>(null),[dirty,setDirty]=useState(false),[tab,setTab]=useState(['chat','nodes','assets','tasks'].includes(initialTab)?initialTab:'chat');
  const [projectType,setProjectType]=useState('video'),[query,setQuery]=useState(''),[prompt,setPrompt]=useState(''),[models,setModels]=useState<CmRow[]>([]),[skills,setSkills]=useState<CmRow[]>([]),[skill,setSkill]=useState('');
  const [assets,setAssets]=useState<CmRow[]>([]),[generations,setGenerations]=useState<CmRow[]>([]),[jobs,setJobs]=useState<CmRow[]>([]),[executions,setExecutions]=useState<CmRow[]>([]),[readErrors,setReadErrors]=useState<string[]>([]);
  const [shotNode,setShotNode]=useState<CmRow|null>(null),[manageSkills,setManageSkills]=useState(false);

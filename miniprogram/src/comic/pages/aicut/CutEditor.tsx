@@ -12,8 +12,8 @@ import CutExports from './CutExports';
 
 const freshID = () => `mini-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
-export default function CutEditor({ project, onBack }: { project: CutRecord; onBack: () => void }) {
-  const [timeline, setTimeline] = useState<CutTimeline | null>(null), [timelineId, setTimelineId] = useState('default');
+export default function CutEditor({ project, onBack,initialTimelineId='default',initialPanel='' }: { project: CutRecord;initialTimelineId?:string;initialPanel?:string; onBack: () => void }) {
+  const [timeline, setTimeline] = useState<CutTimeline | null>(null), [timelineId, setTimelineId] = useState(initialTimelineId);
   const [timelines, setTimelines] = useState<CutRecord[]>([]), [assets, setAssets] = useState<CutRecord[]>([]);
   const [dirty, setDirty] = useState(false), [busy, setBusy] = useState(''), [error, setError] = useState('');
   const [panel, setPanel] = useState(''), [selection, setSelection] = useState<{ track: string; clip: string } | null>(null);
@@ -31,7 +31,7 @@ export default function CutEditor({ project, onBack }: { project: CutRecord; onB
     const ticket = ++epoch.current;
     const [value, media, metadata] = await Promise.all([client.timeline(project.id, id), client.assets(project.id), client.timelines(project.id)]);
     if (!alive.current || ticket !== epoch.current) return;
-    setTimeline(value); setAssets(media); setTimelines(metadata); setTimelineId(id); setDirty(false); setSelection(null); setPanel(''); setPreview(null);
+    setTimeline(value); setAssets(media); setTimelines(metadata); setTimelineId(id); setDirty(false); setSelection(null); setPanel(initialPanel==='exports'?'exports':''); setPreview(null);
   };
   // Loading owns its busy cleanup because it increments the project read version.
   const reload = async (id = state.current.timelineId) => {

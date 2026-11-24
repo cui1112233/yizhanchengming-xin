@@ -5,7 +5,7 @@ vi.mock('react', () => ({
   useRef: (v: any) => { const i = h.cursor++; if (!(i in h.slots)) h.slots[i] = { current: v }; return h.slots[i]; },
   useEffect: (fn: any) => { const i = h.cursor++; if (!h.seen.has(i)) { h.seen.add(i); h.effects.push(fn); } },
 }));
-vi.mock('@tarojs/taro', () => ({ default: { showModal: h.modal, showToast: vi.fn(), enableAlertBeforeUnload: vi.fn(), disableAlertBeforeUnload: vi.fn() }, useDidHide: (fn: any) => { h.hide = fn; }, useDidShow: (fn: any) => { h.show = fn; } }));
+vi.mock('@tarojs/taro', () => ({ default: { showModal: h.modal, showToast: vi.fn(), enableAlertBeforeUnload: vi.fn(), disableAlertBeforeUnload: vi.fn() }, useLoad:()=>{},useDidHide: (fn: any) => { h.hide = fn; }, useDidShow: (fn: any) => { h.show = fn; } }));
 vi.mock('@tarojs/components', () => Object.fromEntries(['Audio', 'Button', 'Image', 'Input', 'Picker', 'ScrollView', 'Text', 'Textarea', 'Video', 'View', 'Progress'].map(name => [name, name])));
 vi.mock('../../../services/api', () => ({ apiRequest: h.api }));
 vi.mock('../../../services/aicutMedia', () => ({ importCutMedia: vi.fn(), downloadCutExport: vi.fn() }));

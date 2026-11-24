@@ -10,6 +10,8 @@ const MODULE_SOURCES: Partial<Record<ModuleKey, TaskSource>> = {
   batch: "batch",
   shuihuo: "shuihuo",
   agent: "agent",
+  novel:"novel",
+  aicut:"aicut",
 };
 
 export function taskSourceForModule(key: ModuleKey) {
@@ -17,9 +19,9 @@ export function taskSourceForModule(key: ModuleKey) {
 }
 
 export function selectCurrentTask(key: ModuleKey, entries: AggregatedTask[]) {
-  if (key === 'shuihuo') return entries.find(entry => entry.source === 'shuihuo' || entry.source === 'batch');
-  const source = taskSourceForModule(key);
-  return source ? entries.find((entry) => entry.source === source) : undefined;
+  const source=taskSourceForModule(key);
+  const matches=entries.filter(entry=>key==='shuihuo'?(entry.source==='shuihuo'||entry.source==='batch'):entry.source===source);
+  return matches.find(entry=>entry.status==='running')||matches.find(entry=>entry.status==='attention')||matches.find(entry=>entry.status==='retry')||matches[0];
 }
 
 export function workbenchProgress(task?: AggregatedTask) {

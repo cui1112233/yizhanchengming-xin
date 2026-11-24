@@ -3,6 +3,7 @@ import { Button, Image, Text, View } from "@tarojs/components";
 import { useEffect, useRef, useState } from "react";
 import { readAccountSession, hasAccountSession } from "../../services/session";
 import { createSessionGate, getSessionErrorMessage, resolveSessionGate } from "../../services/sessionGate";
+import {onSessionInvalidated} from "../../services/sessionBoundary";
 import { apiRequest } from "../../services/api";
 import { loadTaskSummary, taskDestination, type AggregatedTask } from "../../services/taskSummary";
 import BrandHeader from "../../components/BrandHeader";
@@ -31,10 +32,10 @@ export default function WorkspacePage() {
   const [summaryError, setSummaryError] = useState("");
   const [summaryWarning, setSummaryWarning] = useState("");
   const readVersion = useRef(0);
-  useEffect(() => () => { readVersion.current += 1; }, []);
+  useEffect(()=>{const off=onSessionInvalidated(()=>{readVersion.current++;setRecords([]);setSummaryLoading(false);setSummaryError('账号已切换，请重新连接');setStatus('binding-required');});return()=>{off();readVersion.current++;};},[]);
 
   const currentTask = selectCurrentTask(activeModule.key, records);
-  const currentStatus = activeModule.key === 'novel' ? {label:'在作品内查看进度',tone:'unknown' as const} : workbenchStatus(currentTask);
+  const currentStatus = workbenchStatus(currentTask);
   const progress = workbenchProgress(currentTask);
   const visual = FUNCTION_VISUALS[activeModule.key];
 

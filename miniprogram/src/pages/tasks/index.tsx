@@ -2,6 +2,7 @@ import { Button, Image, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { API_ORIGIN_CONFIGURATION_ERROR, isApiOriginConfigured } from "../../config/runtime";
+import {onSessionInvalidated} from "../../services/sessionBoundary";
 import { apiRequest } from "../../services/api";
 import { deriveTaskPageState } from "../../services/taskPageState";
 import { filterTaskEntries, loadTaskSummary, taskCounts, taskDestination, type AggregatedTask, type TaskFilter, type TaskSummary } from "../../services/taskSummary";
@@ -19,7 +20,7 @@ const FILTERS: TaskFilter[] = ["全部", "进行中", "需重试", "已完成"];
 function statusLabel(entry: AggregatedTask) {
   if (entry.status === "running") return "进行中";
   if (entry.status === "retry") return "需重试";
-  if (entry.status === "completed") return "已完成";
+  if (entry.status === "completed") return entry.kind==='automation'?'流程已结束':'已完成';
   return entry.statusDetail || (entry.rawStatus ? `状态：${entry.rawStatus}` : "状态未返回");
 }
 
@@ -38,12 +39,8 @@ function validProgress(entry: AggregatedTask) {
 }
 
 function aggregateProgress(entries: AggregatedTask[]) {
-  const values = entries.map(validProgress).filter((value): value is NonNullable<ReturnType<typeof validProgress>> => Boolean(value));
-  if (!values.length) return undefined;
-  const completed = values.reduce((total, value) => total + value.completed, 0);
-  const total = values.reduce((sum, value) => sum + value.total, 0);
-  if (total <= 0) return undefined;
-  return Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+  const active=entries.filter(entry=>entry.status==='running');
+  return active.length===1?validProgress(active[0])?.percent:undefined;
 }
 
 export default function TasksPage() {
@@ -53,15 +50,17 @@ export default function TasksPage() {
   const [retryingId, setRetryingId] = useState("");
   const [configurationError, setConfigurationError] = useState("");
   const [filter, setFilter] = useState<TaskFilter>("全部");
+  const [page,setPage]=useState(0);
   const requestVersion = useRef(0);
-  useEffect(() => () => { requestVersion.current += 1; }, []);
+  useEffect(()=>{const off=onSessionInvalidated(()=>{requestVersion.current++;setSummary(null);setLoading(false);setRefreshing(false);setConfigurationError('账号已切换，请重新进入任务中心');});return()=>{off();requestVersion.current++;};},[]);
 
   const load = () => {
     const version = ++requestVersion.current;
+
     if (!isApiOriginConfigured()) { setConfigurationError(API_ORIGIN_CONFIGURATION_ERROR); setLoading(false); setRefreshing(false); return; }
-    setConfigurationError(""); setLoading(!summary); setRefreshing(Boolean(summary));
+    setPage(0);setConfigurationError(""); setLoading(!summary); setRefreshing(Boolean(summary));
     void loadTaskSummary(apiRequest)
-      .then((result) => { if (version === requestVersion.current) setSummary(result); })
+      .then((result) => {if (version === requestVersion.current) setSummary(result); })
       .catch(() => { if (version === requestVersion.current) setSummary(null); })
       .finally(() => { if (version === requestVersion.current) { setLoading(false); setRefreshing(false); } });
   };
@@ -72,6 +71,8 @@ export default function TasksPage() {
   const overallProgress = aggregateProgress(entries);
   const filtered = filterTaskEntries(entries, filter);
   const counts = taskCounts(entries);
+  const pages=Math.max(1,Math.ceil(filtered.length/30)),currentPage=Math.min(page,pages-1);
+  const visibleEntries=filtered.slice(currentPage*30,currentPage*30+30);
   const failedSources = summary?.sources.filter((source) => source.state === "error") || [];
   const openTask = (entry: AggregatedTask) => { if (entry.id) void Taro.navigateTo({ url: taskDestination(entry) }); };
   const retryTask = async (entry: AggregatedTask, event?: { stopPropagation?: () => void }) => {
@@ -108,18 +109,19 @@ export default function TasksPage() {
         <View className="task-studio-count-item is-retry"><Image className="task-studio-count-art" src={taskAttentionArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.retry}</Text><Text>需重试</Text></View></View><View className="task-studio-count-divider" />
         <View className="task-studio-count-item is-completed"><Image className="task-studio-count-art" src={taskCompletedArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.completed}</Text><Text>已完成</Text></View></View>
       </View>
-      <View className="task-studio-segments liquid-glass--list" data-glass-role="list">{FILTERS.map((item) => <Text key={item} className={filter === item ? "task-studio-filter is-active" : "task-studio-filter"} onClick={() => setFilter(item)}>{item}</Text>)}</View>
+      <View className="task-studio-segments liquid-glass--list" data-glass-role="list">{FILTERS.map((item) => <Text key={item} className={filter === item ? "task-studio-filter is-active" : "task-studio-filter"} onClick={() => {setFilter(item);setPage(0);}}>{item}</Text>)}</View>
       {failedSources.map((source) => <View className="task-studio-source-error" key={source.source}><View><Text className="task-studio-state-title">{source.sourceLabel} 暂未同步</Text><Text>{source.error}</Text></View><Button className="task-studio-retry" onClick={load}>重试</Button></View>)}
       <View className="task-studio-list liquid-glass--list" data-glass-role="list">
-        {filtered.map((entry, index) => {
+        {visibleEntries.map((entry, index) => {
           const progress = validProgress(entry); const visual = taskVisualAsset(entry); const disabled = !entry.id;
-          return <View className={`task-studio-row is-${entry.status}${disabled ? " is-disabled" : ""}${index === filtered.length - 1 ? " is-last" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
+          return <View className={`task-studio-row is-${entry.status}${disabled ? " is-disabled" : ""}${index === visibleEntries.length - 1 ? " is-last" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
             <Image className="task-studio-row-art" src={visual} mode="aspectFit" />
             <View className="task-studio-row-copy"><Text className="task-studio-row-title">{entry.title || "服务端未返回标题"}</Text><Text className="task-studio-row-source">{entry.sourceLabel} · {formatTimestamp(entry.createdAt)}</Text></View>
-            <View className="task-studio-row-state">{progress ? <><Text className="task-studio-progress-value">{progress.percent}%</Text><View className="task-studio-progress-track"><View style={{ width: `${progress.percent}%` }} /></View></> : null}<Text className={`task-studio-status mp-status-pill is-${entry.status}`}>{disabled ? "记录 ID 未返回" : statusLabel(entry)}</Text>{entry.status === "retry" && !disabled ? <Button className="task-studio-row-retry" loading={retryingId === entry.id} onClick={(event) => void retryTask(entry, event)}> {entry.retryable ? "重试" : "查看处理"}</Button> : null}</View>
+            <View className="task-studio-row-state">{progress ? <><Text className="task-studio-progress-value">{entry.kind==='automation'?`就绪 ${progress.completed}/${progress.total}`:`${progress.percent}%`}</Text><View className="task-studio-progress-track"><View style={{ width: `${progress.percent}%` }} /></View></> : null}<Text className={`task-studio-status mp-status-pill is-${entry.status}`}>{disabled ? "记录 ID 未返回" : statusLabel(entry)}</Text>{entry.status === "retry" && !disabled ? <Button className="task-studio-row-retry" loading={retryingId === entry.id} onClick={(event) => void retryTask(entry, event)}> {entry.retryable ? "重试" : "查看处理"}</Button> : null}</View>
             {!disabled ? <AppIcon className="task-studio-row-arrow" name="chevron-right" size={17} /> : null}
           </View>;
         })}
+        {filtered.length>30?<View className="task-studio-pagination"><Button className="task-studio-prev" disabled={currentPage===0} onClick={()=>{setPage(currentPage-1);void Taro.pageScrollTo?.({scrollTop:0,duration:150});}}>上一页</Button><Text>第 {currentPage+1} / {pages} 页 · 共 {filtered.length} 条</Text><Button className="task-studio-next" disabled={currentPage>=pages-1} onClick={()=>{setPage(currentPage+1);void Taro.pageScrollTo?.({scrollTop:0,duration:150});}}>下一页</Button></View>:null}
         {pageState.kind === "empty" || (pageState.kind === "content" && !filtered.length) ? <View className="task-studio-empty"><AppIcon name="circle-dashed" size={28} /><Text className="task-studio-state-title">{pageState.kind === "empty" ? "暂无真实任务记录" : `暂无${filter}任务`}</Text><Text>服务端返回新任务后会显示在这里。</Text></View> : null}
       </View>
     </View> : null}

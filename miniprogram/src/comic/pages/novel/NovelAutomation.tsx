@@ -1,5 +1,5 @@
 import {Button,Text,View} from '@tarojs/components';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {apiRequest} from '../../../services/api';
 import {createNovelManagement,findNovelAutomationReceipt,type NovelAutomation} from '../../../services/novelManagement';
 import {novelUID,type NovelRecord} from '../../../services/novelCreationInputs';
@@ -7,16 +7,17 @@ import type {NovelJournal} from '../../../services/novelRecovery';
 import {NovelField,NovelSelect,NovelNotice,novelConfirm,useNovelOperations,useNovelRead} from './shared';
 const client=createNovelManagement(apiRequest);
 const status:NovelRecord={not_started:'尚未开始',waiting:'等待执行',running:'进行中',paused:'已暂停',failed:'失败',completed:'已完成',stopped:'已停止'};
-export default function NovelAutomation({project,session,mode,models,references,journal,onOpenSession}:{project:NovelRecord;session:string;mode:string;models:NovelRecord[];references:NovelRecord;journal:NovelJournal;onOpenSession:(id:string)=>void}){
+export default function NovelAutomation({project,session,mode,models,references,journal,onOpenSession,initialPlanId='',initialKind='schedules'}:{initialPlanId?:string;initialKind?:NovelAutomation;project:NovelRecord;session:string;mode:string;models:NovelRecord[];references:NovelRecord;journal:NovelJournal;onOpenSession:(id:string)=>void}){
  const cache=`manage-automation:${project.id}`,saved=journal.read(cache);
- const [kind,setKind]=useState<NovelAutomation>('schedules'),[rows,setRows]=useState<NovelRecord[]>([]),[selected,setSelected]=useState(''),[ready,setReady]=useState(false),[configuring,setConfiguring]=useState(false),[logs,setLogs]=useState<NovelRecord[]|null>(null);
+ const [kind,setKind]=useState<NovelAutomation>(initialKind),[rows,setRows]=useState<NovelRecord[]>([]),[selected,setSelected]=useState(initialPlanId),[ready,setReady]=useState(false),[configuring,setConfiguring]=useState(false),[logs,setLogs]=useState<NovelRecord[]|null>(null);
  const [form,setForm]=useState<NovelRecord>(saved?.form||{modelId:models[0]?.id||'',minutes:'30',cap:'10',failures:'3',total:'5',prompt:''}),[pending,setPending]=useState<NovelRecord|null>(saved?.pending||null);
  const [pendingControl,setPendingControl]=useState<NovelRecord|null>(saved?.pendingControl||null),[lastRun,setLastRun]=useState('');
+ const target=useRef(initialPlanId);
  const op=useNovelOperations();
  function persist(next:NovelRecord|null,nextForm=form){journal.save(cache,{form:nextForm,pending:next,pendingControl});if(op.current())setPending(next);}
  function persistControl(value:NovelRecord|null){journal.save(cache,{form,pending,pendingControl:value});if(op.current())setPendingControl(value);}
  function change(patch:NovelRecord){if(op.busy||pending)return;const next={...form,...patch};journal.save(cache,{form:next,pending,pendingControl});setForm(next);}
- const refresh=useNovelRead(()=>client.list(project.id,kind),items=>{setRows(items);setReady(true);setSelected(value=>items.some((v:NovelRecord)=>v.id===value)?value:items.length===1?items[0].id:'');},items=>items.some((r:NovelRecord)=>['running','waiting','not_started'].includes(r.status)),e=>{setReady(false);op.setError(e.message);});
+ const refresh=useNovelRead(()=>client.list(project.id,kind),items=>{setRows(items);setReady(true);if(target.current){const id=target.current;target.current='';if(items.some((v:NovelRecord)=>v.id===id))setSelected(id);else{setSelected('');op.setError('原计划不在当前作品中，请核对后从已有计划选择');}}else setSelected(value=>items.some((v:NovelRecord)=>v.id===value)?value:items.length===1?items[0].id:'');},items=>items.some((r:NovelRecord)=>['running','waiting','not_started'].includes(r.status)),e=>{setReady(false);op.setError(e.message);});
  useEffect(()=>{void refresh();},[kind]);
  const plan=rows.find(r=>r.id===selected),readonly=['archived','purging'].includes(project.status),short=mode.startsWith('short_');
  async function recover(){if(!pending)return;await op.run('核对原启动记录',async()=>{const items=await client.list(project.id,pending.kind);if(!op.current())return;const receipt=findNovelAutomationReceipt(pending.kind,pending.values.key,items);if(receipt){persist(null);setKind(pending.kind);setRows(items);setSelected(receipt.id);setConfiguring(false);setReady(true);return;}persist({...pending,allowResubmit:true});op.setError('尚未找到原记录。可明确以原编号重发，参数保持不变；不会自动新建其他任务。');});}

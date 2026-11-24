@@ -1,0 +1,34 @@
+// @vitest-environment jsdom
+import {act} from 'react';
+import {createRoot,type Root} from 'react-dom/client';
+import {beforeEach,afterEach,expect,test,vi} from 'vitest';
+const h=vi.hoisted(()=>({load:(_:any)=>{},api:vi.fn(),store:new Map<string,any>()}));
+vi.mock('@tarojs/taro',()=>({default:{getStorageSync:(k:string)=>h.store.get(k),setStorageSync:(k:string,v:any)=>h.store.set(k,v),removeStorageSync:(k:string)=>h.store.delete(k),redirectTo:vi.fn()},useLoad:(fn:any)=>{h.load=fn;},useDidShow:()=>{},useDidHide:()=>{}}));
+vi.mock('@tarojs/components',()=>({View:'div',Text:'span',Button:'button',Input:({onInput,maxlength,...p}:any)=><input {...p} onInput={e=>onInput?.({detail:{value:e.currentTarget.value}})}/>}));
+vi.mock('./api',()=>({apiRequest:h.api}));
+vi.mock('./session',()=>({readAccountSession:async()=>({account:{username:'tester'}})}));
+vi.mock('../theme',()=>({ThemedPage:({children}:any)=><div>{children}</div>}));
+vi.mock('../components/AppIcon',()=>({default:()=>null}));
+vi.mock('../components/BrandHeader',()=>({default:()=>null}));
+vi.mock('../components/AmbientStarfield',()=>({default:()=>null}));
+vi.mock('../comic/pages/aicut/CutEditor',()=>({default:(p:any)=><div data-testid="cut-editor" data-project={p.project.id} data-timeline={p.initialTimelineId||'default'} data-panel={p.initialPanel||''}><button onClick={p.onBack}>返回工程列表</button></div>}));
+vi.mock('../comic/pages/novel/NovelProject',()=>({default:(p:any)=><div data-testid="novel-project" data-project={p.project.id} data-session={p.initialSession?.id} data-run={p.initialRunId} data-plan={p.initialPlanId} data-panel={p.initialPanel}/> }));
+vi.mock('../comic/pages/novel/NovelCreate',()=>({default:()=>null}));
+vi.mock('../comic/pages/novel/NovelStudio',()=>({default:()=>null}));
+vi.mock('../pages/module-detail/CmWorkspace',()=>({default:(p:any)=><div data-testid="cm" data-project={p.taskId} data-tab={p.initialTab}/> }));
+vi.mock('../pages/module-detail/ScriptWorkspace',()=>({default:(p:any)=><div data-testid="script" data-history={p.historyId}/> }));
+vi.mock('../pages/module-detail/FetchWorkspace',()=>({default:()=>null}));
+vi.mock('../pages/module-detail/PanelWorkspace',()=>({default:()=>null}));
+vi.mock('../pages/module-detail/ShuihuoWorkspace',()=>({default:()=>null}));
+import AICut from '../comic/pages/aicut';
+import Novel from '../comic/pages/novel';
+import Detail from '../pages/module-detail';
+let root:Root,container:HTMLDivElement;
+beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);h.api.mockReset();h.store.clear();container=document.createElement('div');root=createRoot(container);h.api.mockImplementation(async(p:string)=>p==='/api/ai-cut/projects'?{projects:[{id:'cut1',title:'工程一'},{id:'cut2',title:'工程二'}]}:p==='/api/novel-creation/projects'?{projects:[{id:'novel1',title:'小说一'}]}:p.includes('/models?')?{models:[{id:'m',name:'模型'}]}:{sessions:[]});});
+afterEach(async()=>{await act(async()=>root.unmount());vi.unstubAllGlobals();});
+async function mount(page:any,query:any){await act(async()=>root.render(page));await act(async()=>h.load(query));}
+test('AI-CUT task opens the owned project and exact timeline exports, then clears destination before another project',async()=>{await mount(<AICut/>,{projectId:'cut1',timelineId:'alt',tab:'exports'});let editor=container.querySelector('[data-testid="cut-editor"]')!;expect(editor.getAttribute('data-project')).toBe('cut1');expect(editor.getAttribute('data-timeline')).toBe('alt');expect(editor.getAttribute('data-panel')).toBe('exports');await act(async()=>(editor.querySelector('button') as HTMLButtonElement).click());const open=[...container.querySelectorAll('button')].find(b=>b.textContent==='工程二')!;await act(async()=>open.click());editor=container.querySelector('[data-testid="cut-editor"]')!;expect(editor.getAttribute('data-project')).toBe('cut2');expect(editor.getAttribute('data-timeline')).toBe('default');});
+test('novel task opens the exact owned work session and historical run',async()=>{await mount(<Novel/>,{projectId:'novel1',sessionId:'session1',runId:'run1'});const p=container.querySelector('[data-testid="novel-project"]')!;expect(p.getAttribute('data-project')).toBe('novel1');expect(p.getAttribute('data-session')).toBe('session1');expect(p.getAttribute('data-run')).toBe('run1');});
+test('a writing plan opens automation management without treating the plan id as a run id',async()=>{await mount(<Novel/>,{projectId:'novel1',sessionId:'session1',tab:'automation',planId:'plan1',planKind:'schedules'});const p=container.querySelector('[data-testid="novel-project"]')!;expect(p.getAttribute('data-plan')).toBe('plan1');expect(p.getAttribute('data-panel')).toBe('automation');expect(p.getAttribute('data-run')).toBe('');});
+test('unknown project ids show a readable error instead of opening a different work',async()=>{await mount(<AICut/>,{projectId:'not-owned',timelineId:'alt'});expect(container.querySelector('[data-testid="cut-editor"]')).toBeNull();expect(container.textContent).toContain('不在当前账号目录');});
+test('CM deep link passes project id and task tab; script deep link passes history id',async()=>{await mount(<Detail/>,{key:'agent',taskId:'cm-project',tab:'tasks'});expect(container.querySelector('[data-testid="cm"]')?.getAttribute('data-project')).toBe('cm-project');expect(container.querySelector('[data-testid="cm"]')?.getAttribute('data-tab')).toBe('tasks');await act(async()=>h.load({key:'script',historyId:'history-1'}));expect(container.querySelector('[data-testid="script"]')?.getAttribute('data-history')).toBe('history-1');});

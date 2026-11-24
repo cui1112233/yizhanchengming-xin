@@ -37,6 +37,7 @@ describe("workspace current task state", () => {
     expect(selectCurrentTask("script", entries)?.id).toBe("current");
     expect(selectCurrentTask("comic", entries)).toBeUndefined();
   });
+  test('the execution workbench prefers an active task over a newer completed record',()=>{expect(selectCurrentTask('script',[task('script','new-done',{status:'completed'}),task('script','older-running')])?.id).toBe('older-running');});
 
   test("water production resumes either real production source in newest-first order", () => {
     expect(selectCurrentTask("shuihuo", [task("script", "other"), task("batch", "batch-work"), task("shuihuo", "manual")])?.id).toBe("batch-work");
