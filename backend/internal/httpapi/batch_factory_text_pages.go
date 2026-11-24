@@ -360,6 +360,11 @@ func (a textAPI) listAfterEdit(w http.ResponseWriter, x textRequest, previous []
 		return txt.ErrConflict
 	}
 	result := map[string]any{"document": d, "version": version, "sentenceBreaks": breaks, "pages": ps, "artifacts": views, "fonts": renderfont.Catalog()}
+	if desired, err := bookTextSnapshot(x); err == nil {
+		result["settingsSnapshot"] = desired
+	} else {
+		result["settingsError"] = "当前排版配置无效，请检查字号、边距和字体"
+	}
 	if previous != nil {
 		before := make(map[string]txt.Page, len(previous))
 		for _, p := range previous {

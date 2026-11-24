@@ -13,6 +13,7 @@ function describeN8DirectoryFailure(error) {
 	return { kind: 'upstream', message: detail || 'N8 目录服务读取失败，请稍后重试' };
 }
 export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBook = false, books = [], productionMode = 'comic' }) {
+  const [directoryRefresh,setDirectoryRefresh]=useState(0);
   const comicPublishSettings = value.comicPublishSettings || {};
 	const cachedDirectory = readComicPublishDirectoryCache();
 	const [producerAccounts, setProducerAccounts] = useState(cachedDirectory?.producerAccounts || []);
@@ -39,7 +40,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
   });
   useEffect(() => {
     let active = true;
-    setProducerAccountsLoading(!cachedDirectory);
+    setProducerAccountsLoading(true);
     getN8ComicPublishStatus({ silent: true, suppressGlobalError: true }).then(response => {
       if (!active) return;
       const nextAccounts = Array.isArray(response?.producerAccounts) ? response.producerAccounts : [];
@@ -65,7 +66,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
       setDirectoryFailureMessage(failure.message);
     }).finally(() => { if (active) setProducerAccountsLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [directoryRefresh]);
   const manualAudioMode = singleBook && comicPublishSettings.audioCategorySelectionMode === 'manual';
   const manualAudioReady = Boolean(singleBook && manualAudioMode && comicPublishSettings.organizationId && comicPublishSettings.audioCategoryId);
   const loadComicPublishAudios = async (organizationId, audioCategoryId, selectedCategory = {}) => {
@@ -97,6 +98,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
     || (directoryFailureKind === 'auth' ? '登录已失效，请重新登录' : '')
     || (directoryAvailable === false ? 'N8 目录服务未配置（服务器缺少 N8 后台登录令牌）' : '');
   return <Space className="batch-factory-publish-layout" direction="vertical" size={16} style={{ width: '100%' }}>
+    <div className="batch-factory-directory-status" role="status"><span>{producerAccountsLoading?'正在读取发布目录…':directoryFailureMessage || accountDirectoryHint || organizationsWarning || `发布目录已连接 · ${producerAccounts.length} 个账号 · ${organizations.length} 个组织`}</span><Button size="small" loading={producerAccountsLoading} onClick={()=>setDirectoryRefresh(n=>n+1)}>刷新目录</Button></div>
     {publishKeyConfigured === false
       ? <Alert type="info" showIcon message="发布密钥未配置：目录可以读取，但发布/上传不可用。请配置服务器环境变量 QIANTIE_N8_COMIC_OPEN_API_KEY 后重启服务。" />
       : null}

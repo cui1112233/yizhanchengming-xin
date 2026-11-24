@@ -36,3 +36,7 @@
  .batch-factory-publish-layout .batch-factory-env-status-row { grid-template-columns:minmax(0,1fr); }
  .batch-factory-publish-layout .batch-factory-vms-connection-card { display:flex; flex-direction:column; align-items:stretch; gap:12px; }
 }
+
+.text-layout-presets,.text-publish-restores,.batch-factory-directory-status{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}.batch-factory-directory-status{justify-content:space-between;color:var(--sh-muted);font-size:12px}.text-publish-restores:empty{display:none}
+
+.text-settings-preview{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}.text-settings-preview img{max-width:180px;max-height:240px;object-fit:contain;border-radius:6px}.text-settings-preview span{color:var(--sh-muted);font-size:12px}

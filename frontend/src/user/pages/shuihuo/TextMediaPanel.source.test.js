@@ -43,7 +43,8 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
       const mutations=[];
       let confirmRestore=false, confirmCount=0, releaseSave, single=true;
       let bookRevision=7, bookWrites=0, ready=false, collection, publishes=0;
-      window.confirm=()=>{confirmCount++;return confirmRestore};
+      let uploadSummary='';
+      window.confirm=message=>{if(message.startsWith('上传确认')){uploadSummary=message;return true}confirmCount++;return confirmRestore};
       window.fetch=async(path,opts)=>{
         requests.push([path,opts.method]); if(opts.method==='POST')mutations.push([path,opts.body]);
         let items=[];
@@ -165,6 +166,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         button('更新文字页').click();await until(()=>button('合成当前书')?.disabled===false);
         button('合成当前书').click();await until(()=>button('重新合成')&&button('上传网络')?.disabled===false);
         button('上传网络').click();await until(()=>button('再次上传'));
+        if(!uploadSummary.includes('作品：测试书') || !uploadSummary.includes('页数：'))throw Error('上传前未核对作品和页数');
         confirmRestore=false;button('再次上传').click();await sleep(50);if(publishes!==1)throw Error('取消后重复上传');
         confirmRestore=true;await until(()=>button('再次上传')?.disabled===false);button('再次上传').click();await sleep(100);
         await until(()=>publishes===2&&button('关闭文本媒体库')?.disabled===false);

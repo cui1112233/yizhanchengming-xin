@@ -8,8 +8,10 @@ import { producerAccountOptions } from './batchFactoryComicPublishAccounts';
 import { TEXT_PRODUCTION_SECTIONS, textProductionInitialSection, textProfileChanges } from './textProductionConfig';
 import TextBackgroundGallery from './TextBackgroundGallery.jsx';
 import './publish-settings.css';
+import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores} from './textLayoutTemplates.js';
 
 const SharedImagePublishSettings = lazy(() => import('./BatchFactoryImagePublishSettingsForm').then(module => ({default:module.BatchFactoryComicPublishSettingsForm})));
+const SettingsPreview = lazy(()=>import('./TextSettingsPreview.jsx'));
 
 function ColorPicker({ label, value, onChange }) {
   const [draft, setDraft] = useState(value);
@@ -38,7 +40,7 @@ function BackgroundPicker({value,items,onChange,onUploaded}) {
     try {
       const item=await uploadPersonalTextBackground(file);
       onUploaded(item);
-      onChange({kind:'library',id:item.id});
+      onChange({kind:'library',id:item.id,color:value?.color || '#111318'});
     } catch(error) {message.error(error.message || '背景上传失败');}
     finally {setBusy(false);}
   };
@@ -51,7 +53,7 @@ function BackgroundPicker({value,items,onChange,onUploaded}) {
 
 // All three entry points render this form. value is the resolved display
 // model while changes contain only the path the person actually touched.
-export default function TextProductionSettingsForm({value, explicitKeys=[], onChange, onRestore, scope='batch', open=true, activeSection='models'}) {
+export default function TextProductionSettingsForm({value, explicitKeys=[], onChange, onRestore, scope='batch', open=true, activeSection='models',batchId,bookId}) {
   const [tab,setTab]=useState(()=>textProductionInitialSection(activeSection));
   const [directory,setDirectory]=useState({});
   const [models,setModels]=useState([]);
@@ -146,13 +148,14 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
   const panel=section=><>{section.key==='publish' && <Suspense fallback={null}><SharedImagePublishSettings productionMode="text" singleBook={scope==='book'} value={{comicPublishSettings:sharedPublishValue}} onChange={next=>{
     const changes=Object.fromEntries(Object.entries(next.comicPublishSettings || {}).filter(([key,v])=>JSON.stringify(v)!==JSON.stringify(sharedPublishValue[key])).map(([key,v])=>['comicPublishSettings.'+key,v]));
     if(Object.keys(changes).length)onChange(changes);
-  }}/></Suspense>}<div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
+  }}/></Suspense>}{section.key==='publish' && scope==='book' && <div className="text-publish-restores">{publishOverrideRestores(explicitKeys).map(group=><Button key={group.label} size="small" onClick={()=>onChange(Object.fromEntries(group.keys.map(key=>[key,undefined])))}>{group.label} · 恢复继承</Button>)}</div>}{section.key==='layout' && <div className="text-layout-presets"><b>排版预设</b>{TEXT_LAYOUT_TEMPLATES.map(preset=><Button key={preset.id} onClick={()=>onChange(structuredClone(preset.values))}>{preset.label}</Button>)}<Button onClick={()=>onChange({textColor:'#222222'})}>深色文字</Button><Button onClick={()=>onChange({textColor:'#FFFFFF'})}>浅色文字</Button></div>}<div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
     {fieldGroups(section).map(group=><section className="batch-factory-engine-group" key={group.title || section.key}>
       {group.title ? <div className="batch-factory-engine-group-title">{group.title}</div> : null}
       {group.fields.map(renderField)}
     </section>)}
   </div></div></>;
   return <>{error && <Alert type="warning" showIcon message={error}/>}
+    {tab==='layout' && batchId && bookId && <Suspense fallback={null}><SettingsPreview key={batchId+bookId} batchId={batchId} bookId={bookId} value={value}/></Suspense>}
     <Tabs activeKey={tab} onChange={setTab} items={TEXT_PRODUCTION_SECTIONS.map(s=>({key:s.key,label:s.label,children:panel(s)}))}/>
   </>;
 }

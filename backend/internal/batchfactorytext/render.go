@@ -267,6 +267,7 @@ func layoutText(ctx context.Context, text string, c LayoutConfig, size image.Poi
 		return nil
 	}
 	runeIndex := 0
+	runes := []rune(text)
 	for _, r := range text {
 		if reading[runeIndex] && hasGlyph && r != '\n' {
 			if err := flush(); err != nil {
@@ -310,7 +311,27 @@ func layoutText(ctx context.Context, text string, c LayoutConfig, size image.Poi
 		}
 		right := max(line.right, x+advance, x+shape.bounds.Max.X+fixed.I(spread))
 		left := min(line.left, x+shape.bounds.Min.X)
-		if hasGlyph && right.Ceil()-left.Floor() > width {
+		// Keep an opening mark with its next character, and reserve space for
+		// closing marks following the current character. Measurement and painting
+		// use the same lookahead; original rune indexes never change.
+		reservedRight, reservedLeft := right, left
+		cursor, previous := x+advance, display
+		for j := runeIndex + 1; j < len(runes); j++ {
+			next := runes[j]
+			if next == '\n' || (!strings.ContainsRune("，。！？；：、）》】」』”’", next) && !strings.ContainsRune("（《【「『“‘", previous)) {
+				break
+			}
+			bounds, ad, ok := face.GlyphBounds(next)
+			if !ok {
+				break
+			}
+			cursor += face.Kern(previous, next)
+			reservedRight = max(reservedRight, cursor+ad, cursor+bounds.Max.X+fixed.I(spread))
+			reservedLeft = min(reservedLeft, cursor+bounds.Min.X)
+			cursor += ad
+			previous = next
+		}
+		if hasGlyph && reservedRight.Ceil()-reservedLeft.Floor() > width {
 			if err := flush(); err != nil {
 				return m, err
 			}

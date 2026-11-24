@@ -3,6 +3,7 @@ import { ConfigProvider, Select } from 'antd';
 import * as api from '../../../shared/api/batchFactoryText.js';
 import {layoutFields,pageControls} from './textMediaActions.js';
 import TextBackgroundGallery from './TextBackgroundGallery.jsx';
+import {TEXT_LAYOUT_TEMPLATES} from './textLayoutTemplates.js';
 
 export function useDraftPreview(batchId,bookId,session) {
   const [view,setView]=useState({});
@@ -56,8 +57,10 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     } catch(e){setBgError(e.message);} finally{onUploading(false);setFileBusy(false);}
   };
   return <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextPlaceholder:'var(--sh-muted)',colorBorder:'var(--sh-line)',controlItemBgActive:'var(--sh-panel-strong)',controlItemBgHover:'var(--sh-panel-strong)',colorPrimary:'var(--sh-accent)'}}}><fieldset className="text-page-editor" disabled={busy || fileBusy}>
-    <legend>{cover?'封面排版':'排版调整'}</legend>
+    <legend>{cover?'封面排版':'排版调整 · 仅本页'}</legend>
+    {!cover && <small className="text-editor-scope">字号和段距只调整本页内容，放不下的句子会顺延；不会从下一页补字。整书重排请在统一配置或单书配置中调整后重新分页。</small>}
     {!cover && <label>页面正文<textarea aria-label="页面正文" rows={6} value={draft.text} onChange={e=>{const text=e.target.value;onDraft(old=>({...old,text}));}}/></label>}
+    {!cover && <div className="text-layout-presets">{TEXT_LAYOUT_TEMPLATES.map(preset=><button key={preset.id} type="button" onClick={()=>onDraft(old=>({...old,layout:{...old.layout,...Object.fromEntries(Object.entries(preset.values).filter(([key])=>layoutFields[key]).map(([key,value])=>[layoutFields[key],value]))},background:{...preset.values.textBackground}}))}>{preset.label}</button>)}<button type="button" onClick={()=>setLayout('textColor','#222222')}>深色文字</button><button type="button" onClick={()=>setLayout('textColor','#FFFFFF')}>浅色文字</button></div>}
     <div className="text-layout-fields">{pageControls.filter(f=>!cover || ['fontId','fontSize','fontWeight','align','textColor'].includes(layoutFields[f.key])).map(f=>{
       const key=layoutFields[f.key], value=draft.layout[key];
       const opts=key==='fontId' && fonts?.length ? fonts.filter(v=>v.available!==false).map(v=>({value:v.id,label:f.options?.find(option=>option.value===v.id)?.label || v.name})) : f.options;
