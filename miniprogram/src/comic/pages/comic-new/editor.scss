@@ -129,3 +129,53 @@
   .comic-sheet-mask { background: rgba(0,0,0,.4); }
 }
 .mp-page.comic-new.comic-editor .ce-source-card.has-notice .ce-source-input { height: max(110PX, calc(100vh - 570PX - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+.mp-page.comic-new.comic-editor {
+  .comic-sheet { display: flex; flex-direction: column; box-sizing: border-box; max-height: 82vh; padding: 0 0 env(safe-area-inset-bottom); background: var(--comic-paper); border-radius: 24PX 24PX 0 0; overflow: hidden; box-shadow: 0 -8PX 40PX var(--ce-shadow); }
+  .comic-sheet-handle { flex-shrink: 0; width: 32PX; height: 4PX; margin: 10PX auto 8PX; border-radius: 4PX; background: var(--comic-line); }
+  .comic-setting-sheet-head, .ce-sheet-title, .comic-sheet-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; padding: 0 16PX; min-height: 44PX; border: 0; color: var(--comic-ink); font-size: 16PX; font-weight: 600; }
+  .comic-head-title { font-size: 16PX; line-height: 24PX; }
+  .comic-setting-sheet-head button, .ce-sheet-title button, .comic-sheet-close { display: flex; align-items: center; justify-content: center; min-height: 44PX; padding: 0 4PX; background: transparent; color: var(--comic-muted); font-size: 12PX; font-weight: 400; }
+  .ce-sheet-subtitle { display: block; flex-shrink: 0; padding: 0 16PX 16PX; color: var(--comic-muted); font-size: 12PX; line-height: 20PX; }
+  .ce-prompt-categories { display: flex; flex-shrink: 0; margin: 0 16PX 12PX; padding: 4PX; border: 0; border-radius: 12PX; background: var(--ce-raised); }
+  .ce-prompt-categories button { min-height: 36PX; padding: 0 3PX; color: var(--comic-muted); font-size: 12PX; border-radius: 9PX; }
+  .ce-prompt-categories .is-active { color: var(--comic-ink); background: var(--comic-paper); box-shadow: 0 1PX 4PX var(--ce-shadow); font-weight: 600; }
+  .comic-setting-sheet-list { height: 43vh; max-height: 43vh; min-height: 120PX; padding: 0 12PX; box-sizing: border-box; }
+  .comic-setting-group { padding: 0; margin: 0; }
+  .comic-setting-group-title { display: block; margin: 0; padding: 14PX 8PX 6PX; color: var(--comic-muted); font-size: 12PX; font-weight: 500; }
+  .comic-preset-choice.ce-option-row { display: flex; align-items: center; gap: 12PX; min-height: 72PX; box-sizing: border-box; margin: 0; padding: 12PX 8PX; border: 0; border-bottom: 1PX solid var(--comic-line); border-radius: 0; background: transparent; box-shadow: none; }
+  .comic-preset-choice.ce-option-row.is-active { border-bottom-color: transparent; border-radius: 12PX; background: var(--comic-soft); box-shadow: none; }
+  .comic-preset-copy { flex: 1; min-width: 0; }
+  .comic-preset-name { display: block; max-height: none; overflow: visible; white-space: normal; word-break: break-all; font-size: 14PX; font-weight: 600; line-height: 22PX; color: var(--comic-ink); }
+  .comic-caption { display: block; margin: 4PX 0 0; font-size: 12PX; line-height: 18PX; }
+  .ce-option-side { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 36PX; }
+  .ce-option-radio { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 20PX; height: 20PX; box-sizing: border-box; border: 1PX solid var(--comic-muted); border-radius: 50%; color: var(--comic-paper); }
+  .ce-option-radio.is-checked { border-color: var(--comic-accent); background: var(--comic-accent); color: var(--ce-canvas); }
+  .ce-option-detail-button { height: 28PX; min-height: 28PX; padding: 0; font-size: 11PX; color: var(--comic-muted); }
+  .ce-option-detail { display: block; padding-top: 8PX; color: var(--comic-muted); font-size: 12PX; line-height: 20PX; }
+  .ce-sheet-footer { flex-shrink: 0; padding: 14PX 16PX 12PX; border-top: 1PX solid var(--comic-line); background: var(--comic-paper); }
+  .ce-sheet-note { display: block; margin-bottom: 12PX; color: var(--comic-muted); font-size: 11PX; line-height: 18PX; }
+  .ce-sheet-confirm { width: 100%; display: flex; align-items: center; justify-content: center; min-height: 44PX; background: #28c9b9; color: var(--comic-on-button); border-radius: 12PX; font-size: 14PX; font-weight: 500; }
+  .ce-sheet-empty { display: block; padding: 24PX 8PX; color: var(--comic-muted); font-size: 13PX; }
+  .ce-sheet-scroll { flex-shrink: 1; height: 46vh; max-height: 46vh; padding: 0 16PX 16PX; }
+  .ce-choice-sheet.is-ratio .ce-sheet-scroll { height: 176PX; }
+  .ce-style-grid { gap: 12PX; }
+  .ce-style-grid button { padding: 6PX; border: 1PX solid var(--comic-line); border-radius: 12PX; background: transparent; text-align: left; }
+  .ce-style-grid .is-selected { border-color: var(--comic-accent); background: var(--comic-soft); box-shadow: none; }
+  .ce-style-label { display: flex; gap: 6PX; align-items: center; justify-content: space-between; padding: 8PX 2PX 2PX; }
+  .ce-style-label text { flex: 1; font-size: 12PX; line-height: 18PX; }
+  .comic-aspect-grid { gap: 10PX; }
+  .comic-aspect-choice { display: flex; position: relative; flex-direction: column; align-items: center; justify-content: center; gap: 6PX; min-height: 72PX; padding: 8PX 4PX; background: var(--ce-raised); border: 1PX solid transparent; border-radius: 10PX; font-size: 12PX; line-height: 18PX; }
+  .comic-aspect-choice.is-active { background: var(--comic-soft); border-color: var(--comic-accent); color: var(--comic-accent); }
+  .ce-ratio-outline { width: 18PX; height: 22PX; border: 1PX solid currentColor; border-radius: 2PX; }
+  .comic-sheet-body { padding: 12PX 16PX 16PX; }
+  .comic-sheet-body > .comic-hint { margin-top: 0; }
+  .comic-reference { width: 100%; max-height: 230PX; margin: 16PX 0; object-fit: contain; border: 1PX solid var(--comic-line); border-radius: 12PX; }
+  .comic-sheet-actions { display: flex; gap: 12PX; margin-top: 16PX; }
+  .comic-sheet-actions .mp-secondary { min-height: 44PX; border: 1PX solid var(--comic-line); border-radius: 12PX; font-size: 14PX; }
+}
+.mp-page.comic-new.comic-editor {
+  .ce-check-glyph { color: var(--ce-canvas); font-size: 14PX; line-height: 18PX; font-weight: 700; }
+  .ce-ratio-check { position: absolute; top: 4PX; right: 6PX; font-size: 12PX; }
+  .comic-setting-sheet-list { margin-top: 0; }
+  .ce-reference-empty { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10PX; min-height: 150PX; margin: 16PX 0; border: 1PX dashed var(--comic-muted); border-radius: 14PX; background: var(--ce-raised); color: var(--comic-muted); font-size: 13PX; }
+}

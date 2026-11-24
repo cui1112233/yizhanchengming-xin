@@ -951,7 +951,8 @@ export default function ComicPrivatePage() {
         onStyleChange={(styleId) => patch({ styleId })}
         onAspectChange={(aspectRatio) => patch({ aspectRatio })}
         onPresetChange={(selectedPresetId) => patch({ selectedPresetId })}
-        onSettingSelectionChange={(key, value) => patch({ settingSelections: { ...state.settingSelections, [key]: value } })}
+        onSettingSelectionChange={(key, value) => setState(prev => ({...prev, settingSelections: {...prev.settingSelections, [key]: value}}))}
+        onConfirmSettingSelections={(values) => setState(prev => ({ ...prev, settingSelections: { ...prev.settingSelections, ...values } }))}
         onToggleAdvanced={() => patch({ advancedOpen: !state.advancedOpen })}
         onOpenSettingPicker={(settingPicker) => patch({ settingPicker })}
         onCloseSettingPicker={() => patch({ settingPicker: "" })}

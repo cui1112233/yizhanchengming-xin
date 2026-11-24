@@ -449,7 +449,7 @@ describe("私人定制漫画页", () => {
     const modelCard = findSetting("模型配置");
     modelCard.props.onClick();
     findByText(render(), "真实图片模型").props.onClick();
-    findByText(render(), "取消").props.onClick();
+    findByText(render(), "使用此配置").props.onClick();
     const selectedModelCard = findSetting("模型配置");
     expect(nodesOfType(rawRender(), ComicSettingsStage)[0].props.settingSelections.imageModelId).toBe("image-real");
     expect(textContent(selectedModelCard)).not.toContain("image-real");
@@ -458,6 +458,20 @@ describe("私人定制漫画页", () => {
     expect(h.create).toHaveBeenCalledWith(expect.objectContaining({
       initialBatchSettings: expect.objectContaining({ imageAspectRatio: "3:4", imageModelId: "image-real", imageProvider: "doubao" }),
     }));
+  });
+
+  test("选择面板暂存跨分类选择，取消不改变配置，确认一起保存", async () => {
+    render(); runEffects(); await flush();
+    findSetting("漫画提示词").props.onClick();
+    findByText(render(), "现代条漫分页").props.onClick();
+    expect(nodesOfType(rawRender(), ComicSettingsStage)[0].props.settingSelections.pagePromptId).toBeUndefined();
+    findByText(render(), "取消").props.onClick();
+    findSetting("漫画提示词").props.onClick();
+    findByText(render(), "现代条漫分页").props.onClick();
+    findByText(render(), "图片描述词推导").props.onClick();
+    findByText(render(), "电影感图片推导").props.onClick();
+    findByText(render(), "使用此提示词").props.onClick();
+    expect(nodesOfType(rawRender(), ComicSettingsStage)[0].props.settingSelections).toMatchObject({pagePromptId: "page-modern", imageDerivationId: "derive-cinema"});
   });
 
   test("四类设置分别写入自己的提交字段，不会整套预设一起替换", async () => {
@@ -470,17 +484,19 @@ describe("私人定制漫画页", () => {
     };
     openSetting("漫画提示词");
     findByText(render(), "现代条漫分页").props.onClick();
+    findByText(render(), "使用此提示词").props.onClick();
     openSetting("图片描述词推导");
     findByText(render(), "电影感图片推导").props.onClick();
+    findByText(render(), "使用此提示词").props.onClick();
     openSetting("模型配置");
     findByText(render(), "真实文本模型").props.onClick();
     findByText(render(), "真实图片模型").props.onClick();
-    findByText(render(), "取消").props.onClick();
+    findByText(render(), "使用此配置").props.onClick();
     openSetting("画质与约束");
     findByText(render(), "高清细节").props.onClick();
     findByText(render(), "安全构图").props.onClick();
     findByText(render(), "无水印无乱码").props.onClick();
-    findByText(render(), "取消").props.onClick();
+    findByText(render(), "使用此提示词").props.onClick();
 
     primaryButton(render()).props.onClick();
     await flush();
@@ -716,7 +732,7 @@ describe("私人定制漫画页", () => {
     const openModel = () => findSetting("模型配置")!.props.onClick();
     openModel();
     findByText(render(), "真实图片模型").props.onClick();
-    findByText(render(), "取消").props.onClick();
+    findByText(render(), "使用此配置").props.onClick();
     primaryButton(render()).props.onClick(); await flush();
 
     findByText(render(), "正文").props.onClick();
