@@ -54,8 +54,8 @@ export const TEXT_PRODUCTION_SECTIONS = [
       ['audioCategorySelectionMode','auto'],['audioCategoryId',null],['audioCategoryName',''],['audioCandidates',[]],
       ['specifiedAudioId',''],['specifiedAudioName',''],['workMatchMode','title_auto']
     ].map(([key,initial])=>field('comicPublishSettings.'+key,key,'publishShared',initial)),
-    field('publishSettings.websiteProfileId','网站配置档','profile',''),
-    field('publishSettings.bookCategory','书籍分类','input',''),
+    field('publishSettings.websiteProfileId','网站配置档','profile','',{hidden:true}),
+    field('publishSettings.bookCategory','书籍分类','input','',{hidden:true}),
     field('textAutoCollection','自动生成合集','switch',true),
     field('textAutoUpload','自动上传','switch',false),
     field('textUploadRetryLimit','上传失败重试次数','number',3,{min:0,max:10})

@@ -401,21 +401,10 @@ func (t textCollectionPublisher) resolveMapping(ctx context.Context, r *cp.Publi
 	if err != nil {
 		return fmt.Errorf("%w：请先配置文本上传人和组织", cp.ErrInvalid)
 	}
-	var website map[string]any
-	if raw := settings["publishSettings"]; len(raw) > 0 {
-		if err = json.Unmarshal(raw, &website); err != nil {
-			return cp.ErrInvalid
-		}
-	}
 	r.Producer = strings.TrimSpace(config.ProducerAdminName)
 	r.OrganizationID = strings.TrimSpace(config.OrganizationID)
-	r.CategoryID = strings.TrimSpace(toString(website["bookCategory"]))
-	r.WebsiteProfileID = strings.TrimSpace(toString(website["websiteProfileId"]))
-	if r.Producer == "" || r.OrganizationID == "" || r.CategoryID == "" || r.WebsiteProfileID == "" {
-		return fmt.Errorf("%w：请在文本发布配置中填写上传人、组织、网站配置档和书籍分类", cp.ErrInvalid)
-	}
-	if profile := selectedPublishProfile(website); profile == nil {
-		return fmt.Errorf("%w：所选网站配置档不存在，请重新同步并选择", cp.ErrInvalid)
+	if r.Producer == "" || r.OrganizationID == "" {
+		return fmt.Errorf("%w：请在文本发布配置中填写上传人和组织", cp.ErrInvalid)
 	}
 	p := t.n8
 	names, _, warning, orgs := p.producerDirectorySnapshot(ctx)

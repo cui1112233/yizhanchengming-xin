@@ -66,11 +66,27 @@ func (f *textPublishTestClient) Readback(_ context.Context, in n8comic.ReceiptLo
 	return n8comic.PublishResult{}, nil
 }
 
+func TestTextPublishSettingsIgnoreLegacyWebsiteMapping(t *testing.T) {
+	settings := batchfactoryv11.SettingsPatch{"comicPublishSettings": json.RawMessage(`{"producerAdminName":"maker","organizationId":"1","audioCategoryId":3,"audioId":77,"workIds":[45]}`)}
+	before, err := workflowPublishSettingsKey(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings["publishSettings"] = json.RawMessage(`{"websiteProfileId":"old-site","bookCategory":"旧分类"}`)
+	after, err := workflowPublishSettingsKey(settings)
+	if err != nil || before != after {
+		t.Fatalf("legacy fields changed upload routing: %v", err)
+	}
+	if err := cp.ValidateMapping(cp.PublishRequest{Kind: cp.CollectionKindText, Producer: "maker", OrganizationID: "1", AudioCategoryID: 3, AudioID: 77, WorkIDs: []int64{45}}); err != nil {
+		t.Fatalf("valid shared mapping rejected: %v", err)
+	}
+}
+
 func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 	ctx := context.Background()
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
-	settings := batchfactoryv11.SettingsPatch{"productionMode": json.RawMessage(`"text"`), "comicPublishSettings": json.RawMessage(`{"producerAdminName":"maker","organizationId":"1","audioCategoryId":3,"audioId":77,"workIds":[45]}`), "publishSettings": json.RawMessage(`{"websiteProfileId":"121-1","websiteProfiles":[{"id":"121-1"}],"bookCategory":"小说"}`)}
+	settings := batchfactoryv11.SettingsPatch{"productionMode": json.RawMessage(`"text"`), "comicPublishSettings": json.RawMessage(`{"producerAdminName":"maker","organizationId":"1","audioCategoryId":3,"audioId":77,"workIds":[45]}`)}
 	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "批次", InitialBatchSettings: settings, Books: []batchfactoryv11.CreateBookInput{{Title: "作品"}}})
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +186,7 @@ func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 	if first.Publish.RunID != "run-1" || first.Publish.Attempt != 1 || first.Publish.RequestKey != "request-1" {
 		t.Fatal(first.Publish)
 	}
-	if !first.Published || first.Publish.CarouselID != 19 || first.Publish.CategoryID != "小说" || first.Publish.OrganizationID != "1" || len(client.images) != 3 || !bytes.Equal(client.images[0].Content, pageData) || !bytes.Equal(client.images[1].Content, pageData2) || !bytes.Equal(client.images[2].Content, pageData3) {
+	if !first.Published || first.Publish.CarouselID != 19 || first.Publish.CategoryID != "" || first.Publish.OrganizationID != "1" || len(client.images) != 3 || !bytes.Equal(client.images[0].Content, pageData) || !bytes.Equal(client.images[1].Content, pageData2) || !bytes.Equal(client.images[2].Content, pageData3) {
 		t.Fatal(first, client.images)
 	}
 	if g := call("POST", map[string]any{}); g.Publish.IntentID != first.Publish.IntentID || client.calls != 1 {

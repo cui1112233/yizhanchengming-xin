@@ -10,7 +10,7 @@ import { build } from 'esbuild';
 const browser = [process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(path => path && existsSync(path));
 
-test('文本统一配置可同步选档，关闭再打开显示保存的名称与生产失败说明', {skip:!browser}, async () => {
+test('文本发布复用漫画配置，不显示旧网站映射，自动发布选项保存后保留', {skip:!browser}, async () => {
   const dir = mkdtempSync(join(tmpdir(),'text-settings-browser-'));
   try {
     const bundle = await build({
@@ -65,28 +65,20 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
           document.body.click();
           const publish=()=>waitFor(()=>byText('[role=tab]','发布配置'),'publish tab');
           (await publish()).click();
-          const publishGroup=await waitFor(()=>byText('.batch-factory-engine-group-title','发布映射'),'publish group');
-          document.body.dataset.step='publish';
+          const publishGroup=await waitFor(()=>byText('.batch-factory-engine-group-title','自动发布'),'publish group');
           const publishFields=[...publishGroup.closest('.batch-factory-engine-card').querySelectorAll('.batch-factory-engine-field')];
-          if(publishFields.length!==5) throw Error('text upload controls escaped the shared grid');
+          if(publishFields.length!==3) throw Error('automatic publish field count');
+          if(document.body.textContent.includes('发布映射') || document.querySelector('[aria-label="网站配置档"]') || byText('button','同步网站配置档'))throw Error('legacy website mapping still visible');
           await waitFor(()=>document.body.textContent.includes('文案来源') && document.body.textContent.includes('音频匹配方式') && document.body.textContent.includes('作品匹配方式'),'shared image publish controls');
-          (await waitFor(()=>byText('button','同步网站配置档'),'sync button')).click();
-          await waitFor(()=>window.synced,'sync request');
-          document.body.dataset.step='synced';
-          const combo=await waitFor(()=>document.querySelector('[aria-label="网站配置档"]'),'profile field');
-          combo.closest('.ant-select').querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-          (await waitFor(()=>byText('.ant-select-item-option-content','8个解压'),'profile option')).click();
-          await waitFor(()=>document.querySelector('.ant-select-selection-item[title="8个解压"]'),'selected label');
-          document.body.dataset.step='selected';
+          document.querySelector('[aria-label="自动上传"]').click();
+          await waitFor(()=>document.querySelector('[aria-label="自动上传"]')?.getAttribute('aria-checked')==='true','auto upload enabled');
           document.querySelector('#toggle').click();
           await waitFor(()=>!document.querySelector('[role=tab]'),'closing dialog');
           document.querySelector('#toggle').click();
           (await publish()).click();
-          document.body.dataset.step='reopened';
-          await waitFor(()=>document.querySelector('.ant-select-selection-item[title="8个解压"]'),'label on reopen');
-          const saved=JSON.parse(window.saved).publishSettings;
+          await waitFor(()=>document.querySelector('[aria-label="自动上传"]')?.getAttribute('aria-checked')==='true','upload flag on reopen');
           if(!JSON.parse(window.saved).textHighlightRules.includes('dialogue') || JSON.parse(window.saved).textHighlightLines!=='1,3')throw Error('highlight rules not persisted');
-          if(saved.organization!=='7' || saved.websiteProfileId!=='121-8' || window.synced!==1) throw Error('saved mapping');
+          if(!JSON.parse(window.saved).textAutoUpload || window.synced)throw Error('unexpected profile sync or missing upload flag');
           document.body.dataset.result='passed';
         }
         run().catch(err=>{ document.body.dataset.error=err.message; });

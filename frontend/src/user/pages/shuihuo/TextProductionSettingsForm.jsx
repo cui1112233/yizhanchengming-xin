@@ -1,12 +1,9 @@
 import ColorPicker from './TextColorPicker.jsx';
-import { Alert, Button, Input, InputNumber, Select, Switch, Tabs, message } from 'antd';
+import { Alert, Button, Input, InputNumber, Select, Switch, Tabs } from 'antd';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { describeModelCatalogFailure, getAvailableModelCatalog, modelSelectOptions } from '../../../shared/api/modelCatalog';
-import { getN8ComicPublishStatus } from '../../../shared/api/batchFactoryV12';
-import { syncWebSubmitConfigs } from '../../../shared/api/novelFetch';
 import { listPersonalTextBackgrounds, uploadPersonalTextBackground } from '../../../shared/api/batchFactoryText';
-import { producerAccountOptions } from './batchFactoryComicPublishAccounts';
-import { TEXT_PRODUCTION_SECTIONS, textProductionInitialSection, textProfileChanges } from './textProductionConfig';
+import { TEXT_PRODUCTION_SECTIONS, textProductionInitialSection } from './textProductionConfig';
 import TextBackgroundGallery from './TextBackgroundGallery.jsx';
 import './publish-settings.css';
 import {TEXT_LAYOUT_TEMPLATES,publishOverrideRestores,textColorScheme,lightTextChanges} from './textLayoutTemplates.js';
@@ -32,18 +29,10 @@ function BackgroundPicker({value,items,onChange,onUploaded}) {
 // model while changes contain only the path the person actually touched.
 export default function TextProductionSettingsForm({value, explicitKeys=[], onChange, onRestore, scope='batch', open=true, activeSection='models',batchId,bookId}) {
   const [tab,setTab]=useState(()=>textProductionInitialSection(activeSection));
-  const [directory,setDirectory]=useState({});
   const [models,setModels]=useState([]);
   const [backgrounds,setBackgrounds]=useState([]);
-  const [syncedProfiles,setSyncedProfiles]=useState(null);
   const [error,setError]=useState('');
   const [modelRetry,setModelRetry]=useState(0);
-  const [syncing,setSyncing]=useState(false);
-  const profileId = 'publishSettings.websiteProfileId';
-  const profiles = syncedProfiles ?? value['publishSettings.websiteProfiles'] ?? [];
-  useEffect(() => {
-    if (!open) setSyncedProfiles(null);
-  }, [open]);
   useEffect(()=>{
     if (!open) return;
     let alive=true;
@@ -54,37 +43,14 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
       setError(describeModelCatalogFailure(catalog));
     })
       : tab==='layout' ? listPersonalTextBackgrounds().then(x=>{if(alive)setBackgrounds(x.items || []);})
-      : getN8ComicPublishStatus({silent:true,suppressGlobalError:true}).then(x=>{if(alive)setDirectory(x || {});});
+      : Promise.resolve();
     load.catch(e=>{if(alive)setError(e.message || '目录读取失败，请稍后重试');});
     return ()=>{alive=false;};
   },[tab,open,modelRetry]);
-  const syncProfiles=async()=>{
-    setSyncing(true);
-    try {
-      const result = await syncWebSubmitConfigs({persist:false});
-      if (!Array.isArray(result.groups)) throw new Error('网站配置档目录格式错误');
-      const changes = textProfileChanges(result.groups,value[profileId]);
-      setSyncedProfiles(changes['publishSettings.websiteProfiles']);
-      if (scope !== 'book' || explicitKeys.includes(profileId)) {
-        onChange(changes);
-        if (value[profileId] && !changes[profileId]) message.warning('原网站配置档已失效，请重新选择');
-      }
-    }
-    catch(e){message.error(e.message || '网站配置档同步失败');}
-    finally{setSyncing(false);}
-  };
-  const choices=field=>{
-    switch(field.type){
-      case 'model': case 'models':return models;
-      case 'producer':return producerAccountOptions(directory.producerAccounts,value[field.key],value['comicPublishSettings.organizationId'],directory.producerAccountOrganizations);
-      case 'organization':return (directory.organizations || []).map(o=>({value:String(o.id),label:o.name || String(o.id)}));
-      case 'profile':return profiles.map(p=>({value:String(p.id),label:p.name || String(p.id)}));
-      default:return field.options;
-    }
-  };
+  const choices=field=>field.type==='model' || field.type==='models' ? models : field.options;
   const control=field=>{
     const v=value[field.key];
-    const set=next=>onChange(field.type==='profile' ? textProfileChanges(profiles,next) : {[field.key]:next});
+    const set=next=>onChange({[field.key]:next});
     const attrs={'aria-label':field.label};
     if(field.type==='highlightRules')return <TextHighlightRuleSelect value={v} legacyKeywords={value.highlightReuseEnabled} onChange={next=>onChange({textHighlightRules:next,...(next.split(',').includes('lines')?{textHighlightLines:value.textHighlightLines || '1,3'}:{})})}/>;
     if(field.type==='background')return <BackgroundPicker value={v} items={backgrounds} onChange={set} onUploaded={item=>setBackgrounds(old=>[item,...old.filter(x=>x.id!==item.id)])}/>;
@@ -109,17 +75,15 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
       {title:'背景与标题',fields:section.fields.filter(field=>field.key==='textBackground' || field.key.startsWith('textCover.'))}
     ];
     if(section.key==='publish') return [
-      {title:'发布映射',fields:section.fields.filter(field=>field.key.startsWith('publishSettings.'))},
       {title:'自动发布',fields:section.fields.filter(field=>field.key.startsWith('text'))}
     ];
     return [{title:'',fields:section.fields}];
   };
   const renderField=field=>{
       const own=explicitKeys.includes(field.key);
-      const action=field.type==='profile' ? <Button size="small" loading={syncing} onClick={syncProfiles}>同步网站配置档</Button> : null;
       return <div className={`batch-factory-engine-field${field.type==='switch' ? ' is-switch-row' : ''}`} key={field.key}>
         <span><b>{field.label}</b>{scope==='book' && own && <small> · 本书覆盖</small>}</span>
-        {action ? <div className="batch-factory-engine-control-with-action">{control(field)}{action}</div> : control(field)}
+        {control(field)}
         {scope==='book' && own && <Button className="batch-factory-field-restore" size="small" type="link" onClick={()=>onRestore(field.key)}>恢复继承</Button>}
       </div>;
   };

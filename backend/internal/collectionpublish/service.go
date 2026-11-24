@@ -53,9 +53,6 @@ func ValidateMapping(r PublishRequest) error {
 		if strings.TrimSpace(r.OrganizationID) == "" {
 			missing = append(missing, "组织")
 		}
-		if strings.TrimSpace(r.CategoryID) == "" {
-			missing = append(missing, "书籍分类")
-		}
 	}
 	if r.AudioCategoryID <= 0 {
 		missing = append(missing, "音频分类")

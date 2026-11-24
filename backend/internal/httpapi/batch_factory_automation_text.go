@@ -191,8 +191,7 @@ func matchingWorkflowPublishAttempt(rec cp.Record, run batchfactoryv11.BookStage
 	return hasRun || hasAttempt || hasKey
 }
 
-// A directory sync can change many profiles. Only the selected profile and
-// the choices consumed by the text publisher identify this upload attempt.
+// Only routing choices consumed by the image publisher identify this upload attempt.
 func workflowPublishSettingsKey(settings batchfactoryv11.SettingsPatch) (string, error) {
 	var config n8ComicPublishSettings
 	var err error
@@ -202,15 +201,7 @@ func workflowPublishSettingsKey(settings batchfactoryv11.SettingsPatch) (string,
 			return "", err
 		}
 	}
-	var website map[string]any
-	if raw := settings["publishSettings"]; len(raw) > 0 {
-		if err := json.Unmarshal(raw, &website); err != nil {
-			return "", err
-		}
-	}
-	profile := selectedPublishProfile(website)
 	selected, err := json.Marshal([]any{
-		website["websiteProfileId"], website["bookCategory"], profile["id"], profile["config_id"],
 		config.ProducerAdminName, config.OrganizationID, config.AudioCategoryID, config.AudioCategoryName,
 		config.AudioCategorySelectionMode, config.AudioID, config.SpecifiedAudioID,
 		config.WorkIDs, config.WorkIDsText, config.WorkMatchMode,
