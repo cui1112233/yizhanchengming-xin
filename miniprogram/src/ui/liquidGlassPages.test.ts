@@ -46,11 +46,17 @@ test('functions keeps card glow restrained like the approved reference', () => {
 
 test('profile applies glass to grouped surfaces rather than every setting row', () => {
   const source = read('../pages/profile/index.tsx');
+  const style = read('../pages/profile/parity.scss');
   expect(source).toContain('mp-profile-hero liquid-glass--primary');
   expect(source).toContain('profile-space-quota liquid-glass--secondary');
   expect(source).toContain('profile-space-list liquid-glass--list');
   expect(source).toContain('profile-space-transparency liquid-glass--list');
   expect(source).not.toContain('profile-space-row liquid-glass');
+  expect(style).toContain('@keyframes profile-petal-drift-a');
+  expect(style).toContain('@keyframes profile-petal-drift-b');
+  expect(style).toContain('@keyframes profile-petal-drift-c');
+  expect(style).toContain('.profile-space-identity.is-reduced-motion .profile-space-petal');
+  expect(style).toContain('@media (prefers-reduced-motion: reduce)');
 });
 
 test('profile detail opts summary cards into secondary glass explicitly', () => {
