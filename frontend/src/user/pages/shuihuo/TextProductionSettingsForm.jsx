@@ -1,4 +1,4 @@
-import { Alert, Button, Input, InputNumber, Select, Space, Switch, Tabs, Upload, message } from 'antd';
+import { Alert, Button, ColorPicker as ThemeColorPicker, ConfigProvider, Input, InputNumber, Select, Space, Switch, Tabs, Upload, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { getAvailableModelCatalog, modelSelectOptions } from '../../../shared/api/modelCatalog';
 import { getN8ComicPublishStatus } from '../../../shared/api/batchFactoryV12';
@@ -15,7 +15,12 @@ function ColorPicker({ label, value, onChange }) {
     if (/^#[0-9a-f]{6}$/i.test(color)) onChange(color);
   }
   return <Space>
-    <input type="color" aria-label={label} value={value} onChange={event => edit(event.target.value)} />
+    <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextSecondary:'var(--sh-muted)',colorBorder:'var(--sh-line)',colorPrimary:'var(--sh-accent)'}}}>
+      <ThemeColorPicker value={value} disabledAlpha format="hex" rootClassName="batch-factory-theme-color-picker"
+        getPopupContainer={trigger => trigger.parentElement} onChange={color => edit(color.toHexString())}>
+        <button type="button" className="batch-factory-color-trigger" aria-label={label} style={{'--selected-color':value}}><i /></button>
+      </ThemeColorPicker>
+    </ConfigProvider>
     <Input aria-label={label+'色值'} value={draft} maxLength={7} style={{width: 100}}
       onChange={event => edit(event.target.value)} onBlur={() => setDraft(value)} />
   </Space>;

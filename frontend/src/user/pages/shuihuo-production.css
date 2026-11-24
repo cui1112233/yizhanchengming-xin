@@ -756,6 +756,10 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-preset-option small { color:var(--sh-muted); flex:none; font-size:11px; }
 .batch-factory-engine-field .ant-select, .batch-factory-engine-field .ant-input, .batch-factory-engine-field .ant-input-number { max-width:300px; }
 .batch-factory-settings-card{gap:0!important;padding:14px!important;border-radius:12px!important;background:var(--sh-panel)!important}
+.batch-factory-color-trigger{display:grid;place-items:center;flex:none;width:36px;height:34px;padding:5px;border:1px solid var(--sh-line);border-radius:8px;background:var(--sh-panel-strong);cursor:pointer}
+.batch-factory-color-trigger i{display:block;width:100%;height:100%;border:1px solid var(--sh-line);border-radius:4px;background:var(--selected-color)}
+.batch-factory-color-trigger:hover,.batch-factory-color-trigger:focus-visible{border-color:var(--sh-accent);outline:2px solid color-mix(in srgb,var(--sh-accent) 20%,transparent);outline-offset:1px}
+.batch-factory-theme-color-picker .ant-popover-inner{color:var(--sh-text);border:1px solid var(--sh-line);border-radius:12px;background:var(--sh-panel);box-shadow:0 12px 36px #0005}
 .batch-factory-settings-card .batch-factory-engine-card-body{gap:0}
 .batch-factory-engine-group{display:grid;grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px;min-width:0}
 .batch-factory-engine-group+.batch-factory-engine-group{padding-top:14px;margin-top:14px;border-top:1px solid var(--sh-line)}
