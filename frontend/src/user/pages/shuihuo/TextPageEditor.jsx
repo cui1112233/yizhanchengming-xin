@@ -67,7 +67,7 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     <div className="text-layout-fields">
       <label>背景色<input type="color" value={draft.background.color || '#111318'} onChange={e=>setBackground({kind:'color',color:e.target.value})}/></label>
       <label>背景图库<select aria-label="背景图库" value={draft.background.id || ''} onChange={e=>setBackground(e.target.value ? {kind:'library',id:e.target.value}:{kind:'color',color:'#111318'})}>
-        <option value="">{bgLoading?'正在读取…':'纯色背景'}</option>{items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></label>
+        <option value="">{bgLoading?'正在读取…':'纯色背景'}</option><optgroup label="我的图库">{items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</optgroup></select></label>
     </div>
     <label className="text-upload-input">上传背景图<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files[0];e.target.value='';void upload(file);}}/></label>
     {bgError && <p role="alert">{bgError}</p>}
