@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import BrandHeader from "../../components/BrandHeader";
 import AppIcon from "../../components/AppIcon";
 import { profileFacts, type PublicMemberCenter } from "../../config/profileData";
-import { apiRequest, apiUrl } from "../../config/runtime";
+import { apiUrl } from "../../config/runtime";
+import { apiRequest } from "../../services/api";
 import { readMemberProfile } from "../../services/memberProfile";
 import { profileQuota, profileTaskMetrics } from "../../services/profileOverview";
 import { uploadProfileAvatar } from "../../services/profileEditor";
@@ -80,7 +81,8 @@ export default function ProfilePage() {
     setLoading(true);
     setDiagnostic({ phase: "request-started", failure: "none", elapsedMs: 0 });
     const current = () => mounted.current && activeAttempt.current === attempt && sessionRevision() === revision;
-    void loadTaskSummary(apiRequest).then(result => { if (current()) setTaskSummary(result); }).catch(() => { if (current()) setTaskSummary(undefined); });
+    const taskCurrent = () => mounted.current && nextAttempt.current === attempt && sessionRevision() === revision;
+    void loadTaskSummary(apiRequest).then(result => { if (taskCurrent()) setTaskSummary(result); }).catch(() => { if (taskCurrent()) setTaskSummary(undefined); });
     clearTimeout(watchdog.current);
     watchdog.current = setTimeout(() => {
       if (!current()) return;
@@ -195,7 +197,7 @@ export default function ProfilePage() {
               <View className="profile-space-metrics"><View><AppIcon name="clapperboard" size={17} /><Text className="profile-space-metric-value">{taskMetrics.running ?? "—"}</Text><Text>进行中</Text></View><View className="profile-space-metric-divider" /><View><AppIcon name="shield-check" size={17} /><Text className="profile-space-metric-value">{taskMetrics.completed ?? "—"}</Text><Text>已完成</Text></View></View>
             </View>
           </View>
-          <Button className="profile-space-quota" onClick={() => openDetail("usage")}><Image className="profile-space-quota-icon" src={membershipIcon} mode="aspectFit" /><View className="profile-space-quota-copy"><Text className="profile-space-quota-title">创作额度</Text><Text className="profile-space-quota-value">{quota.value}</Text><Text className="profile-space-quota-caption">{quota.caption}</Text></View><View className="profile-space-quota-link"><Text>查看详情</Text><AppIcon name="chevron-right" size={16} /></View></Button>
+          <Button className="profile-space-quota liquid-glass--secondary" data-glass-role="secondary" onClick={() => openDetail("usage")}><Image className="profile-space-quota-icon" src={membershipIcon} mode="aspectFit" /><View className="profile-space-quota-copy"><Text className="profile-space-quota-title">创作额度</Text><Text className="profile-space-quota-value">{quota.value}</Text><Text className="profile-space-quota-caption">{quota.caption}</Text></View><View className="profile-space-quota-link"><Text>查看详情</Text><AppIcon name="chevron-right" size={16} /></View></Button>
           <View className="profile-space-list liquid-glass--list">{menuRows.map(row => <Button className={`profile-space-row profile-space-${row.key}${row.key === "preference" ? " studio-appearance-entry" : ""}`} key={row.key} onClick={row.action}><Image className="profile-space-row-icon" src={row.icon} mode="aspectFit" /><View className="profile-space-row-copy"><Text className="profile-space-row-title">{row.title}</Text><Text className="profile-space-row-description">{row.description}</Text></View><AppIcon name="chevron-right" size={18} className="profile-space-row-arrow" /></Button>)}</View>
           <View className="profile-space-transparency liquid-glass--list"><Image className="profile-space-transparency-icon" src={transparencyIcon} mode="aspectFit" /><View className="profile-space-transparency-copy"><Text className="profile-space-row-title">降低透明度</Text><Text className="profile-space-row-description">减少界面透明效果，获得更清晰的显示</Text></View><Switch ariaLabel="降低透明度" checked={reducedGlass} color="#50eadc" onChange={event => setReducedTransparency(event.detail.value)} /></View>
           {diagnostic.failure !== "none" ? <View className="mp-profile-inline-error"><Text className="mp-error">{failureLabels[diagnostic.failure]}</Text></View> : null}

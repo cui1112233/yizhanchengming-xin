@@ -47,9 +47,10 @@ test('functions keeps card glow restrained like the approved reference', () => {
 test('profile applies glass to grouped surfaces rather than every setting row', () => {
   const source = read('../pages/profile/index.tsx');
   expect(source).toContain('mp-profile-hero liquid-glass--primary');
-  expect(source).toContain('mp-usage-card liquid-glass--secondary');
-  expect(source).toContain('mp-profile-section liquid-glass--list');
-  expect(source).not.toContain('mp-profile-item liquid-glass');
+  expect(source).toContain('profile-space-quota liquid-glass--secondary');
+  expect(source).toContain('profile-space-list liquid-glass--list');
+  expect(source).toContain('profile-space-transparency liquid-glass--list');
+  expect(source).not.toContain('profile-space-row liquid-glass');
 });
 
 test('profile detail opts summary cards into secondary glass explicitly', () => {

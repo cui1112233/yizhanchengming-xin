@@ -180,6 +180,22 @@ test("approved profile composition uses real account, task, and quota data", asy
   expect(textContent(tree).match(/我的空间/g)).toHaveLength(1);
 });
 
+test("late task summary still updates after the faster account request finishes", async () => {
+  h.hasSession = true;
+  const tasks = deferred();
+  h.read.mockResolvedValue({ member: { username: "creator" } });
+  h.loadTasks.mockReturnValue(tasks.promise);
+  mount();
+  await flush();
+  expect(textContent(findByClass(render(), "profile-space-metrics"))).toContain("—进行中");
+
+  tasks.resolve({ entries: [{ id: "running", status: "running" }, { id: "done", status: "completed" }] });
+  await flush();
+  const metrics = textContent(findByClass(render(), "profile-space-metrics"));
+  expect(metrics).toContain("1进行中");
+  expect(metrics).toContain("1已完成");
+});
+
 test("profile rows keep their real actions instead of decorative navigation", async () => {
   h.hasSession = true;
   h.read.mockResolvedValue({ member: { username: "creator" }, usage: { month: { totalTokens: 0 } } });
