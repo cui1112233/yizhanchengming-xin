@@ -187,6 +187,7 @@ import { getTextPublishStatus, publishTextCollection } from '../../../shared/api
 import automationStages from './automationStages.json';
 import { collectionUploadKind, retryTextBooks, textModelPreflightReasons } from './batchFactoryNovelListHelpers.js';
 import TextMediaDialog from './TextMediaDialog.jsx';
+import InlineTextBookPages from './InlineTextBookPages.jsx';
 import { ComicReferenceChips } from './ComicReferenceChips.jsx';
 import { removablePageReferences } from './comicReferenceMaterials.js';
 import {
@@ -3208,50 +3209,6 @@ function mergeBookExecutionLogs(previousLogs, nextLogs) {
   return Array.from(merged.values()).slice(-300);
 }
 
-function DeferredInlineTextPages({ batchId, bookId, pageTarget = 150, automationActive = false }) {
-  const [pages, setPages] = useState([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    const controller = new AbortController();
-    let timer;
-    const read = async () => {
-      try {
-        const result = await textApi.listTextPages(batchId, bookId, { signal: controller.signal, suppressGlobalError: true });
-        if (controller.signal.aborted) return;
-        setPages(Array.isArray(result?.pages) ? result.pages : []);
-        setError('');
-      } catch (readError) {
-        if (!controller.signal.aborted) setError(readError?.message || '页面内容读取失败');
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-          if (automationActive) timer = setTimeout(read, 2000);
-        }
-      }
-    };
-    setLoading(true);
-    void read();
-    return () => { controller.abort(); clearTimeout(timer); };
-  }, [batchId, bookId, automationActive]);
-  useEffect(() => {
-    setSelectedIndex(current => Math.max(0, Math.min(current, Math.max(0, pages.length - 1))));
-  }, [pages.length]);
-  const page = pages[selectedIndex];
-  return <div className="shuihuo-workbench-cell batch-factory-text-page-cell">
-    <div className="batch-factory-cell-shell">
-      <header className="batch-factory-text-page-head"><div><b>页面内容</b><small>{page ? `第 ${page.ordinal} 页 · ${String(page.text || '').length} 字` : `单页约 ${pageTarget} 字`}</small></div><span>{pages.length ? `${selectedIndex + 1}/${pages.length}` : '未分页'}</span></header>
-      <div className="batch-factory-text-page-content"><p>{page?.text || (loading ? '正在读取分配内容…' : error || '尚未分配页面内容')}</p></div>
-      <div className="batch-factory-cell-pager">
-        <button type="button" aria-label="上一文字页" disabled={selectedIndex <= 0} onClick={() => setSelectedIndex(index => Math.max(0, index - 1))}><LeftOutlined /></button>
-        <span>{page ? `第 ${page.ordinal} 页` : `目标 ${pageTarget} 字/页`}</span>
-        <button type="button" aria-label="下一文字页" disabled={!pages.length || selectedIndex >= pages.length - 1} onClick={() => setSelectedIndex(index => Math.min(pages.length - 1, index + 1))}><RightOutlined /></button>
-      </div>
-    </div>
-  </div>;
-}
-
 function DeferredInlineComicLibrary(props) {
   const placeholderRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
@@ -3273,7 +3230,6 @@ function DeferredInlineComicLibrary(props) {
     <div className="batch-factory-cell-empty">滚动到附近后加载漫画页。</div>
   </div>;
 }
-
 
 // 自动生产执行中，流动光带围绕“当前阶段对应的格子”转，而不是整条书行：
 // 资产类阶段围绕“资产设置”，分段/提示词/配音围绕提示词格，
@@ -5909,9 +5865,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const mediaMode = mediaBook && effectiveBookSettings(batch, mediaBook).productionMode;
   const pageMediaMode = mediaMode === 'text' || mediaMode === 'comic';
   const textBatch = batchProductionMode === 'text';
-  function openTextBook(book, tab = 'pages') {
+  function openTextBook(book, tab = 'pages', pageId = '') {
     setMediaStartTab(tab);
-    setMediaVideoId('');
+    setMediaVideoId(pageId);
     setMediaBook(book);
   }
   const hasComicBooks = batchProductionMode === 'comic' || books.some(book => effectiveBookSettings(batch, book).productionMode === 'comic');
@@ -6340,7 +6296,13 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     })}
                   </div>
                 </div>
-                {productionMode === "text" ? <DeferredInlineTextPages batchId={batch?.id} bookId={book.id} pageTarget={settings.textPageTarget || 150} automationActive={Boolean(automationRunningStage)} /> : <DeferredInlineBookPrompts
+                {productionMode === "text" ? <InlineTextBookPages
+                  batchId={batch?.id}
+                  book={book}
+                  pageTarget={settings.textPageTarget || 150}
+                  automationActive={Boolean(automationRunningStage)}
+                  onOpen={pageId => openTextBook(book, 'pages', pageId)}
+                /> : <DeferredInlineBookPrompts
                   batch={batch}
                   book={book}
                   batchId={batch?.id}
@@ -6361,8 +6323,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     setPromptBook(book);
                   }}
                 />}
-                <div className={`shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell${automationActiveCell === 'comic' ? ' is-automation-cell' : ''}`}>
-                  {productionMode === "text" ? <Button aria-label="打开文本媒体库" onClick={() => openTextBook(book)}>文本媒体库</Button> : productionMode === "comic" ? (
+                {productionMode !== "text" ? <div className={`shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell${automationActiveCell === 'comic' ? ' is-automation-cell' : ''}`}>
+                  {productionMode === "comic" ? (
                     <DeferredInlineComicLibrary
                       batchId={batch?.id}
                       book={book}
@@ -6416,7 +6378,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                       }}
                     />
                   )}
-                </div>
+                </div> : null}
                 <div className={`shuihuo-workbench-cell batch-factory-actions${automationActiveCell === 'actions' ? ' is-automation-cell' : ''}`}>
                   <div className="batch-factory-action-group is-utility">
                     <span>资料与流程</span>

@@ -20,13 +20,11 @@ test('text content editor uses the captured full text and text-specific copy', (
   assert.match(source, /productionMode === "text"\s*\? `正文总字数 \$\{batchFactoryCleanSourceText\(book\.sourceText\)\.length\} 字 · 单页约 \$\{Number\(settings\.textPageTarget \|\| 150\)\} 字`/);
 });
 
-test('text rows show the assigned page text with page navigation instead of a static target', () => {
-  assert.match(source, /textApi\.listTextPages\(/);
-  assert.match(source, /function DeferredInlineTextPages\(/);
-  assert.match(source, /第 \$\{page\.ordinal\} 页/);
-  assert.match(source, /page\?\.text \|\| \(loading \? '正在读取分配内容…' : error \|\| '尚未分配页面内容'\)/);
-  assert.match(source, /aria-label="上一文字页"/);
-  assert.match(source, /aria-label="下一文字页"/);
+test('text rows delegate assigned copy and rendered page navigation to the shared workbench', () => {
+  assert.match(source, /import InlineTextBookPages from '\.\/InlineTextBookPages\.jsx'/);
+  assert.match(source, /<InlineTextBookPages/);
+  assert.match(source, /onOpen=\{pageId => openTextBook\(book, 'pages', pageId\)\}/);
+  assert.doesNotMatch(source, /function DeferredInlineTextPages\(/);
 });
 
 test('saving pasted text promotes it to the formal source instead of leaving fetch-original failed', () => {
