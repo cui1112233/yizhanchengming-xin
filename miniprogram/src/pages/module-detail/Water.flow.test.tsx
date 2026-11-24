@@ -12,10 +12,12 @@ vi.mock('../../components/AppIcon',()=>({default:()=>null}));
 vi.mock('../../components/BrandHeader',()=>({default:()=>null}));
 vi.mock('../../components/AmbientStarfield',()=>({default:()=>null}));
 vi.mock('../batch/BatchCover',()=>({default:()=>null}));
+vi.mock('../../services/waterMedia',()=>({pickWaterMedia:vi.fn(async()=>({kind:'image',name:'photo.png',dataUrl:'data:image/png;base64,cGlj'}))}));
 import Workspace from './ShuihuoWorkspace';
+import {invalidateSessionResources} from '../../services/sessionBoundary';
 let root:Root,container:HTMLDivElement;
 const models=[{id:'text-1',name:'文本',kind:'text',enabled:true},{id:'image-1',modelId:'provider-image-1',name:'同名图片模型',kind:'image',enabled:true},{id:'image-2',modelId:'provider-image-2',name:'同名图片模型',kind:'image',enabled:true}];
-function doc(id='p1'){return {project:{id,name:id==='p1'?'小城故事':'恢复项目',sourceText:'保存的原文',sourceRevision:1},segments:[{id:'s1',subtitleText:'原分镜正文',speaker:'旁白',confirmed:true}],assets:[{id:'a1',name:'林夏',category:'character',description:'旧描述'}],media:[]};}
+function doc(id='p1'){return {project:{id,name:id==='p1'?'小城故事':'恢复项目',sourceText:'保存的原文',sourceRevision:1,books:[{directorRevision:{id:'director-2'},videos:[{id:'v1'},{id:'v2'}]}]},segments:[{id:'s1',subtitleText:'原分镜正文',speaker:'旁白',confirmed:true}],assets:[{id:'a1',name:'林夏',category:'character',description:'旧描述'}],media:[]};}
 beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);container=document.createElement('div');root=createRoot(container);h.modal.mockResolvedValue({confirm:true});h.api.mockReset();h.projects=[{id:'p1',name:'小城故事'}];h.tasks=[];h.api.mockImplementation(async(path:string,options:any)=>{if(path.endsWith('/batches/summary'))return{batches:[]};if(path.endsWith('/models'))return{models};if(path.endsWith('/projects')&&options?.method==='POST'){const created={id:'p2',name:options.data.name};h.projects.push(created);return created;}if(path.endsWith('/projects'))return{projects:h.projects};if(path.endsWith('/tasks')&&options?.method==='POST'){h.tasks=[{id:'t1',status:'queued',kind:options.data.kind}];return{task:h.tasks[0]};}if(path.endsWith('/tasks'))return{tasks:h.tasks};if(path.endsWith('/segmentation/paragraphs'))return{candidates:[{text:'候选分镜',speaker:'旁白'}]};if(/\/projects\/p[12]$/.test(path))return doc(path.endsWith('p2')?'p2':'p1');return{};});});
 afterEach(async()=>{await act(async()=>root.unmount());vi.unstubAllGlobals();});
 async function mount(){await act(async()=>root.render(<Workspace/>));await act(async()=>h.show());}
@@ -63,7 +65,29 @@ test('the image dialog exposes no single-segment video or selectable audio model
  await mount();await openProject();await click('分镜');await click('生成素材');expect(container.textContent).toContain('生成分镜图片');expect(container.querySelector('#water-generation-kind')).toBeNull();expect(container.textContent).toContain('视频需在作品工作区按整部作品执行');
 });
 
+test('segment audio and whole-project video are separate confirmed operations without fake model selectors',async()=>{
+ await mount();await openProject();await click('分镜');await click('生成配音');
+ let writes=h.api.mock.calls.filter(([p,o])=>p.endsWith('/tasks')&&o?.method==='POST');expect(writes[0][1].data).toEqual({kind:'audio',segmentId:'s1'});
+ await click('分镜');await click('生成整部视频');writes=h.api.mock.calls.filter(([p,o])=>p.endsWith('/tasks')&&o?.method==='POST');expect(writes[1][1].data).toMatchObject({kind:'video',requestId:expect.any(String)});expect(writes[1][1].data).not.toHaveProperty('segmentId');expect(h.modal.mock.calls[h.modal.mock.calls.length-1]?.[0].content).toContain('基础视频 2 段');
+});
+
+test('cancelling the whole-project video confirmation never submits and an uncertain audio result cannot be resubmitted',async()=>{
+ await mount();await openProject();await click('分镜');h.modal.mockResolvedValueOnce({confirm:false});await click('生成整部视频');expect(h.api.mock.calls.some(([p,o])=>p.endsWith('/tasks')&&o?.method==='POST')).toBe(false);
+ const normal=h.api.getMockImplementation()!;h.api.mockImplementation(async(p,o)=>{if(p.endsWith('/tasks')&&o?.method==='POST')throw Error('响应超时');return normal(p,o);});await click('生成配音');await click('生成配音');expect(h.api.mock.calls.filter(([p,o])=>p.endsWith('/tasks')&&o?.method==='POST')).toHaveLength(1);expect(container.textContent).toContain('结果未知');
+});
+
+test('a failed video preflight does not falsely lock a request which was never sent',async()=>{invalidateSessionResources();await mount();await openProject();await click('分镜');const normal=h.api.getMockImplementation()!;let fail=true;h.api.mockImplementation(async(p,o)=>{if(p.endsWith('/projects/p1')&&fail){fail=false;throw Error('项目读取失败');}return normal(p,o);});await click('生成整部视频');expect(h.api.mock.calls.filter(([p,o])=>p.endsWith('/tasks')&&o?.method==='POST')).toHaveLength(0);await click('生成整部视频');expect(h.api.mock.calls.filter(([p,o])=>p.endsWith('/tasks')&&o?.method==='POST')).toHaveLength(1);});
+
 test('a timed-out source save that already persisted is recovered by reading it back',async()=>{
  const normal=h.api.getMockImplementation()!;h.api.mockImplementation(async(p,o)=>{if(p.endsWith('/p2/source'))throw Error('响应超时');if(p.endsWith('/projects/p2')){const next=doc('p2');next.project.sourceText='实际已保存原文';return next;}return normal(p,o);});
  await mount();await click('新建漫剧');await input('water-create-name','恢复项目');await input('water-create-source','实际已保存原文');await click('保存项目');await click('打开已创建项目');await click('返回作品库');await click('新建漫剧');expect(container.textContent).not.toContain('打开已创建项目');await input('water-create-name','第二部');await input('water-create-source','第二部原文');expect(button('保存项目').disabled).toBe(false);expect(h.api.mock.calls.filter(([p,o])=>p.endsWith('/projects')&&o?.method==='POST')).toHaveLength(1);
 });
+
+test('asset reference tools read without writing and generate only selected asset using provider model id',async()=>{
+ const normal=h.api.getMockImplementation()!;let imageModelId='',imageAspectRatio='';h.api.mockImplementation(async(p,o)=>{if(p.endsWith('/assets/a1')&&o?.method==='PUT'){imageModelId=o.data.imageModelId;imageAspectRatio=o.data.imageAspectRatio;return{asset:{imageModelId,imageAspectRatio}};}if(p.endsWith('/projects/p1')){const d=doc();d.assets[0]={...d.assets[0],imageModelId,imageAspectRatio} as any;return d;}return p.endsWith('/a1/images')?{images:[]}:p.endsWith('/assets/generate')?{images:[{id:'img'}]}:normal(p,o);});await mount();await openProject();await click('素材');await click('参考图片库');expect(h.api.mock.calls.some(([,o])=>o?.method==='POST')).toBe(false);
+ const select=container.querySelector('#water-asset-image-model-select') as HTMLSelectElement;await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});await click('生成参考图');expect(h.api.mock.calls.find(([p])=>p.endsWith('/assets/generate'))?.[1].data).toEqual({assetIds:['a1'],modelId:'provider-image-2',aspectRatio:'1:1'});
+});
+test('cancelled reference generation sends no chargeable write; imported album image uses asset replacement endpoint',async()=>{
+ const normal=h.api.getMockImplementation()!;h.api.mockImplementation(async(p,o)=>p.endsWith('/a1/images')?{images:[]}:normal(p,o));await mount();await openProject();await click('素材');await click('参考图片库');const select=container.querySelector('#water-asset-image-model-select') as HTMLSelectElement;await act(async()=>{select.value='0';select.dispatchEvent(new Event('change',{bubbles:true}));});h.modal.mockResolvedValueOnce({confirm:false});await click('生成参考图');expect(h.api.mock.calls.some(([p])=>p.endsWith('/assets/generate'))).toBe(false);await click('从相册导入参考图');expect(h.api.mock.calls.find(([p,o])=>p.endsWith('/assets/a1/image')&&o?.method==='PUT')?.[1].data.dataUrl).toBe('data:image/png;base64,cGlj');
+});
+test('project media import carries explicitly selected segment without generating AI work',async()=>{await mount();await openProject();await click('素材');await click('导入素材');const select=container.querySelector('#water-media-segment-select') as HTMLSelectElement;await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});await click('相册图片');const write=h.api.mock.calls.find(([p,o])=>p.endsWith('/p1/media')&&o?.method==='POST');expect(write?.[1].data).toEqual({kind:'image',filename:'photo.png',dataUrl:'data:image/png;base64,cGlj',segmentId:'s1'});expect(h.api.mock.calls.some(([p])=>p.endsWith('/tasks')&&p.includes('generate'))).toBe(false);});

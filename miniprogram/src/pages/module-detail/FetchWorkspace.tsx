@@ -1,9 +1,9 @@
 import Taro, { useDidShow } from "@tarojs/taro";
 import { Button, Checkbox, CheckboxGroup, Input, Picker, ScrollView, Text, Textarea, View } from "@tarojs/components";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import BrandHeader from "../../components/BrandHeader";
 import AppIcon from "../../components/AppIcon";
-import { apiRequest } from "../../services/api";
+import { apiRequest as rawApiRequest } from "../../services/api";
 import { sessionConfirmation } from "../../services/sessionConfirmation";
 import { createFetchRequestGuard } from "../../services/fetchWorkspaceRequests";
 import { previewFetchSubmission, submitFetchSubmission } from "../../services/fetchSubmission";
@@ -26,9 +26,12 @@ import { fetchDetailBody } from "../../services/fetchDetailBody";
 import { writeFetchMaintenance } from "../../services/fetchMaintenance";
 import "./script-studio.scss";
 import "./fetch-studio.scss";
+import FetchAccountScope from "./FetchAccountScope";
+import BooktestManagement from "./BooktestManagement";
+import type {FetchRequest} from "../../services/booktestManagement";
 
 type Schedule = { status?:string; id?: string; runAt?: string; run_at?: string; enabled?: boolean; autoSubmit?: boolean; auto_submit?: boolean };
-type SettingsPanel = "" | "parameters" | "versions" | "schedule" | "schedules" | "web" | "logs" | "config" | "prompts";
+type SettingsPanel = "queue" | "knowledge" | "batch" | "" | "parameters" | "versions" | "schedule" | "schedules" | "web" | "logs" | "config" | "prompts";
 
 const VERSION_OPTIONS = ["original", "ai1", "ai2", "ai3", "ai4", "ai5"];
 
@@ -65,7 +68,7 @@ function displaySchedule(schedule: Schedule) {
   return Number.isFinite(date.getTime()) ? date.toLocaleString("zh-CN", { hour12: false }) : value;
 }
 
-function FetchWorkspace({title="小说获取",compact=false,initialTaskId=""}:{title?:string;compact?:boolean;initialTaskId?:string}) {
+export function FetchWorkspaceBody({title="小说获取",compact=false,initialTaskId="",request:apiRequest=rawApiRequest,scopeKey="self",isSelf=true,accountControl}:{title?:string;compact?:boolean;initialTaskId?:string;request?:FetchRequest;scopeKey?:string;isSelf?:boolean;accountControl?:ReactNode}) {
   const [inputExpanded, setInputExpanded] = useState(true);
   const [tab, setTab] = useState(initialTaskId ? "任务" : "处理");
   const [input, setInput] = useState("");
@@ -117,7 +120,7 @@ function FetchWorkspace({title="小说获取",compact=false,initialTaskId=""}:{t
       .catch((cause: Error) => { if (version === taskVersion.current) {setTasksRead("error");setError(cause.message || "任务读取失败");} });
   };
 
-  const job=useBooktestJob(compact,()=>loadTasks(true));
+  const job=useBooktestJob(compact,()=>loadTasks(true),apiRequest,scopeKey);
 
   const loadSchedules = () => {
     const version = ++scheduleVersion.current;
@@ -432,11 +435,13 @@ function FetchWorkspace({title="小说获取",compact=false,initialTaskId=""}:{t
   const selectedTask = tasks.find(task => task.bookId === selectedTaskId);
   const selectedStages = selectedTask ? fetchTaskStages(selectedTask) : [];
 
-  return <View className={`mp-page mp-detail-page mp-fetch-page script-studio fetch-studio${compact?" fetch-booktest":""}`}><BrandHeader title={title} showBack />
+  return <View className={`mp-page mp-detail-page mp-fetch-page script-studio fetch-studio${compact?" fetch-booktest":""}`}><BrandHeader title={title} showBack />{accountControl}
     <View className="mp-fetch-hero studio-titlebar">
       <View><Text className="studio-eyebrow">STORY COLLECTION</Text><Text className="studio-title">{compact?"从书单到可用文案":"收集下一段好故事"}</Text><View className="mp-fetch-meta"><Text>{platforms.length} 个平台</Text><Text>{tasksRead==="ready"?tasks.length:"—"} 个任务</Text></View></View>
       <Button className="studio-history" loading={refreshing} disabled={loading || refreshing} onClick={refresh} aria-label={`刷新${title}`}><AppIcon name="refresh-ccw" size={19} /></Button>
     </View>
+    <BooktestManagement request={apiRequest} scopeKey={scopeKey} isSelf={isSelf} date={taskDate} />
+    {job.recovery?<View className="mp-card"><Text className="mp-error">上次启动结果待核对</Text><Text className="studio-caption">{job.recovery.at} · {String(job.recovery.input?.inputText||'').slice(0,120)}</Text><Button onClick={job.refresh}>读取最近作业</Button>{job.recent.filter(item=>!job.recovery.baselineIds?.includes(item.id)).map(item=><Button key={item.id} onClick={async()=>{const result=await sessionConfirmation(()=>Taro.showModal({title:'关联已有作业',content:`确认 ${item.id} 是上次提交对应的作业？不会重新启动。`}));if(result.confirm)await job.adopt(item.id);}}>{String(item.id)} · {String(item.status||'未知')} · 核对关联</Button>)}<Button onClick={async()=>{const result=await sessionConfirmation(()=>Taro.showModal({title:'解除等待记录',content:'请先核对服务端最近作业与任务正文；仅在确认上次没有启动作业后解除，否则再次处理可能重复产生费用。'}));if(result.confirm)job.release();}}>已核对未启动，解除等待</Button></View>:null}
     <View className="studio-tabs"><Button id="booktest-input-tab" className={`studio-tab ${tab === "处理" ? "is-active" : ""}`} onClick={() => setTab("处理")}>处理</Button><Button id="booktest-task-tab" className={`studio-tab ${tab === "任务" ? "is-active" : ""}`} onClick={() => { setTab("任务"); loadTasks(); }}>任务</Button></View>
     {error ? <View className="mp-fetch-alert"><Text>{error}</Text><Button className="mp-fetch-alert-action" onClick={refresh}>刷新核对</Button></View> : null}
     {compact&&(tab==="任务"||job.job||job.error)?<View className="booktest-job"><View className="studio-section-head"><Text>后台作业</Text><Button className="studio-link" onClick={()=>void job.refresh()}>核对最近作业</Button></View>{job.error?<Text className="mp-error">{job.error}</Text>:null}{job.job?<><Text className="mp-row-title">{({queued:"排队中",running:"正在处理",done:"处理完成",failed:"处理失败",stopped:"已停止",cancelled:"已取消"} as Record<string,string>)[job.job.status]||"状态待确认"}</Text><Text className="studio-caption">{job.job.id}</Text>{job.job.error?<Text className="mp-error">{String(job.job.error)}</Text>:null}{(Array.isArray(job.job.progress)?job.job.progress:[]).slice(-3).map((item:any,index:number)=><Text className="studio-caption" key={index}>{typeof item==="string"?item:String(item.message||item.detail||item.status||"")}</Text>)}{job.running?<Button className="studio-link" disabled={job.busy} onClick={async()=>{const confirmation=await sessionConfirmation(()=>Taro.showModal({title:"停止本次测书？",content:"将请求停止当前作业；已经完成的原文和文案保留，不改变全自动队列开关。"}));if(confirmation.confirm)try{await job.stop();}catch(cause:any){setError(cause.message||"停止请求结果未知，请刷新核对");}}}>停止本次任务</Button>:null}</>:<Text className="studio-caption">最近作业将在这里显示，进入页面不会自动执行。</Text>}</View>:null}
@@ -467,10 +472,10 @@ function FetchWorkspace({title="小说获取",compact=false,initialTaskId=""}:{t
       {settingsPanel === "versions" ? <View className="mp-card mp-fetch-panel"><Text className="mp-row-title">版本配置 / 处理规则</Text><CheckboxGroup onChange={(event) => editConfig(() => setSelectedVersions(event.detail.value))}><View className="mp-fetch-version-list">{VERSION_OPTIONS.map((version) => <Checkbox key={version} value={version} checked={selectedVersions.includes(version)}><Text>{version === "original" ? "原文" : version.toUpperCase()}</Text></Checkbox>)}</View></CheckboxGroup>{selectedVersions.filter(version=>version!=="original").map(version=><Picker key={version} range={BOOKTEST_METHODS.map(method=>method.name)} value={Math.max(0,BOOKTEST_METHODS.findIndex(method=>method.id===(aiSlotMethods[version]||"auto")))} onChange={event=>editConfig(()=>setAiSlotMethods(current=>({...current,[version]:BOOKTEST_METHODS[Number(event.detail.value)]?.id||"auto"})))}><View className="mp-fetch-setting booktest-method"><Text>{version.toUpperCase()} 改文方式</Text><View><Text>{BOOKTEST_METHODS.find(method=>method.id===(aiSlotMethods[version]||"auto"))?.name||"请选择"}</Text><AppIcon name="chevron-right" size={14}/></View></View></Picker>)}<View className="mp-fetch-toggle-row"><View><Text className="mp-row-title">敏感内容处理</Text><Text className="mp-row-description">按服务端规则处理敏感文本。</Text></View><Text className={sensitiveAiEnabled ? "mp-switch mp-switch-on" : "mp-switch"} onClick={() => editConfig(() => setSensitiveAiEnabled(!sensitiveAiEnabled))}>{sensitiveAiEnabled ? "开" : "关"}</Text></View><Button className="mp-primary" loading={loading} onClick={saveWorkForm}>保存处理规则</Button></View> : null}
       {settingsPanel === "schedule" ? <View className="mp-card mp-fetch-panel"><Text className="mp-row-title">{editingSchedule ? "编辑定时任务" : "创建定时任务"}</Text><Text className="mp-row-description">本地时间，例如 2026-10-17T09:30。编辑保留原任务输入快照。</Text>{compact?<View className="booktest-date"><Picker mode="date" value={scheduleAt.slice(0,10)} onChange={event=>setScheduleAt(`${event.detail.value}T${scheduleAt.slice(11,16)||"09:00"}`)}><View className="mp-input">{scheduleAt.slice(0,10)||"选择日期"}</View></Picker><Picker mode="time" value={scheduleAt.slice(11,16)||"09:00"} onChange={event=>setScheduleAt(`${scheduleAt.slice(0,10)||new Date().toLocaleDateString('sv-SE')}T${event.detail.value}`)}><View className="mp-input">{scheduleAt.slice(11,16)||"选择时间"}</View></Picker></View>:<Input maxlength={32} disabled={loading} className="mp-input" value={scheduleAt} onInput={e => setScheduleAt(e.detail.value)} placeholder="2026-10-17T09:30" />}<CheckboxGroup onChange={e => setScheduleAutoSubmit(e.detail.value.includes("autoSubmit"))}><Checkbox value="autoSubmit" checked={scheduleAutoSubmit}>执行后自动提交网站（可产生外部提交）</Checkbox></CheckboxGroup><Button disabled={loading} loading={loading} className="mp-primary" onClick={createSchedule}>{editingSchedule ? "保存定时修改" : "创建定时任务"}</Button></View> : null}
       {settingsPanel === "schedules" ? <View className="mp-card mp-fetch-panel"><Text className="mp-row-title">定时任务</Text><Button disabled={loading} onClick={loadSchedules}>刷新定时任务</Button>{schedules.map((schedule, index) => <View className="mp-fetch-schedule" key={schedule.id || index}><View><Text className="mp-row-title">{displaySchedule(schedule)}</Text><Text className="mp-row-description">{compact?({preparing:"准备中",scheduled:"待执行",paused:"已暂停",cancelled:"已取消",completed:"已完成",failed:"失败"} as Record<string,string>)[schedule.status||""]||schedule.status||"状态待确认":schedule.enabled === false ? "已停用" : "已启用"} · {schedule.autoSubmit === true || schedule.auto_submit === true ? "自动提交" : "不自动提交"}</Text><Button disabled={loading || !schedule.id} onClick={() => { setEditingSchedule(schedule); const date = new Date(String(schedule.runAt || schedule.run_at || "")); setScheduleAt(Number.isFinite(date.getTime()) ? new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""); setScheduleAutoSubmit(schedule.autoSubmit === true || schedule.auto_submit === true); setSettingsPanel("schedule"); }}>编辑</Button>{compact?<Button disabled={loading||!schedule.id||['cancelled','canceled','completed','done','failed','stopped'].includes(schedule.status||'')} onClick={async()=>{const confirmation=await sessionConfirmation(()=>Taro.showModal({title:"取消这个定时任务？",content:"将停止尚未执行的处理；服务端可能清理此定时创建且尚未使用的书目，已保存正文保留。"}));if(confirmation.confirm)await mutateSchedule(`/api/batch-rewrite/schedules/${encodeURIComponent(String(schedule.id))}/cancel`,"POST",{});}}>取消定时</Button>:<Button disabled={loading || !schedule.id} onClick={() => mutateSchedule(`/api/batch-rewrite/schedules/${encodeURIComponent(String(schedule.id))}`, "PATCH", { enabled: schedule.enabled === false })}>{schedule.enabled === false ? "启用" : "停用"}</Button>}<Button disabled={loading || !schedule.id || (compact&&!['cancelled','canceled','completed','done','failed','stopped','success','skipped_existing'].includes(schedule.status||""))} onClick={async () => { const result = await sessionConfirmation(() => Taro.showModal({ title: "删除定时任务", content: "删除后将不再按此时间执行，是否继续？" })); if (result.confirm) await mutateSchedule(`/api/batch-rewrite/schedules/${encodeURIComponent(String(schedule.id))}`, "DELETE"); }}>删除定时</Button></View></View>)}{!schedules.length ? <Text>当前没有服务端定时任务。</Text> : null}</View> : null}
-      {["config", "prompts", "web", "logs"].includes(settingsPanel) ? <FetchMaintenancePanel key={settingsPanel} panel={settingsPanel} /> : null}
+      {["config", "prompts", "web", "logs"].includes(settingsPanel) ? <FetchMaintenancePanel key={settingsPanel} panel={settingsPanel} request={apiRequest} /> : null}
       </View></ScrollView></View></View> : null}
       {processResult ? <View className="mp-card mp-fetch-summary"><View className="mp-fetch-summary-head"><Text className="mp-row-title">本次处理</Text><Text className="mp-status-pill">{Number(processResult.fetch_failed ?? processResult.fetchFailed ?? 0) ? "存在抓取失败" : "处理已返回"}</Text></View><View className="mp-fetch-summary-grid">{[["解析", processResult.parsed ?? processResult.parsed_count ?? "—"], ["有效", processResult.unique_tasks ?? processResult.uniqueTasks ?? "—"], ["原文", processResult.fetched ?? "—"], ["AI 版本", processResult.generated_ai_files ?? processResult.generatedAiFiles ?? "—"]].map(([label, value]) => <View key={String(label)}><Text>{String(value)}</Text><Text>{String(label)}</Text></View>)}</View></View> : null}
-      <View className="studio-dock"><View className="studio-dock-copy"><Text>{loading ? "正在处理，请稍候" : "书单准备好了吗"}</Text><Text className="studio-caption">{versionSummary} · 最多 {maxTxt} 字</Text></View><Button className="studio-primary" disabled={!input.trim() || !platformId || loading || refreshing || modelSaving || (compact&&(job.busy||job.running))} loading={loading} onClick={process}><AppIcon name="sparkles" size={18} />开始处理</Button></View>
+      <View className="studio-dock"><View className="studio-dock-copy"><Text>{loading ? "正在处理，请稍候" : "书单准备好了吗"}</Text><Text className="studio-caption">{versionSummary} · 最多 {maxTxt} 字</Text></View><Button className="studio-primary" disabled={!input.trim() || !platformId || loading || refreshing || modelSaving || (compact&&(job.busy||job.running||Boolean(job.recovery)))} loading={loading} onClick={process}><AppIcon name="sparkles" size={18} />开始处理</Button></View>
     </View> : <View className="mp-fetch-content">
       <View className="mp-fetch-task-toolbar">
         <View className="booktest-task-heading"><Text>测书任务</Text><Text className="mp-row-description">按日期查看处理进度与已保存版本</Text></View>
@@ -510,4 +515,5 @@ function FetchWorkspace({title="小说获取",compact=false,initialTaskId=""}:{t
   </View>;
 }
 
+function FetchWorkspace(props:{title?:string;compact?:boolean;initialTaskId?:string}){return <FetchAccountScope>{(scope)=><FetchWorkspaceBody key={scope.key} {...props} request={scope.request} scopeKey={scope.key} isSelf={scope.self} accountControl={scope.control} />}</FetchAccountScope>;}
 export default withThemedPage(FetchWorkspace);

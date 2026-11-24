@@ -14,6 +14,8 @@ const SOURCE_FALLBACK: Record<TaskSource, string> = {
   fetch: novelBook,
   batch: batchBooks,
   shuihuo: videoClapper,
+  novel:novelBook,
+  aicut:aiCut,
 };
 
 export function taskVisualAsset(entry: AggregatedTask) {

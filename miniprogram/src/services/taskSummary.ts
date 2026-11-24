@@ -1,10 +1,16 @@
-export type TaskSource = "script" | "agent" | "fetch" | "batch" | "shuihuo";
+import {sessionRevision} from './sessionBoundary';
+import {loadCmTaskFeed,loadNovelTaskFeed,loadCutTaskFeed,loadWaterTaskFeed,limitTaskRequests} from './taskFeeds';
+export type TaskSource = "script" | "agent" | "fetch" | "batch" | "shuihuo" | "novel" | "aicut";
 export type TaskStatus = "running" | "retry" | "attention" | "completed" | "unknown";
 export type TaskFilter = "全部" | "进行中" | "需重试" | "已完成";
 
 export type AggregatedTask = {
   source: TaskSource;
   projectId?: string;
+  bookId?:string;
+  sessionId?:string;
+  timelineId?:string;
+  planKind?:string;
   sourceLabel: string;
   id: string | undefined;
   title: string | undefined;
@@ -49,16 +55,18 @@ type InternalTask = AggregatedTask & {
 
 const TASK_SOURCE_DEFINITIONS: SourceDefinition[] = [
   { source: "script", sourceLabel: "剧本", path: "/api/history", collection: "entries" },
-  { source: "agent", sourceLabel: "Agent", path: "/api/studio/runs", collection: "runs" },
+  { source: "agent", sourceLabel: "CM画布", path: "/api/agent/tasks", collection: "tasks" },
   { source: "fetch", sourceLabel: "批量测书", path: "/api/batch-rewrite/tasks", collection: "tasks" },
   { source: "batch", sourceLabel: "批量工厂", path: "/api/batch-factory/v12/batches/summary", collection: "batches" },
   { source: "shuihuo", sourceLabel: "水货生产", path: "/api/shuihuo-production/projects", collection: "projects" },
+  {source:"novel",sourceLabel:"小说近期写作",path:"/api/novel-creation/projects",collection:"projects"},
+  {source:"aicut",sourceLabel:"AI-CUT导出",path:"/api/ai-cut/projects",collection:"projects"},
 ];
 
-const COMPLETED_STATUSES = new Set(["done", "completed", "success", "succeeded", "finished", "ai_done", "已完成", "完成", "成功", "已合并"]);
+const COMPLETED_STATUSES = new Set(["done", "completed", "success", "succeeded", "succeeded_with_warnings", "finished", "ai_done", "已完成", "完成", "成功", "已合并"]);
 const RETRY_STATUSES = new Set(["failed", "error", "canceled", "cancelled", "stopped", "waiting_retry", "original_failed", "ai_failed", "失败", "异常", "等待重试"]);
-const ATTENTION_STATUSES = new Set(["waiting-review", "waiting_review", "pending_confirmation", "accepted_pending", "待确认", "待审核"]);
-const RUNNING_STATUSES = new Set(["queued", "pending", "running", "processing", "executing", "waiting", "scheduled_waiting", "ai_processing", "retrying", "进行中", "处理中", "排队中", "等待中"]);
+const ATTENTION_STATUSES = new Set(["waiting-review", "waiting_review", "pending_confirmation", "accepted_pending", "待确认", "待审核", "awaiting_confirmation", "paused", "save_pending"]);
+const RUNNING_STATUSES = new Set(["queued", "pending", "running", "processing", "executing", "waiting", "scheduled_waiting", "ai_processing", "retrying", "进行中", "处理中", "排队中", "等待中", "writing", "revising", "planning", "normalizing", "auditing", "settling", "indexing", "not_started", "analyzing", "preparing", "submitting", "result_ready", "ingesting", "cancel_requested", "canceling"]);
 
 const STATUS_DETAILS: Record<string, string> = {
   scheduled_waiting: "等待定时启动", input_ready: "分类信息已就绪", waiting_retry: "需重试",
@@ -66,7 +74,7 @@ const STATUS_DETAILS: Record<string, string> = {
   waiting_configuration: "待配置", waiting_login: "待登录", pending_submit: "待提交",
   upload_pending: "提交结果待确认", stopped: "已停止", queued: "排队中", pending: "排队中",
   processing: "进行中", running: "进行中", completed: "已完成", succeeded: "已完成",
-  failed: "需重试", error: "需重试",
+  failed: "需重试", error: "需重试", awaiting_confirmation:"待确认", planning:"生成创作蓝图", writing:"写作正文", normalizing:"整理正文", auditing:"审核章节", revising:"修订章节", settling:"整理人物与伏笔", indexing:"建立记忆索引", not_started:"等待启动", paused:"已暂停", save_pending:"待恢复保存", cancel_requested:"正在取消",
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -161,13 +169,17 @@ function entryFromRecord(definition: SourceDefinition, record: Record<string, un
   return {
     source: definition.source,
     sourceLabel: definition.sourceLabel,
-    ...(definition.source === 'shuihuo' ? { projectId: textValue(record.projectId) } : {}),
+    ...(firstText(record,['projectId','batchId'])?{projectId:firstText(record,['projectId','batchId'])}:{}),
+    ...(textValue(record.bookId)?{bookId:textValue(record.bookId)}:{}),
+    ...(textValue(record.sessionId)?{sessionId:textValue(record.sessionId)}:{}),
+    ...(textValue(record.timelineId)?{timelineId:textValue(record.timelineId)}:{}),
+    ...(textValue(record.planKind)?{planKind:textValue(record.planKind)}:{}),
     id: firstText(record, ["id", "bookId", "book_id"]),
     title: firstText(record, titleKeys) || (definition.source === "agent" ? firstText(request, ["instruction"]) : undefined),
     createdAt: firstText(record, ["updatedAt", "updated_at", "createdAt", "created_at"]),
     rawStatus,
     status,
-    statusDetail: taskStatusDetail(rawStatus),
+    statusDetail: definition.source==='batch'&&record.kind==='automation'&&taskStatusFromServer(rawStatus)==='completed'?'流程已结束':taskStatusDetail(rawStatus),
     progress: video.progress || recordProgress(record),
     visualHint: firstText(record, ["kind", "type", "stage", "taskType", "task_type"]),
     moduleKey: definition.source,
@@ -185,10 +197,14 @@ function batchRuntimeRecords(batch: Record<string, unknown>, runtime: unknown) {
   const batchID = firstText(batch, ["id"]);
   const batchTitle = firstText(batch, ["title", "name"]) || "批量任务";
   const rows: Record<string, unknown>[] = [];
-  const push = (record: Record<string, unknown>, fallback: Record<string, unknown>) => rows.push({ moduleKey: "batch", batchId: batchID, ...fallback, ...record });
+  const push = (record: Record<string, unknown>, fallback: Record<string, unknown>) => rows.push({ ...fallback, ...record, moduleKey: "batch", batchId: batchID, projectId:batchID });
 
   const automation = isRecord(runtime.automation) ? runtime.automation : undefined;
   const automationState = automation && firstText(automation, ["state", "status"]);
+  const bookRows=Array.isArray(automation?.books)?automation!.books.filter(isRecord):isRecord(automation?.books)?Object.values(automation!.books).filter(isRecord):[];
+  const bookTitle=(bookId:unknown)=>{const book=bookRows.find(b=>firstText(b,['bookId','id'])===textValue(bookId));return book?firstText(book,['title','name','bookTitle'])||batchTitle:batchTitle;};
+  const stageNames:Record<string,string>={assets:'人物场景',director:'剧本分镜',opening:'开篇',visual:'视觉风格',comic:'漫画分镜',image:'漫画图片',video:'视频生成',merge:'成片合成'};
+
   if (automation && automationState && automationState !== "idle") {
     const counts = isRecord(automation.counts) ? automation.counts : {};
     push(automation, {
@@ -203,7 +219,7 @@ function batchRuntimeRecords(batch: Record<string, unknown>, runtime: unknown) {
   productionJobs.forEach((job) => {
     const tasks = Array.isArray(job.tasks) ? job.tasks.filter(isRecord) : [];
     tasks.forEach((task) => push(task, {
-      title: `${batchTitle} · 视频生成`, kind: "video", stage: "video",
+      title: `${bookTitle(job.bookId)} · 视频生成`, kind: "video", stage: "video", bookId:textValue(job.bookId),
       status: firstText(task, ["status"]) || firstText(job, ["status"]),
       createdAt: firstText(task, ["updatedAt", "createdAt"]) || firstText(job, ["updatedAt", "createdAt"]),
     }));
@@ -211,14 +227,14 @@ function batchRuntimeRecords(batch: Record<string, unknown>, runtime: unknown) {
 
   const merge = isRecord(runtime.merge) ? runtime.merge : {};
   const mergeJobs = Array.isArray(merge.jobs) ? merge.jobs.filter(isRecord) : [];
-  mergeJobs.forEach((job) => push(job, { title: `${batchTitle} · 成片合成`, kind: "export", stage: "merge" }));
+  mergeJobs.forEach((job) => push(job, { title: `${bookTitle(job.bookId)} · 成片合成`, kind: "export", stage: "merge" }));
 
   const stageSummaries = isRecord(runtime.stageSummaries) ? runtime.stageSummaries : {};
   Object.values(stageSummaries).filter(isRecord).forEach((summary) => {
     const runs = Array.isArray(summary.runs) ? summary.runs.filter(isRecord) : [];
     runs.forEach((run) => {
       const stage = firstText(run, ["stage"]) || "stage";
-      push(run, { title: `${batchTitle} · ${stage}`, kind: stage, stage });
+      push(run, { title: `${bookTitle(run.bookId||summary.bookId)} · ${stageNames[stage]||stage}`, bookId:run.bookId||summary.bookId,kind: stage, stage });
     });
   });
   return rows;
@@ -227,6 +243,7 @@ function batchRuntimeRecords(batch: Record<string, unknown>, runtime: unknown) {
 function batchListRecord(batch: Record<string, unknown>) {
   return {
     id: firstText(batch, ["id"]),
+    projectId:firstText(batch,["id"]),
     title: firstText(batch, ["title", "name"]),
     createdAt: firstText(batch, ["updatedAt", "updated_at", "createdAt", "created_at"]),
     status: firstText(batch, ["status", "state"]),
@@ -260,9 +277,18 @@ function errorMessage(cause: unknown) {
 }
 
 export async function loadTaskSummary(request: TaskRequest, options: { projectsOnly?: boolean } = {}): Promise<TaskSummary> {
+  const accountRevision=sessionRevision();
+  request=limitTaskRequests(request);
   const settled = await Promise.allSettled(TASK_SOURCE_DEFINITIONS.map(async (definition) => {
     const payload = await request(definition.path);
     if (!isRecord(payload) || !Array.isArray(payload[definition.collection])) throw new Error("服务端任务列表响应不完整");
+
+    if(['agent','novel','aicut'].includes(definition.source)){
+      const projects=collectionFrom(payload,definition.collection);
+      if(options.projectsOnly)return{[definition.collection]:projects.map(p=>({...p,projectId:textValue(p.id),taskType:'project'}))};
+      const feed=definition.source==='agent'?await loadCmTaskFeed(request,projects):definition.source==='novel'?await loadNovelTaskFeed(request,projects):await loadCutTaskFeed(request,projects);
+      return{[definition.collection]:feed.rows,warning:feed.warning};
+    }
     if (definition.source === "batch") {
       const batches = collectionFrom(payload, "batches");
       const runtimeRows = await Promise.all(batches.map(async (batch) => {
@@ -282,15 +308,10 @@ export async function loadTaskSummary(request: TaskRequest, options: { projectsO
     }
     if (definition.source !== "shuihuo") return payload;
     if (options.projectsOnly) return { projects: collectionFrom(payload, "projects").map(project => ({ ...project, projectId: textValue(project.id) })) };
-    const projects = collectionFrom(payload, 'projects');
-    const results = await Promise.all(projects.map(async project => {
-      const id = textValue(project.id); if (!id) throw new Error('水货项目缺少 ID');
-      const tasks = await request(`/api/shuihuo-production/projects/${encodeURIComponent(id)}/tasks`);
-      if (!isRecord(tasks) || !Array.isArray(tasks.tasks)) throw new Error('水货任务响应不完整');
-      return collectionFrom(tasks, 'tasks').map(task => ({ ...task, projectId: id, title: firstText(task, ['title', 'name']) || `${textValue(project.name) || id} · ${textValue(task.kind) || '任务'}` }));
-    }));
-    return { projects: results.flat() };
+    const feed=await loadWaterTaskFeed(request,collectionFrom(payload,'projects'));
+    return{projects:feed.rows,warning:feed.warning};
   }));
+  if(accountRevision!==sessionRevision())throw Error('账号已切换，请重新读取任务');
   const entries: InternalTask[] = [];
   const sources = settled.map((result, sourceOrder): TaskSourceResult => {
     const definition = TASK_SOURCE_DEFINITIONS[sourceOrder];
@@ -307,11 +328,12 @@ export async function loadTaskSummary(request: TaskRequest, options: { projectsO
       entries.push(entryFromRecord(definition, record, sourceOrder, entryOrder));
     });
 
+    const warning=(result.value as Record<string,unknown>).warning;
     return {
       source: definition.source,
       sourceLabel: definition.sourceLabel,
-      state: "ready",
-      error: undefined,
+      state: warning ? "error" : "ready",
+      error: typeof warning==='string'&&warning?`部分任务未同步：${warning}`:undefined,
     };
   });
 
@@ -342,9 +364,14 @@ export function taskCounts(entries: AggregatedTask[]) {
 
 export function taskDestination(entry: AggregatedTask) {
   const id = encodeURIComponent(entry.id || '');
-  if (entry.source === 'batch') return `/pages/batch/index?batchId=${id}`;
+  if (entry.source === 'batch') return `/pages/batch/index?batchId=${encodeURIComponent(entry.projectId||entry.id||'')}${entry.bookId?`&bookId=${encodeURIComponent(entry.bookId)}`:''}`;
   if (entry.source === 'shuihuo') return `/pages/module-detail/index?key=shuihuo&projectId=${encodeURIComponent(entry.projectId || '')}`;
-  if (entry.source === 'agent') return `/pages/module-detail/index?key=agent&taskId=${id}`;
+  if (entry.source === 'agent') return `/pages/module-detail/index?key=agent&taskId=${encodeURIComponent(entry.projectId||entry.id||'')}&tab=tasks`;
+  if(entry.source==='novel'&&entry.taskType==='project')return `/comic/pages/novel/index?projectId=${encodeURIComponent(entry.projectId||entry.id||'')}`;
+  if(entry.source==='aicut'&&entry.taskType==='project')return `/comic/pages/aicut/index?projectId=${encodeURIComponent(entry.projectId||entry.id||'')}`;
+  if(entry.source==='novel'&&entry.taskType==='writing-plan')return `/comic/pages/novel/index?projectId=${encodeURIComponent(entry.projectId||'')}&sessionId=${encodeURIComponent(entry.sessionId||'')}&tab=automation&planId=${id}&planKind=${entry.planKind==='batches'?'batches':'schedules'}`;
+  if(entry.source==='novel')return `/comic/pages/novel/index?projectId=${encodeURIComponent(entry.projectId||'')}&sessionId=${encodeURIComponent(entry.sessionId||'')}&runId=${id}`;
+  if(entry.source==='aicut')return `/comic/pages/aicut/index?projectId=${encodeURIComponent(entry.projectId||'')}&timelineId=${encodeURIComponent(entry.timelineId||'default')}&tab=exports`;
   if (entry.source === 'fetch') return `/pages/module-detail/index?key=booktest&taskId=${id}`;
-  return `/pages/module-detail/index?key=script&entryId=${id}`;
+  return `/pages/module-detail/index?key=script&historyId=${id}`;
 }

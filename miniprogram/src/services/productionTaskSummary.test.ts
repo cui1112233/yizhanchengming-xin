@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { loadTaskSummary } from './taskSummary';
 test('task center distinguishes fetch, real Agent tasks, batch summaries and per-project Shuihuo tasks', async () => {
   const payloads: Record<string, unknown> = {
-    '/api/history': { entries: [] }, '/api/studio/runs': { runs: [{ id: 'a', title: 'Agent' }] },
+    '/api/history': { entries: [] }, '/api/agent/tasks': {tasks:[{id:'cm1',title:'CM'}]},'/api/agent/tasks/cm1/generations':{tasks:[{id:'a',title:'Agent'}]},'/api/agent/tasks/cm1/video-jobs':{jobs:[]},'/api/novel-creation/projects':{projects:[]},'/api/ai-cut/projects':{projects:[]},
     '/api/batch-rewrite/tasks': { tasks: [{ id: 'f', title: 'Fetch' }] },
     '/api/batch-factory/v12/batches/summary': { batches: [{ id: 'b', title: 'Batch' }] },
     '/api/batch-factory/v12/batches/b/runtime-summary': {
@@ -24,7 +24,7 @@ test('task center distinguishes fetch, real Agent tasks, batch summaries and per
 test('one slow batch runtime cannot erase the real batch list', async () => {
   const payloads: Record<string, unknown | Error> = {
     '/api/history': { entries: [] },
-    '/api/studio/runs': { runs: [] },
+    '/api/agent/tasks': { tasks: [] },
     '/api/batch-rewrite/tasks': { tasks: [] },
     '/api/batch-factory/v12/batches/summary': { batches: [
       { id: 'slow', title: '十月老书', productionMode: 'comic', updatedAt: '2026-11-22T01:04:00Z' },
@@ -53,7 +53,7 @@ test('one slow batch runtime cannot erase the real batch list', async () => {
 
 test('an idle batch is still a real task record instead of disappearing', async () => {
   const payloads: Record<string, unknown> = {
-    '/api/history': { entries: [] }, '/api/studio/runs': { runs: [] }, '/api/batch-rewrite/tasks': { tasks: [] },
+    '/api/history': { entries: [] }, '/api/agent/tasks': { tasks: [] }, '/api/batch-rewrite/tasks': { tasks: [] },
     '/api/batch-factory/v12/batches/summary': { batches: [{ id: 'idle', title: '已建立的批次', productionMode: 'text' }] },
     '/api/batch-factory/v12/batches/idle/runtime-summary': {
       automation: { state: 'idle', counts: { ready: 0, total: 0 } }, production: { jobs: [] }, merge: { jobs: [] }, stageSummaries: {},
@@ -63,3 +63,4 @@ test('an idle batch is still a real task record instead of disappearing', async 
   const result = await loadTaskSummary(async path => payloads[path]);
   expect(result.entries.find(entry => entry.source === 'batch')).toMatchObject({ id: 'idle', title: '已建立的批次', status: 'unknown', kind: 'text' });
 });
+test('batch stages use actual book titles and readable stage labels, while ended automation is not called a finished product',async()=>{const payloads:Record<string,unknown>={'/api/batch-factory/v12/batches/summary':{batches:[{id:'b',title:'批次'}]},'/api/batch-factory/v12/batches/b/runtime-summary':{automation:{state:'completed',counts:{total:1,ready:0},books:{book:{bookId:'book',title:'实际书名'}}},production:{jobs:[]},merge:{jobs:[]},stageSummaries:{book:{bookId:'book',runs:[{id:'stage',bookId:'book',stage:'assets',status:'succeeded'}]}}}};const r=await loadTaskSummary(async p=>payloads[p]);expect(r.entries.find(e=>e.id==='stage')?.title).toBe('实际书名 · 人物场景');expect(r.entries.find(e=>e.kind==='automation')?.statusDetail).toBe('流程已结束');});

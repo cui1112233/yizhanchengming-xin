@@ -192,9 +192,9 @@ export default function ProfilePage() {
         {!loading && !memberLoaded ? <View className="mp-card mp-profile-state"><Text className="mp-row-title">无法读取当前账号资料</Text><Text className="mp-error">{failureLabels[diagnostic.failure]}</Text><View className="mp-profile-actions"><Button className="mp-primary mp-profile-retry" onClick={load}>重新读取</Button><Button className="mp-secondary mp-profile-cancel" onClick={cancelAndLogin}>返回登录</Button></View></View> : null}
         {memberLoaded ? <>
           <View className={`profile-space-identity mp-profile-hero liquid-glass--primary${reducedGlass ? " is-reduced-motion" : ""}`} data-glass-role="primary">
-            <View className="profile-space-identity-background" ariaHidden />
-            <View className="profile-space-identity-glass" ariaHidden />
-            <View className="profile-space-particles" ariaHidden>{PROFILE_PETALS.map(name => <Image key={name} className={`profile-space-petal is-${name}`} src={petalIcon} mode="aspectFit" />)}</View>
+            <View className="profile-space-identity-background" aria-hidden={true} />
+            <View className="profile-space-identity-glass" aria-hidden={true} />
+            <View className="profile-space-particles" aria-hidden={true}>{PROFILE_PETALS.map(name => <Image key={name} className={`profile-space-petal is-${name}`} src={petalIcon} mode="aspectFit" />)}</View>
             <View className="profile-space-avatar" onClick={chooseAvatar}>{facts.avatarUrl ? <Image className="profile-space-avatar-image" src={apiUrl(facts.avatarUrl)} mode="aspectFill" /> : <Text>{displayName ? displayName.slice(0, 1).toUpperCase() : "?"}</Text>}<View className="profile-space-camera">{uploading ? <Text>上传中</Text> : <AppIcon name="camera" size={13} />}</View></View>
             <View className="profile-space-identity-copy">
               <View className="profile-space-name-line"><Text className="profile-space-name">{displayName || "未设置名称"}</Text><Text className="profile-space-badge">{facts.role || "创作者"}</Text></View>

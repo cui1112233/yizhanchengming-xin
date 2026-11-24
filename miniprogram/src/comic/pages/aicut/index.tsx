@@ -1,4 +1,4 @@
-import Taro from '@tarojs/taro';
+import Taro,{useLoad} from '@tarojs/taro';
 import { Button, Input, Text, View } from '@tarojs/components';
 import { useEffect, useRef, useState } from 'react';
 import BrandHeader from '../../../components/BrandHeader';
@@ -15,6 +15,9 @@ export default function AICutPage() {
   const [query, setQuery] = useState(''), [busy, setBusy] = useState(''), [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false), [dialog, setDialog] = useState<CutRecord | null>(null);
   const [name, setName] = useState(''), [ratio, setRatio] = useState('9:16');
+  const [requested,setRequested]=useState<CutRecord|null>(null),[destination,setDestination]=useState<CutRecord>({});
+  useLoad(params=>{if(params?.projectId)setRequested({projectId:String(params.projectId),timelineId:String(params.timelineId||'default'),tab:String(params.tab||'')});});
+  useEffect(()=>{if(!requested||!loaded)return;const exact=projects.find(p=>String(p.id)===requested.projectId);if(exact){setDestination(requested);setProject(exact);}else setError('对应剪辑工程不在当前账号目录中，请刷新核对');setRequested(null);},[requested,loaded,projects]);
   const alive = useRef(true), version = useRef(0), lock = useRef(false);
   const client = createAICutClient(apiRequest);
   const run = async (label: string, work: () => Promise<void>) => {
@@ -34,7 +37,7 @@ export default function AICutPage() {
     if (dialog.id) await client.rename(dialog.id, name);
     else {
       const created = await client.create(name, ratio);
-      if (alive.current && ticket === version.current) { setDialog(null); setProject(created); }
+      if (alive.current && ticket === version.current) { setDialog(null);setDestination({});setProject(created); }
     }
     if (!alive.current || ticket !== version.current) return;
     setDialog(null); const list = await client.list();
@@ -42,7 +45,7 @@ export default function AICutPage() {
   });
   const visible = projects.filter(item => String(item.title || '').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).sort((a, b) => (Date.parse(b.updatedAt || b.createdAt) || 0) - (Date.parse(a.updatedAt || a.createdAt) || 0));
   return <ThemedPage className="mp-page cut-page" dynamicGlass={false}>
-    {project ? <CutEditor key={project.id} project={project} onBack={() => { setProject(null); void reload(); }} /> : <>
+    {project ? <CutEditor key={project.id} project={project} initialTimelineId={destination.timelineId} initialPanel={destination.tab} onBack={() => { setDestination({});setProject(null); void reload(); }} /> : <>
       <BrandHeader title="AI-CUT" eyebrow="剪辑工作区" showBack />
       <View className="cut-content">
         <View className="cut-heading"><View><Text className="cut-title">我的剪辑</Text><Text className="cut-caption">把素材，剪成你的故事</Text></View><Button id="cut-create" className="cut-primary" disabled={Boolean(busy)} onClick={() => { setName(''); setRatio('9:16'); setDialog({}); }}><AppIcon name="plus" size={16} />新建</Button></View>
@@ -52,8 +55,8 @@ export default function AICutPage() {
         {error ? <View className="cut-error"><Text>{error}</Text><Button disabled={Boolean(busy)} onClick={() => void reload()}>重新读取</Button></View> : null}
         {!error && loaded && !visible.length ? <View className="cut-empty"><AppIcon name="clapperboard" size={34} /><Text>{query ? '没有找到这个工程' : '你的下一部作品，从这里开始'}</Text><Text className="cut-caption">{query ? '试试其他名称' : '新建工程，添加素材后开始剪辑'}</Text></View> : null}
         <View className="cut-projects">{visible.map(item => <View className="cut-project" key={item.id}>
-          <Button className="cut-cover" disabled={Boolean(busy)} onClick={() => setProject(item)}><AppIcon name="clapperboard" size={36} /><Text className="cut-ratio">{item.aspectRatio}</Text><Text className="cut-open">继续剪辑 →</Text></Button>
-          <View className="cut-project-copy"><Button className="cut-project-name" disabled={Boolean(busy)} onClick={() => setProject(item)}>{item.title || '未命名剪辑'}</Button><Text className="cut-caption">{(item.updatedAt || item.createdAt) ? new Date(item.updatedAt || item.createdAt).toLocaleDateString() : '时间未返回'}</Text><Button className="cut-link" disabled={Boolean(busy)} onClick={() => { setName(item.title || ''); setDialog(item); }}>重命名</Button></View>
+          <Button className="cut-cover" disabled={Boolean(busy)} onClick={() => {setDestination({});setProject(item);}}><AppIcon name="clapperboard" size={36} /><Text className="cut-ratio">{item.aspectRatio}</Text><Text className="cut-open">继续剪辑 →</Text></Button>
+          <View className="cut-project-copy"><Button className="cut-project-name" disabled={Boolean(busy)} onClick={() => {setDestination({});setProject(item);}}>{item.title || '未命名剪辑'}</Button><Text className="cut-caption">{(item.updatedAt || item.createdAt) ? new Date(item.updatedAt || item.createdAt).toLocaleDateString() : '时间未返回'}</Text><Button className="cut-link" disabled={Boolean(busy)} onClick={() => { setName(item.title || ''); setDialog(item); }}>重命名</Button></View>
         </View>)}</View>
       </View>
     </>}

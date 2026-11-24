@@ -117,3 +117,9 @@
   .studio-sheet .fetch-detail-title { font-size: 17px; }
   .studio-sheet .mp-fetch-detail-text { font-size: 14px; line-height: 1.9; }
 }
+
+.booktest-account-scope{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--mp-card-bg, #172532);font-size:13px;gap:12px}.booktest-account-scope .mp-input{min-height:36px;font-size:13px;margin:0}.booktest-management-tools{display:flex;align-items:center;gap:8px;margin:10px 0}.booktest-management-tools button{font-size:12px;min-height:36px;flex:1;margin:0}.booktest-management-tools text{font-size:12px;white-space:nowrap}
+
+.booktest-management-sheet button,.booktest-management-tools button{background:var(--ui-surfaceRaised,#27333f);color:var(--ui-text,#f2f1ed);border:1px solid var(--ui-divider,#394451);border-radius:12px;line-height:20px;min-height:44px;padding:10px 12px;font-size:14px}.booktest-management-sheet button[disabled]{opacity:.45}.booktest-account-scope{margin:0 0 12px;padding:8px 0;border-bottom:1px solid var(--ui-divider,#303236);background:transparent}.booktest-account-scope .mp-input{padding:6px 12px}.booktest-management-sheet .mp-card{text-align:left;display:flex;flex-direction:column;gap:4px}.booktest-management-sheet .studio-caption{display:block}
+
+.booktest-account-scope{margin:0 16px 12px}

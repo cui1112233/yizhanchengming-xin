@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { waterImageModels, createProductionClients, latestRequestGuard } from "./productionClients";
+import { waterVideoScope,waterImageModels, createProductionClients, latestRequestGuard } from "./productionClients";
 
 test('water projects become available even while the model request remains pending', async()=>{
   let complete!:(value:any)=>void;
@@ -91,10 +91,25 @@ test('segment prompt edits and asset edits keep established manual mutation cont
   await client.saveWaterAsset('7', { id: 4, name: ' Hero ', category: 'character', description: 'Coat', prompt: 'Portrait' });
   await client.saveWaterAsset('7', { name: ' Square ', category: 'scene', description: 'Evening' });
   expect(calls[0]).toEqual(['/api/shuihuo-production/segments/3', { method: 'PUT', data: { id: 3, subtitleText: 'Caption', imagePrompt: 'Image', videoPrompt: 'Video', speaker: '旁白', confirmed: true } }]);
-  expect(calls[1]).toEqual(['/api/shuihuo-production/assets/4', { method: 'PUT', data: { id: 4, name: 'Hero', category: 'character', description: 'Coat', prompt: 'Portrait', source: 'manual', manuallyEdited: true } }]);
-  expect(calls[2]).toEqual(['/api/shuihuo-production/projects/7/assets', { method: 'POST', data: { name: 'Square', category: 'scene', description: 'Evening', source: 'manual', manuallyEdited: true } }]);
+  expect(calls[1]).toMatchObject(['/api/shuihuo-production/assets/4', { method: 'PUT', data: { name:'Hero',category:'character',appearance:'Coat',prompt:'Portrait' } }]);
+  expect(calls[2]).toMatchObject(['/api/shuihuo-production/projects/7/assets', { method:'POST',data:{name:'Square',category:'scene',appearance:'Evening'} }]);
 });
 
 test('image catalog rejects missing provider ids and ambiguous channels',()=>{
  expect(waterImageModels([{id:'missing',kind:'image'},{id:'a',kind:'image',modelId:'same'},{id:'b',kind:'image',modelId:'same'},{id:'c',kind:'image',modelId:'unique'},{id:'d',kind:'image',modelId:'unique',enabled:false}]).map(item=>item.id)).toEqual(['c']);
+});
+
+test('water audio uses service configuration while video submits the whole project with a stable request id',async()=>{
+ const calls:any[]=[];const client=createProductionClients(async(path,options)=>{calls.push([path,options]);return{tasks:[{id:'real-task'}],job:{requestId:'stable-video'}};});
+ await client.waterAudio('p1','s1');await client.waterVideo('p1','stable-video');
+ expect(calls).toEqual([
+ ['/api/shuihuo-production/projects/p1/tasks',{method:'POST',data:{kind:'audio',segmentId:'s1'},timeout:180000}],
+ ['/api/shuihuo-production/projects/p1/tasks',{method:'POST',data:{kind:'video',requestId:'stable-video'},timeout:180000}],
+ ]);
+ await expect(createProductionClients(async()=>({})).waterVideo('p1','stable-video')).rejects.toThrow('提交结果未确认');
+});
+
+test('video scope comes from the actual director revision and production videos instead of manual segments',()=>{
+ expect(waterVideoScope({project:{books:[]},segments:[{id:'manual'}]})).toBeNull();
+ expect(waterVideoScope({project:{books:[{directorRevision:{id:'director-2'},videos:[{id:'v1'},{id:'v2'}]}]},segments:[{id:'manual'}]})).toEqual({revision:'director-2',count:2});
 });

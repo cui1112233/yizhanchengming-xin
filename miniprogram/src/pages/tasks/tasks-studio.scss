@@ -82,3 +82,6 @@
     .task-studio-row-retry {min-width:48PX;padding:0 5PX}
   }
 }
+
+.task-studio-pagination {display:flex;align-items:center;justify-content:space-between;gap:8PX;padding:14PX 0;font-size:11PX;}
+.task-studio-pagination button {margin:0;min-width:68PX;height:40PX;line-height:40PX;padding:0 10PX;border:1PX solid rgba(111,203,232,.35);border-radius:12PX;background:rgba(25,55,75,.6);color:inherit;font-size:12PX;}
