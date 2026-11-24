@@ -166,7 +166,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
   const activeId = tab === 'cover' ? doc?.coverArtifactId : state.artifactId;
   const display = candidates.find(a => a.id === selectedCandidate) || candidates.find(a => a.id === activeId);
   const preview = tab === 'collections'
-    ? collectionItems.find(i => i.artifactId === collectionImage)?.contentUrl || currentCollection?.coverContentUrl
+    ? collectionItems.find(i => i.artifactId === collectionImage)?.contentUrl || collectionItems[0]?.contentUrl
     : display?.contentUrl;
   const title = book.title || '未命名作品';
   const selectedIds=pages.slice(start-1,end ?? pages.length).map(p=>p.id);
@@ -317,7 +317,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
         })[publishState]} {textPublishImageProgress(publishRecord)} {publishRecord.errorMessage || publishRecord.error}</div>}
         {tab === 'collections' ? <>
           <CollectionChoices collections={collections} current={collection} choose={id=>{chooseCollection(id);setCollectionImage('');}} />
-          {collection && <section><h4>合集内容</h4><div className="text-media-page-choices"><button type="button" onClick={()=>setCollectionImage('')}>封面</button>
+          {collection && <section><h4>合集内容</h4><div className="text-media-page-choices">
             {collectionItems.map(i=><button type="button" key={i.artifactId} onClick={()=>setCollectionImage(i.artifactId)}>文字页 {i.ordinal}</button>)}</div></section>}
         </> : <>
           <CandidateList items={candidates} selectedId={display?.id} activeId={activeId} onSelect={id=>{if(!busy && discard())selectCandidate(id);}}/>

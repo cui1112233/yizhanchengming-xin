@@ -25,7 +25,7 @@ type textPublishTestRepo struct {
 	txt.Repository
 	scope      txt.Scope
 	collection txt.Collection
-	cover      txt.PageArtifact
+	artifacts  []txt.PageArtifact
 }
 
 func (f textPublishTestRepo) GetCollection(_ context.Context, s txt.Scope, id string) (txt.Collection, error) {
@@ -38,7 +38,7 @@ func (f textPublishTestRepo) ListArtifacts(_ context.Context, s txt.Scope) ([]tx
 	if s != f.scope {
 		return nil, txt.ErrNotFound
 	}
-	return []txt.PageArtifact{f.cover}, nil
+	return f.artifacts, nil
 }
 
 type textPublishTestClient struct {
@@ -53,15 +53,15 @@ func (f *textPublishTestClient) Publish(_ context.Context, r n8comic.PublishRequ
 	f.calls++
 	f.images = r.Images
 	if f.calls > 1 {
-		return n8comic.PublishResult{ImageIDs: []int64{21, 22}, ImageSignatures: []string{"signature1", "signature2"}, ReceiptPath: "/receipt?private-proof=7"}, n8comic.ErrCarouselReceiptPending
+		return n8comic.PublishResult{ImageIDs: []int64{21, 22, 23}, ImageSignatures: []string{"signature1", "signature2", "signature3"}, ReceiptPath: "/receipt?private-proof=7"}, n8comic.ErrCarouselReceiptPending
 	}
-	return n8comic.PublishResult{CarouselID: 19, ImageIDs: []int64{11, 12}}, nil
+	return n8comic.PublishResult{CarouselID: 19, ImageIDs: []int64{11, 12, 13}}, nil
 }
 
 func (f *textPublishTestClient) Readback(_ context.Context, in n8comic.ReceiptLookup) (n8comic.PublishResult, error) {
 	f.readbackCalls++
-	if f.confirmedReadback && in.ReceiptPath == "/receipt?private-proof=7" && len(in.ImageSignatures) == 2 && in.PreviousCarouselID == 19 {
-		return n8comic.PublishResult{ReceiptIntentID: in.IntentID, CarouselID: 29, ImageIDs: []int64{21, 22}}, nil
+	if f.confirmedReadback && in.ReceiptPath == "/receipt?private-proof=7" && len(in.ImageSignatures) == 3 && in.PreviousCarouselID == 19 {
+		return n8comic.PublishResult{ReceiptIntentID: in.IntentID, CarouselID: 29, ImageIDs: []int64{21, 22, 23}}, nil
 	}
 	return n8comic.PublishResult{}, nil
 }
@@ -82,15 +82,33 @@ func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 		t.Fatal(err)
 	}
 	pageData := append(append([]byte(nil), png...), 10)
+	pageData2 := append(append([]byte(nil), png...), 20)
+	pageData3 := append(append([]byte(nil), png...), 30)
 	cover, err := f.SaveImage("collection-cover", "image/png", bytes.NewReader(png))
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := f.SaveImage("collection-page", "image/png", bytes.NewReader(pageData))
+	page, err := f.SaveImage("collection-page-1", "image/png", bytes.NewReader(pageData))
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo := textPublishTestRepo{scope: s, collection: txt.Collection{ID: "text-c", Status: "ready", CoverArtifactID: "c", Items: []txt.CollectionItem{{Ordinal: 1, StorageRef: page.StorageRef, MediaType: "image/png"}}}, cover: txt.PageArtifact{ID: "c", Kind: "cover", ArtifactFile: txt.ArtifactFile{StorageRef: cover.StorageRef, MediaType: "image/png"}}}
+	page2, err := f.SaveImage("collection-page-2", "image/png", bytes.NewReader(pageData2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	page3, err := f.SaveImage("collection-page-3", "image/png", bytes.NewReader(pageData3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := textPublishTestRepo{
+		scope: s,
+		collection: txt.Collection{ID: "text-c", Status: "ready", CoverArtifactID: "c", Items: []txt.CollectionItem{
+			{Ordinal: 1, StorageRef: page.StorageRef, MediaType: "image/png"},
+			{Ordinal: 2, StorageRef: page2.StorageRef, MediaType: "image/png"},
+			{Ordinal: 3, StorageRef: page3.StorageRef, MediaType: "image/png"},
+		}},
+		artifacts: []txt.PageArtifact{{ID: "c", Kind: "cover", ArtifactFile: txt.ArtifactFile{StorageRef: cover.StorageRef, MediaType: "image/png"}}},
+	}
 	client := &textPublishTestClient{}
 	directory := fakeN8ComicAudioDirectory{categories: []n8catalog.AudioCategory{{ID: 3, Name: "分类", Status: "ENABLE"}}, audios: []n8catalog.Audio{{ID: 77, OrganizationID: 1, CategoryIDs: []int64{3}, Status: "ENABLE"}}}
 	p := &BatchFactoryN8ComicPublisher{Store: store, Client: client, LocalFiles: f, ProducerDirectory: directory, ProducerAccounts: []string{"maker"}}
@@ -152,7 +170,7 @@ func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 	if first.Publish.RunID != "run-1" || first.Publish.Attempt != 1 || first.Publish.RequestKey != "request-1" {
 		t.Fatal(first.Publish)
 	}
-	if !first.Published || first.Publish.CarouselID != 19 || first.Publish.CategoryID != "小说" || first.Publish.OrganizationID != "1" || len(client.images) != 2 || !bytes.Equal(client.images[0].Content, png) || !bytes.Equal(client.images[1].Content, pageData) {
+	if !first.Published || first.Publish.CarouselID != 19 || first.Publish.CategoryID != "小说" || first.Publish.OrganizationID != "1" || len(client.images) != 3 || !bytes.Equal(client.images[0].Content, pageData) || !bytes.Equal(client.images[1].Content, pageData2) || !bytes.Equal(client.images[2].Content, pageData3) {
 		t.Fatal(first, client.images)
 	}
 	if g := call("POST", map[string]any{}); g.Publish.IntentID != first.Publish.IntentID || client.calls != 1 {

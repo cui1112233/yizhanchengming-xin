@@ -49,13 +49,11 @@ func (w Workflow) inspectFiles(ctx context.Context, scope Scope, doc Document, p
 			return nil, err
 		}
 	}
-	cover := byID[doc.CoverArtifactID]
-	err = check("", doc.CoverArtifactID, "封面", cover.Kind == "cover" && cover.PageID == "" && cover.SourceKind == sourceKind(doc.CoverLocked))
-	return repairs, err
+	return repairs, nil
 }
 
 func matchesPages(collection Collection, doc Document, manifest [][2]string) bool {
-	if collection.Status != "ready" || collection.VersionID != doc.ActiveVersionID || collection.PaginationVersion != doc.PaginationVersion || collection.CoverArtifactID != doc.CoverArtifactID || len(collection.Items) != len(manifest) {
+	if collection.Status != "ready" || collection.VersionID != doc.ActiveVersionID || collection.PaginationVersion != doc.PaginationVersion || len(collection.Items) != len(manifest) {
 		return false
 	}
 	for i, item := range collection.Items {
@@ -67,7 +65,7 @@ func matchesPages(collection Collection, doc Document, manifest [][2]string) boo
 }
 
 func workflowCollectionID(scope Scope, collection Collection) string {
-	return fingerprint(scope, collection.VersionID, collection.PaginationVersion, collection.CoverArtifactID, collection.Items)
+	return fingerprint(scope, collection.VersionID, collection.PaginationVersion, collection.Items)
 }
 
 // Pinned uploads can refer to an earlier document version. Check the saved
@@ -89,15 +87,6 @@ func (w Workflow) verifyManifest(ctx context.Context, scope Scope, c Collection,
 	byID, err := w.artifactsByID(ctx, scope)
 	if err != nil {
 		return err
-	}
-	cover := byID[c.CoverArtifactID]
-	if cover.Kind != "cover" || cover.PageID != "" {
-		return fmt.Errorf("%w（合集封面记录无效）", ErrNotReady)
-	}
-	if pinned {
-		if err := w.VerifyFile(ctx, cover, "封面"); err != nil {
-			return err
-		}
 	}
 	prev := 0
 	for _, item := range c.Items {

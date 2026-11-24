@@ -601,11 +601,8 @@ func (r *MySQLRepository) CreateCollection(ctx context.Context, s Scope, in Coll
 		if h.version == "" || h.pagination == 0 {
 			return Collection{}, ErrNotReady
 		}
-		var cover string
-		err = tx.QueryRowContext(ctx, "SELECT a.id FROM "+documents+" d JOIN "+artifacts+" a ON a.id=d.cover_artifact_id AND a.owner_username=d.owner_username AND a.book_id=d.book_id AND a.artifact_kind='cover' WHERE d.id=?", h.id).Scan(&cover)
-		if errors.Is(err, sql.ErrNoRows) {
-			return Collection{}, fmt.Errorf("%w（封面）", ErrNotReady)
-		}
+		var cover sql.NullString
+		err = tx.QueryRowContext(ctx, "SELECT cover_artifact_id FROM "+documents+" WHERE id=?", h.id).Scan(&cover)
 		if err != nil {
 			return Collection{}, err
 		}
@@ -613,7 +610,7 @@ func (r *MySQLRepository) CreateCollection(ctx context.Context, s Scope, in Coll
 		if err != nil {
 			return Collection{}, err
 		}
-		c := Collection{ID: rand.Text(), VersionID: h.version, PaginationVersion: h.pagination, CoverArtifactID: cover, ConfigSnapshot: in.ConfigSnapshot, Status: "ready", Items: frozen}
+		c := Collection{ID: rand.Text(), VersionID: h.version, PaginationVersion: h.pagination, CoverArtifactID: cover.String, ConfigSnapshot: in.ConfigSnapshot, Status: "ready", Items: frozen}
 		if in.Reuse {
 			// lockHead serializes creation for this book, including across workers.
 			// The immutable manifest supplies the same ID after a lost commit reply.

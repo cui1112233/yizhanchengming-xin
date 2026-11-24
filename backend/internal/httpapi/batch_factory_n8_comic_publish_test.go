@@ -104,7 +104,11 @@ func (f *fakeN8ComicClient) Configured() bool { return f.configured }
 func (f *fakeN8ComicClient) Publish(_ context.Context, request n8comic.PublishRequest) (n8comic.PublishResult, error) {
 	f.calls++
 	f.request = request
-	return n8comic.PublishResult{CarouselID: 456, ImageIDs: []int64{101, 102}}, nil
+	imageIDs := make([]int64, len(request.Images))
+	for index := range imageIDs {
+		imageIDs[index] = int64(101 + index)
+	}
+	return n8comic.PublishResult{CarouselID: 456, ImageIDs: imageIDs}, nil
 }
 
 func TestN8ComicPublishExplainsMissingRequiredSettings(t *testing.T) {

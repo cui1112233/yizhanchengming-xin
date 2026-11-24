@@ -174,20 +174,20 @@ func TestRepositoryMySQLPageLifecycle(t *testing.T) {
 	if _, err := repo.SaveSystemPageArtifact(ctx, s, active[0].ID, active[0].Revision, file); err != nil {
 		t.Fatal(err)
 	}
+	c, err := repo.CreateCollection(ctx, s, CollectionInput{VersionID: v.ID, PaginationVersion: 2})
+	if err != nil {
+		t.Fatalf("page-only collection requires no work cover: %v", err)
+	}
+	if c.CoverArtifactID != "" || len(c.Items) != 2 || c.Items[1].ArtifactID != a.ID {
+		t.Fatalf("bad page-only snapshot %+v", c)
+	}
 	doc, err = repo.GetDocument(ctx, s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cover, err := repo.SaveCover(ctx, s, doc.Revision, file, true)
+	_, err = repo.SaveCover(ctx, s, doc.Revision, file, true)
 	if err != nil {
 		t.Fatal(err)
-	}
-	c, err := repo.CreateCollection(ctx, s, CollectionInput{VersionID: v.ID, PaginationVersion: 2})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.CoverArtifactID != cover.ID || len(c.Items) != 2 || c.Items[1].ArtifactID != a.ID {
-		t.Fatalf("bad snapshot %+v", c)
 	}
 	doc, err = repo.GetDocument(ctx, s)
 	if err != nil {

@@ -30,16 +30,13 @@ const images = [
   {id:'a',kind:'page',pageId:'p1',renderVersion:1,sourceKind:'system'},
   {id:'b',kind:'page',pageId:'p2',renderVersion:1,sourceKind:'user_upload'},
 ];
-test('加载完当前文档和活动封面后才允许合成，旧封面或失败封面不可用', () => {
+test('合成只依赖当前文字页，作品封面缺失或变化不影响合集', () => {
   assert.equal(canCreateTextCollection(pages,['p1']),false);
   assert.equal(canCreateTextCollection(pages,['p1'],null,[cover,...images]),false);
   assert.equal(canCreateTextCollection(pages,['p1'],document),false);
-  for (const changes of [{coverArtifactId:''},{activeVersionId:''},{coverLocked:true}])
-    assert.equal(canCreateTextCollection(pages,['p1'],{...document,...changes},[cover,...images]),false);
-  for (const changes of [{id:'old-cover'},{kind:'page'},{renderVersion:7},{renderVersion:0},{status:'failed'},{status:'rendering'},{status:'stale'}])
-    assert.equal(canCreateTextCollection(pages,['p1'],document,[{...cover,...changes},...images]),false);
-  assert.equal(canCreateTextCollection(pages,['p1'],{...document,coverLocked:true},
-    [{...cover,sourceKind:'user_upload'},...images]),true);
+  assert.equal(canCreateTextCollection(pages,['p1'],{...document,coverArtifactId:''},images),true);
+  assert.equal(canCreateTextCollection(pages,['p1'],{...document,coverArtifactId:'changed'},[{...cover,status:'failed'},...images]),true);
+  assert.equal(canCreateTextCollection(pages,['p1'],{...document,activeVersionId:''},[cover,...images]),false);
 });
 
 test('只计算当前生产版本和所选页对应的成品', () => {

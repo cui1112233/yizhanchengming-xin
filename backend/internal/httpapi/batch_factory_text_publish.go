@@ -362,7 +362,7 @@ func (t textCollectionPublisher) publish(ctx context.Context, s txt.Scope, book 
 		if err != nil {
 			return out, err
 		}
-		if c.ID != id || c.Status != "ready" || len(c.Items) == 0 || c.CoverArtifactID == "" {
+		if c.ID != id || c.Status != "ready" || len(c.Items) == 0 {
 			return out, txt.ErrNotReady
 		}
 		if !r.Resuming {
@@ -383,22 +383,8 @@ func (t textCollectionPublisher) publish(ctx context.Context, s txt.Scope, book 
 		if err != nil {
 			return out, err
 		}
-		files, err := t.repo.ListArtifacts(ctx, s)
-		if err != nil {
-			return out, err
-		}
-		index := slices.IndexFunc(files, func(a txt.PageArtifact) bool { return a.ID == c.CoverArtifactID && a.Kind == "cover" })
-		if index < 0 {
-			return out, fmt.Errorf("%w（封面）", txt.ErrNotReady)
-		}
-		cover := files[index]
-		page, err := p.publishPage(ctx, c.ID, 0, cover.StorageRef, cover.MediaType, cover.SHA256)
-		if err != nil {
-			return out, err
-		}
-		out.Pages = append(out.Pages, page)
 		for _, item := range c.Items {
-			page, err = p.publishPage(ctx, c.ID, item.Ordinal, item.StorageRef, item.MediaType, item.SHA256)
+			page, err := p.publishPage(ctx, c.ID, item.Ordinal, item.StorageRef, item.MediaType, item.SHA256)
 			if err != nil {
 				return out, err
 			}

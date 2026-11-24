@@ -29,15 +29,11 @@ export function textBookCompletion(pages = []) {
   return { ready, total, percent: total ? Math.round(ready * 100 / total) : 0 };
 }
 
-// Use one listTextPages snapshot for document, pages and artifact history.
-// A newer page revision can coexist with a still-current, older cover render.
+// The work cover is edited and displayed separately. A collection is only the
+// ordered set of ready text-page images, so cover readiness cannot block it.
 export function canCreateTextCollection(pages = [], ids, document, artifacts) {
-  if (!document?.activeVersionId || !document.coverArtifactId || !Array.isArray(artifacts)) return false;
+  if (!document?.activeVersionId || !Array.isArray(artifacts)) return false;
   const byArtifactId = new Map(artifacts.map(artifact => [artifact.id, artifact]));
-  const cover = byArtifactId.get(document.coverArtifactId);
-  if (cover?.kind !== 'cover' || cover.sourceKind !== (document.coverLocked ? 'user_upload' : 'system')
-    || (cover.status && cover.status !== 'ready')
-    || !(cover.renderVersion > 0 && cover.renderVersion <= document.revision)) return false;
   const byId = new Map(pages.map(page => [page.id, page]));
   const selected = ids ?? [...byId.keys()];
   if (!selected.length || new Set(selected).size !== selected.length) return false;

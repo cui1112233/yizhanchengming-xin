@@ -18,6 +18,13 @@ test('项目和书目将文本交给文字媒体库', () => {
   assert.match(library, /value:'text',label:'文本'/);
 });
 
+test('文本合集预览只列文字页，不把作品封面放进合集', () => {
+  const source = readFileSync(new URL('./TextMediaPanel.jsx', import.meta.url), 'utf8');
+  assert.match(source, /collectionItems\[0\]\?\.contentUrl/);
+  assert.doesNotMatch(source, /currentCollection\?\.coverContentUrl/);
+  assert.doesNotMatch(source, /setCollectionImage\(''\)>封面/);
+});
+
 const browser = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(path => path && existsSync(path));
 test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询', {skip:!browser}, async () => {
@@ -87,7 +94,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         single=false;button('更新文字页').click();
         await until(()=>document.body.innerText.includes('第一段完整。'));
         for(const label of ['本页背景','页面内容','封面','文字页','文本合集','展开','合成当前书','上传网络'])if(!document.body.innerText.includes(label))throw Error('缺少 '+label);
-        if(!button('合成当前书').disabled)throw Error('缺封面时未禁用合成');
+        if(!button('合成当前书').disabled)throw Error('文字页未就绪时未禁用合成');
         button('下一页').click();
         await until(()=>document.body.innerText.includes('第二段完整。'));
         const beforePoll=reads;rendering=false;await until(()=>reads>beforePoll);

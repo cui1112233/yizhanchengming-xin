@@ -60,6 +60,33 @@ func (r *workflowRepo) CreateCollection(_ context.Context, _ Scope, in Collectio
 	return c, nil
 }
 
+func TestTextCollectionManifestDoesNotDependOnWorkCover(t *testing.T) {
+	ctx := context.Background()
+	scope := Scope{"owner", "batch", "book"}
+	doc := Document{ID: "doc", ActiveVersionID: "version", PaginationVersion: 1, Revision: 1, CoverArtifactID: "current-cover"}
+	page := Page{ID: "p1", VersionID: "version", PaginationVersion: 1, Ordinal: 1, Status: "ready", ActiveArtifactID: "page-1", RenderVersion: 1}
+	repo := &workflowRepo{doc: doc, pages: []Page{page}}
+	collection := Collection{ID: "manual", Status: "ready", VersionID: "version", PaginationVersion: 1, CoverArtifactID: "older-cover", Items: []CollectionItem{{Ordinal: 1, PageID: "p1", ArtifactID: "page-1"}}}
+	manifest := [][2]string{{"p1", "page-1"}}
+
+	if !matchesPages(collection, doc, manifest) {
+		t.Fatal("matching page manifest was rejected only because the external cover changed")
+	}
+	before := workflowCollectionID(scope, collection)
+	collection.CoverArtifactID = "another-cover"
+	if after := workflowCollectionID(scope, collection); after != before {
+		t.Fatalf("collection id changed with external cover: %s != %s", after, before)
+	}
+	w := Workflow{Repo: repo, VerifyFile: func(context.Context, PageArtifact, string) error { return nil }}
+	if err := w.verifyManifest(ctx, scope, collection, false); err != nil {
+		t.Fatalf("page-only manifest rejected: %v", err)
+	}
+	repairs, err := w.inspectFiles(ctx, scope, Document{ID: "doc", ActiveVersionID: "version", PaginationVersion: 1}, []Page{page})
+	if err != nil || repairs[""] != nil {
+		t.Fatalf("missing work cover entered collection repair set: repairs=%v err=%v", repairs, err)
+	}
+}
+
 func TestTextWorkflowFingerprintsFollowChangedSettings(t *testing.T) {
 	ctx := context.Background()
 	repo := &workflowRepo{}
@@ -113,17 +140,17 @@ func TestTextWorkflowFingerprintsFollowChangedSettings(t *testing.T) {
 	req.PublishSettingsKey = "organization-2"
 	req.FrozenSettings["comicPublishSettings"] = json.RawMessage(`{"organizationId":"2"}`)
 	ensure()
-	if reflows != 1 || renders != 2 || publishes != 2 || len(repo.collections) != 1 {
+	if reflows != 1 || renders != 1 || publishes != 2 || len(repo.collections) != 1 {
 		t.Fatalf("mapping change: layout=%d render=%d publish=%d collections=%d", reflows, renders, publishes, len(repo.collections))
 	}
 	src.Snapshot = json.RawMessage(`{"layout":{"fontSize":24,"textColor":"#101010"},"sourceVersion":"v"}`)
 	ensure()
-	if reflows != 1 || renders != 4 || initialPageKey != journal["text_paginate"] || initialRenderKey == journal["text_render"] || len(repo.collections) != 2 {
+	if reflows != 1 || renders != 2 || initialPageKey != journal["text_paginate"] || initialRenderKey == journal["text_render"] || len(repo.collections) != 2 {
 		t.Fatalf("color change: reflows=%d renders=%d journal=%v", reflows, renders, journal)
 	}
 	src.Snapshot = json.RawMessage(`{"layout":{"fontSize":48},"sourceVersion":"v"}`)
 	ensure()
-	if reflows != 2 || renders != 6 || initialPageKey == journal["text_paginate"] || len(repo.collections) != 3 {
+	if reflows != 2 || renders != 3 || initialPageKey == journal["text_paginate"] || len(repo.collections) != 3 {
 		t.Fatalf("layout change: reflows=%d renders=%d", reflows, renders)
 	}
 }
