@@ -1,5 +1,7 @@
 import { Button, Image, ScrollView, Text, Textarea, View } from "@tarojs/components";
-import { useState } from "react";
+import Taro from "@tarojs/taro";
+import { useEffect, useRef, useState } from "react";
+import { createSheetDismissal } from "./sheetMotion";
 import AppIcon from "../../../components/AppIcon";
 import {
   COMIC_ASPECT_RATIOS, COMIC_SOURCE_TRUNCATE_HINT_CHARS, MIN_COMIC_SOURCE_CHARS,
@@ -85,8 +87,18 @@ export default function ComicSettingsStage({
   const [draftStyle, setDraftStyle] = useState(styleId);
   const [draftRatio, setDraftRatio] = useState(aspectRatio);
   const [detail, setDetail] = useState("");
-  const openPicker = (value: "prompt" | "derivation" | "model" | "constraints") => { setDraft({}); setDetail(""); onOpenSettingPicker(value); };
-  const openTool = (value: "style" | "ratio") => { setDraftStyle(styleId); setDraftRatio(aspectRatio); setTool(value); };
+  const [closing, setClosing] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(() => Taro.getStorageSync("yzcm.mobile.reduceMotion") === true);
+  const dismissal = useRef<ReturnType<typeof createSheetDismissal>>();
+  if (!dismissal.current) dismissal.current = createSheetDismissal(setClosing);
+  useEffect(() => () => dismissal.current?.cancel(), []);
+  const beginOpen = () => { dismissal.current!.open(); setReducedMotion(Taro.getStorageSync("yzcm.mobile.reduceMotion") === true); };
+  const dismiss = (finish: () => void, commit?: () => void) => dismissal.current!.dismiss(Taro.getStorageSync("yzcm.mobile.reduceMotion") === true, finish, commit);
+  const openPicker = (value: "prompt" | "derivation" | "model" | "constraints") => { beginOpen(); setDraft({}); setDetail(""); onOpenSettingPicker(value); };
+  const openTool = (value: "style" | "ratio") => { beginOpen(); setDraftStyle(styleId); setDraftRatio(aspectRatio); setTool(value); };
+  const closeTool = () => { dismiss(() => setTool("")); };
+  const closePicker = () => { dismiss(onCloseSettingPicker); };
+  const motionClass = closing ? " is-closing" : "";
   const choose = (key: keyof ComicSettingSelections, value: string) => setDraft(prev => ({...prev, [key]: value}));
   const selected = (key: keyof ComicSettingSelections, fallback: string) => draft[key] ?? settingSelections[key] ?? fallback;
   const length = comicSourceLength(source);
@@ -118,13 +130,13 @@ export default function ComicSettingsStage({
   const currentDerivationId = text(asRecord(comic.imageDerivation).presetId);
   const currentConstraintId = (category: string) => (Array.isArray(comic.constraints) ? comic.constraints : [])
     .map(asRecord).find((item) => text(item.constraintCategory) === category)?.presetId as string || "";
-  const choice = (id: string, name: string, caption: string, active: boolean, onClick: () => void) => <View key={id} className={`comic-preset-choice ce-option-row${active ? " is-active" : ""}`} onClick={onClick}>
+  const choice = (id: string, name: string, caption: string, active: boolean, onClick: () => void) => <View key={id} className={`comic-preset-choice ce-option-row${active ? " is-active" : ""}`} hoverClass="ce-row-press" hoverStartTime={0} hoverStayTime={70} onClick={() => {if (!closing) onClick();}}>
     <View className="comic-preset-copy"><Text className="comic-preset-name">{name}</Text><Text className="comic-caption">{caption}</Text>{detail === id ? <Text className="ce-option-detail">完整名称：{name}。{caption}</Text> : null}</View>
     <View className="ce-option-side"><View className={`ce-option-radio${active ? " is-checked" : ""}`}>{active ? <Text className="ce-check-glyph">✓</Text> : null}</View><Button className="ce-option-detail-button" onClick={event => {event.stopPropagation();setDetail(detail === id ? "" : id);}}>{detail === id ? "收起" : "详情"}</Button></View>
   </View>;
   const presetChoice = (key: keyof ComicSettingSelections, option: ComicCatalogPreset, current: string, caption: string) => choice(`${key}:${option.id}`, option.name, `${caption} · v${option.version}`, selected(key, current) === option.id, () => choose(key, option.id));
   const hint = continueHint || (setupLoading ? "正在读取画风和预设…" : !styleId ? "还没有可用画风，稍后再试" : !length ? "先粘贴小说正文" : remaining > 0 ? `还需 ${remaining} 字` : "先创建项目并提取资产，下一步再确认分镜");
-  return <View className="comic-settings-stage">
+  return <View className={`comic-settings-stage${reducedMotion ? " is-motion-reduced" : ""}`}>
     {error ? <Text className="mp-error comic-error">{error}</Text> : null}
 
 
@@ -136,30 +148,30 @@ export default function ComicSettingsStage({
     {setupLoading ? <Text className="comic-hint">正在读取画风和生成设置…</Text> : null}
     </View>
     <View className="ce-tools ce-source-tools">
-      <Button id="comic-tool-style" onClick={() => openTool("style")}><AppIcon name="sparkles" size={23} /><Text>画风</Text><Text className="ce-tool-value">{selectedStyle}</Text></Button>
-      <Button id="comic-tool-ratio" onClick={() => openTool("ratio")}><AppIcon name="camera" size={23} /><Text>画幅</Text><Text className="ce-tool-value">{aspectRatio}</Text></Button>
-      <Button id="comic-tool-model" onClick={() => openPicker("model")}><AppIcon name="bot" size={23} /><Text>模型</Text><Text className="ce-tool-value">{summary.model}</Text></Button>
-      <Button id="comic-tool-prompt" onClick={() => openPicker("prompt")}><AppIcon name="file-pen-line" size={23} /><Text>提示词</Text></Button>
-      <Button id="comic-tool-reference" onClick={onOpenReference}><AppIcon name="book-open" size={23} /><Text>参考图</Text></Button>
+      <Button id="comic-tool-style" className={tool === "style" ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openTool("style")}><AppIcon name="sparkles" size={23} /><Text>画风</Text><Text className="ce-tool-value">{selectedStyle}</Text></Button>
+      <Button id="comic-tool-ratio" className={tool === "ratio" ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openTool("ratio")}><AppIcon name="camera" size={23} /><Text>画幅</Text><Text className="ce-tool-value">{aspectRatio}</Text></Button>
+      <Button id="comic-tool-model" className={settingPicker === "model" ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openPicker("model")}><AppIcon name="bot" size={23} /><Text>模型</Text><Text className="ce-tool-value">{summary.model}</Text></Button>
+      <Button id="comic-tool-prompt" className={Boolean(settingPicker && settingPicker !== "model") ? "is-open" : ""} hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={() => openPicker("prompt")}><AppIcon name="file-pen-line" size={23} /><Text>提示词</Text></Button>
+      <Button id="comic-tool-reference" hoverClass="ce-tool-press" hoverStartTime={0} hoverStayTime={70} onClick={onOpenReference}><AppIcon name="book-open" size={23} /><Text>参考图</Text></Button>
     </View>
-    {tool ? <><View className="comic-sheet-mask" onClick={() => setTool("")} /><View className={`comic-sheet ce-choice-sheet${tool === "ratio" ? " is-ratio" : ""}`}>
-      <View className="comic-sheet-handle" /><View className="ce-sheet-title"><Text>{tool === "style" ? "漫画风格" : "图片画幅"}</Text><Button onClick={() => setTool("")}>取消</Button></View>
+    {tool ? <><View className={`comic-sheet-mask ce-motion-mask${motionClass}`} onClick={closeTool} /><View className={`comic-sheet ce-choice-sheet ce-motion-sheet${tool === "ratio" ? " is-ratio" : ""}${motionClass}`}>
+      <View className="comic-sheet-handle" /><View className="ce-sheet-title"><Text>{tool === "style" ? "漫画风格" : "图片画幅"}</Text><Button onClick={closeTool}>取消</Button></View>
       <Text className="ce-sheet-subtitle">{tool === "style" ? "选择这次漫画的画面风格" : "选择适合发布平台的图片比例"}</Text>
       <ScrollView scrollY className="ce-sheet-scroll">{tool === "style" ? <View className="ce-style-grid">{styles.map(style => <Button key={style.id} className={draftStyle === style.id ? "is-selected" : ""} onClick={() => setDraftStyle(style.id)}>
         {thumbs[style.id] ? <Image src={thumbs[style.id]} mode="aspectFill" /> : <View className={thumbFailed[style.id] ? "comic-style-thumb is-failed" : style.previewUrl ? "comic-style-thumb is-skeleton" : "ce-style-placeholder"} onClick={event=>{if(thumbFailed[style.id]){event.stopPropagation();onRetryThumb(style.id);}}}><Text>{thumbFailed[style.id] ? "图片读取失败，点按重试" : style.previewUrl ? "读取预览图…" : style.name}</Text></View>}
         <View className="ce-style-label"><Text>{style.name}</Text><View className={`ce-option-radio${draftStyle === style.id ? " is-checked" : ""}`}>{draftStyle === style.id ? <Text className="ce-check-glyph">✓</Text> : null}</View></View>
       </Button>)}</View> : <View className="comic-aspect-grid">{COMIC_ASPECT_RATIOS.map(value => <Button key={value} className={draftRatio === value ? "comic-aspect-choice is-active" : "comic-aspect-choice"} onClick={() => setDraftRatio(value)}><View className="ce-ratio-outline" style={ratioOutline(value)} /><Text>{value}</Text>{draftRatio === value ? <Text className="ce-ratio-check">✓</Text> : null}</Button>)}</View>}
       {tool === "style" && !styles.length ? <Text className="comic-hint">暂无可用画风，请检查账号配置后重试。</Text> : null}</ScrollView>
-      <View className="ce-sheet-footer"><Button className="ce-sheet-confirm" disabled={tool === "style" && !styles.some(style => style.id === draftStyle)} onClick={() => {if(tool === "style") onStyleChange(draftStyle);else onAspectChange(draftRatio);setTool("");}}>完成</Button></View>
+      <View className="ce-sheet-footer"><Button className="ce-sheet-confirm" hoverClass="ce-confirm-press" hoverStartTime={0} hoverStayTime={70} disabled={tool === "style" && !styles.some(style => style.id === draftStyle)} onClick={() => {dismiss(() => setTool(""), () => {if(tool === "style") onStyleChange(draftStyle);else onAspectChange(draftRatio);});}}>完成</Button></View>
     </View></> : null}
     {pickerTitle ? <>
-      <View className="comic-sheet-mask" onClick={onCloseSettingPicker} />
-      <View className="comic-sheet comic-setting-sheet ce-catalog-sheet">
+      <View className={`comic-sheet-mask ce-motion-mask${motionClass}`} onClick={closePicker} />
+      <View className={`comic-sheet comic-setting-sheet ce-catalog-sheet ce-motion-sheet${motionClass}`}>
         <View className="comic-sheet-handle" />
-        <View className="comic-setting-sheet-head"><Text className="comic-head-title">{pickerTitle}</Text><Button className="comic-sheet-cancel" onClick={onCloseSettingPicker}>取消</Button></View>
+        <View className="comic-setting-sheet-head"><Text className="comic-head-title">{pickerTitle}</Text><Button className="comic-sheet-cancel" onClick={closePicker}>取消</Button></View>
         <Text className="ce-sheet-subtitle">{settingPicker === "model" ? "分别选择文本和图片使用的模型" : "选择适合这次创作的提示词配置"}</Text>
-        {settingPicker !== "model" ? <View className="ce-prompt-categories">{([["prompt", "漫画分页"], ["derivation", "图片描述词推导"], ["constraints", "画质与约束"]] as const).map(([value, label]) => <Button key={value} className={settingPicker === value ? "is-active" : ""} onClick={() => {setDetail("");onOpenSettingPicker(value);}}>{label}</Button>)}</View> : null}
-        <ScrollView scrollY className="comic-setting-sheet-list">
+        {settingPicker !== "model" ? <View className="ce-prompt-categories"><View className="ce-category-slider" style={{transform: `translateX(${settingPicker === "constraints" ? 200 : settingPicker === "derivation" ? 100 : 0}%)`}} />{([["prompt", "漫画分页"], ["derivation", "图片描述词推导"], ["constraints", "画质与约束"]] as const).map(([value, label]) => <Button key={value} id={`comic-category-${value}`} disabled={closing} className={settingPicker === value ? "is-active" : ""} onClick={() => {beginOpen();setDetail("");onOpenSettingPicker(value);}}>{label}</Button>)}</View> : null}
+        <ScrollView key={settingPicker} scrollY className="comic-setting-sheet-list ce-category-content">
           {settingPicker === "prompt" ? <View className="comic-setting-group">{settingCatalog.pagePrompts.map(option => presetChoice("pagePromptId",option,currentPromptId,"漫画分页规则"))}{!settingCatalog.pagePrompts.length ? <Text className="ce-sheet-empty">暂无可用漫画分页提示词</Text> : null}</View> : null}
           {settingPicker === "derivation" ? <View className="comic-setting-group">{settingCatalog.imageDerivations.map(option => presetChoice("imageDerivationId",option,currentDerivationId,"图片描述词推导"))}{!settingCatalog.imageDerivations.length ? <Text className="ce-sheet-empty">暂无可用图片描述词</Text> : null}</View> : null}
           {settingPicker === "model" ? <>{(["text", "image"] as const).map(kind => <View key={kind} className="comic-setting-group"><Text className="comic-setting-group-title">{kind === "text" ? "文本模型" : "图片模型"}</Text>{models.filter(model => model.kind === kind).map(model => {const key = kind === "text" ? "textModelId" : "imageModelId";return choice(`${key}:${model.id}`,model.name,kind === "text" ? "文本模型" : model.provider || "图片模型",selected(key,text(config[key])) === model.id,() => choose(key,model.id));})}{!models.some(model => model.kind === kind) ? <Text className="ce-sheet-empty">暂无可用{kind === "text" ? "文本" : "图片"}模型</Text> : null}</View>)}</> : null}
@@ -169,7 +181,7 @@ export default function ComicSettingsStage({
             ["负面提示词", "negativeId", "comic_negative", settingCatalog.constraints.negative],
           ] as const).map(([label,key,category,options]) => <View key={category} className="comic-setting-group"><Text className="comic-setting-group-title">{label}</Text>{options.map(option => presetChoice(key,option,currentConstraintId(category),label))}{!options.length ? <Text className="ce-sheet-empty">暂无可用{label}</Text> : null}</View>)}</> : null}
         </ScrollView>
-        <View className="ce-sheet-footer"><Text className="ce-sheet-note">仅用于下一次创建，已有项目保持原配置</Text><Button className="ce-sheet-confirm" onClick={() => {onConfirmSettingSelections(draft);onCloseSettingPicker();}}>{settingPicker === "model" ? "使用此配置" : "使用此提示词"}</Button></View>
+        <View className="ce-sheet-footer"><Text className="ce-sheet-note">仅用于下一次创建，已有项目保持原配置</Text><Button className="ce-sheet-confirm" hoverClass="ce-confirm-press" hoverStartTime={0} hoverStayTime={70} onClick={() => {dismiss(onCloseSettingPicker, () => onConfirmSettingSelections(draft));}}>{settingPicker === "model" ? "使用此配置" : "使用此提示词"}</Button></View>
       </View>
     </> : null}
 

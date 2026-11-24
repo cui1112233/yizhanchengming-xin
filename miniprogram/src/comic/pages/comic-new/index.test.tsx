@@ -273,6 +273,7 @@ beforeEach(() => {
   h.pollStatus = { state: "completed", books: [{ id: "book-1", status: "completed" }] };
   h.pollStarts = 0;
   h.storage.clear();
+  h.storage.set("yzcm.mobile.reduceMotion", true);
   h.show = null;
   h.hide = null;
   vi.resetAllMocks();
@@ -458,6 +459,23 @@ describe("私人定制漫画页", () => {
     expect(h.create).toHaveBeenCalledWith(expect.objectContaining({
       initialBatchSettings: expect.objectContaining({ imageAspectRatio: "3:4", imageModelId: "image-real", imageProvider: "doubao" }),
     }));
+  });
+
+  test("普通动效关闭保留退出阶段，快速重开不会被旧计时器关闭", async () => {
+    vi.useFakeTimers();
+    try {
+      h.storage.set("yzcm.mobile.reduceMotion", false);
+      render(); runEffects(); await flush();
+      findSetting("漫画提示词").props.onClick();
+      findByText(render(), "取消").props.onClick();
+      expect(nodesOfType(render(), "View").some(node => String(node.props.className).includes("ce-motion-sheet is-closing"))).toBe(true);
+      findSetting("模型配置").props.onClick();
+      vi.advanceTimersByTime(300);
+      expect(textContent(render())).toContain("选择模型配置");
+      findByText(render(), "取消").props.onClick();
+      vi.advanceTimersByTime(220);
+      expect(textContent(render())).not.toContain("选择模型配置");
+    } finally { vi.useRealTimers(); }
   });
 
   test("选择面板暂存跨分类选择，取消不改变配置，确认一起保存", async () => {

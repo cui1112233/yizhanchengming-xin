@@ -179,3 +179,35 @@
   .comic-setting-sheet-list { margin-top: 0; }
   .ce-reference-empty { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10PX; min-height: 150PX; margin: 16PX 0; border: 1PX dashed var(--comic-muted); border-radius: 14PX; background: var(--ce-raised); color: var(--comic-muted); font-size: 13PX; }
 }
+@keyframes ce-sheet-enter { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes ce-sheet-exit { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@keyframes ce-mask-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ce-mask-exit { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ce-content-enter { from { opacity: .3; } to { opacity: 1; } }
+@keyframes ce-check-enter { 0% { transform: scale(.75); opacity: 0; } 70% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+.mp-page.comic-new.comic-editor {
+  .ce-motion-sheet { animation: ce-sheet-enter 260ms cubic-bezier(.2,.8,.2,1) both; }
+  .ce-motion-sheet.is-closing { animation: ce-sheet-exit 220ms cubic-bezier(.4,0,.6,1) both; }
+  .ce-motion-mask { animation: ce-mask-enter 260ms ease-out both; }
+  .ce-motion-mask.is-closing { animation: ce-mask-exit 220ms ease-in both; }
+  .ce-prompt-categories { position: relative; }
+  .ce-category-slider { position: absolute; top: 4PX; bottom: 4PX; left: 4PX; width: calc((100% - 8PX) / 3); border-radius: 9PX; background: var(--comic-paper); box-shadow: 0 1PX 4PX var(--ce-shadow); transition: transform 180ms cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+  .ce-prompt-categories button { position: relative; z-index: 1; transition: color 150ms ease; }
+  .ce-prompt-categories .is-active { background: transparent; box-shadow: none; }
+  .ce-category-content { animation: ce-content-enter 140ms ease-out; }
+  .ce-option-row, .comic-aspect-choice, .ce-style-grid button { transition: background-color 150ms ease, border-color 150ms ease; }
+  .ce-option-radio { transition: background-color 150ms ease, border-color 150ms ease; }
+  .ce-check-glyph, .ce-ratio-check { animation: ce-check-enter 160ms ease-out both; }
+  .ce-tools button { transition: transform 100ms ease, color 150ms ease, background-color 150ms ease; border-radius: 10PX; }
+  .ce-tools button.is-open { color: var(--comic-accent); background: var(--comic-soft); }
+  .ce-tools .ce-tool-press { transform: scale(.95); background: var(--ce-raised); }
+  .ce-sheet-confirm { transition: transform 100ms ease, opacity 100ms ease; }
+  .ce-confirm-press { transform: scale(.985); opacity: .88; }
+  .ce-row-press { background: var(--ce-raised); }
+  .is-motion-reduced .ce-motion-sheet, .is-motion-reduced .ce-motion-mask, .is-motion-reduced .ce-category-content,
+  .is-motion-reduced .ce-check-glyph, .is-motion-reduced .ce-ratio-check { animation: none; }
+  .is-motion-reduced .ce-category-slider, .is-motion-reduced .ce-option-row, .is-motion-reduced .ce-option-radio,
+  .is-motion-reduced .comic-aspect-choice, .is-motion-reduced .ce-style-grid button, .is-motion-reduced .ce-tools button,
+  .is-motion-reduced .ce-sheet-confirm, .is-motion-reduced .ce-prompt-categories button { transition: none; }
+  .is-motion-reduced .ce-tool-press, .is-motion-reduced .ce-confirm-press { transform: none; }
+}
