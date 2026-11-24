@@ -163,7 +163,7 @@ import { assetsForProductionMode } from './batchFactoryAssetMode';
 import { comicPageErrorMessage, comicPageGenerationPayload, comicPromptForImageAspect, generateComicPageWithConflict, runComicPagePool } from './batchFactoryComicMode';
 import { batchFactoryShouldPrepareAudio, batchFactoryShouldRecompileVideoPrompts } from './batchFactoryProductionMode';
 import { ComicSourceContent } from './ComicSourceContent.jsx';
-import { batchMediaCounts as runtimeBatchMediaCounts, batchFactoryNovelCopyText, bookVideoVersions, clearDeletedBookBackgroundTask, resolveBookEditableContent as runtimeResolveBookEditableContent, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
+import { batchMediaCounts as runtimeBatchMediaCounts, batchFactoryNovelCopyText, batchFactoryUploadedBooksForCopy, bookVideoVersions, clearDeletedBookBackgroundTask, resolveBookEditableContent as runtimeResolveBookEditableContent, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { downloadProductionContent } from './batchFactoryContentDownload.js';
 import { realVideoDurationSeconds, formatDurationSeconds } from './batchFactoryVideoMeta';
 import { getWorkshopPlatforms } from '../../../shared/api/novelFetchWorkshop';
@@ -249,14 +249,15 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
   const pendingContentBooks = books.filter(isBatchFactoryContentReadRunning);
   const copyAllBooks = async event => {
     event?.stopPropagation?.();
-    if (!books.length) {
-      message.warning('当前批次没有可复制的小说');
+    const uploadedBooks = batchFactoryUploadedBooksForCopy(books, {productionStatus,mergeStatus,stageSummaries}, book => effectiveBookSettings(batch,book).productionMode);
+    if (!uploadedBooks.length) {
+      message.info('当前没有上传成功的小说可复制');
       return;
     }
-    const text = batchFactoryNovelCopyText(books, platformNames);
+    const text = batchFactoryNovelCopyText(uploadedBooks, platformNames);
     try {
       await navigator.clipboard.writeText(text);
-      message.success(`已复制 ${books.length} 本书`);
+      message.success(`已复制 ${uploadedBooks.length} 本上传成功的书`);
     } catch (error) {
       message.error('复制失败，请检查浏览器剪贴板权限后重试');
     }
@@ -276,12 +277,12 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
       <span className="is-order">#</span>
       <span className="is-novel-head">
         <span>小说</span>
-        <Tooltip title="复制全部书名 / 书城ID / 书城">
+        <Tooltip title="仅复制上传成功的书名 / 书城ID / 书城">
           <Button
             type="text"
             size="small"
             className="batch-factory-copy-books"
-            aria-label="复制全部书名 / 书城ID / 书城"
+            aria-label="仅复制上传成功的书名 / 书城ID / 书城"
             icon={<CopyOutlined />}
             onClick={copyAllBooks}
           />

@@ -36,11 +36,11 @@ test('copies every book as title / source id / platform in tab-separated lines',
   assert.equal(lines[2], '缺字段的书\t\t');
 });
 
-test('the copy-all-books icon lives in the novel header and never triggers row clicks', () => {
-  assert.match(source, /复制全部书名 \/ 书城ID \/ 书城/);
-  assert.match(source, /batchFactoryNovelCopyText\(books, platformNames\)/);
+test('the copy-uploaded-books icon lives in the novel header and never triggers row clicks', () => {
+  assert.match(source, /仅复制上传成功的书名 \/ 书城ID \/ 书城/);
+  assert.match(source, /batchFactoryNovelCopyText\(uploadedBooks, platformNames\)/);
   assert.match(source, /event\?\.stopPropagation\?\.\(\)/);
-  assert.match(source, /已复制 \$\{books\.length\} 本书/);
+  assert.match(source, /已复制 \$\{uploadedBooks\.length\} 本上传成功的书/);
   assert.match(source, /复制失败，请检查浏览器剪贴板权限后重试/);
 });
 

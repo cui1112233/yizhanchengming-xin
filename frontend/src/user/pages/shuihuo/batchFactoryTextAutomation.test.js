@@ -473,3 +473,37 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
     run().catch(e=>document.body.dataset.error=e.message);
   `);
 });
+
+test('Chrome 小说列表复制按钮只写入上传成功项，没有成功项时保留剪贴板', {skip:!browser}, async () => {
+  await runChrome(`
+    import React from 'react';
+    import {createRoot} from 'react-dom/client';
+    import {BatchFactoryNovelList} from './BatchFactoryNovelList.jsx';
+    const root=createRoot(document.querySelector('#root'));
+    const sleep=n=>new Promise(resolve=>setTimeout(resolve,n));
+    async function until(check){for(let i=0;i<200;i++){if(check())return;await sleep(20)}throw Error(document.body.innerText)}
+    const buttons=()=>Array.from(document.querySelectorAll('button'));
+    const button=text=>buttons().find(node=>node.textContent.trim()===text);
+    const writes=[];
+    Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>writes.push(text)}});
+    const books=['success','failed','waiting'].map(id=>({id,title:id,bookId:id,platform:'zhihu',sourceText:'正文。',txtText:'正文。',videos:[],settingsState:{patch:{}}}));
+    const batch={id:'copy-batch',revision:1,title:'复制测试',settingsState:{patch:{productionMode:'text'}},books};
+    const summaries={success:{runs:[],textPublishSource:'manual',textPublishRecord:{kind:'text',bookId:'success',status:'published',carouselId:9,imageIds:[11,12],pageCount:2}},failed:{runs:[],textPublishSource:'manual',textPublishRecord:{kind:'text',bookId:'failed',status:'failed'}},waiting:{runs:[]}};
+    window.fetch=async url=>new Response(JSON.stringify(String(url).includes('runtime-summary')?{stageSummaries:summaries,automation:{state:'idle',books:[]},production:{jobs:[]},merge:{jobs:[]}}:{}),{headers:{'Content-Type':'application/json'}});
+    async function run(){
+      root.render(<BatchFactoryNovelList batch={batch}/>);
+      await until(()=>document.body.innerText.includes('1 上传成功'));
+      button('小说列表').click();
+      await until(()=>document.querySelector('[aria-label="仅复制上传成功的书名 / 书城ID / 书城"]'));
+      document.querySelector('[aria-label="仅复制上传成功的书名 / 书城ID / 书城"]').click();
+      await until(()=>writes.length===1);
+      if(writes[0].split('\\n').length!==1||!writes[0].startsWith('success\\t')||writes[0].includes('failed')||writes[0].includes('waiting'))throw Error('复制了未上传成功的书');
+      root.render(<BatchFactoryNovelList key="empty" batch={{...batch,books:books.slice(1)}}/>);
+      await until(()=>button('小说列表'));button('小说列表').click();
+      await until(()=>document.querySelector('[aria-label="仅复制上传成功的书名 / 书城ID / 书城"]'));
+      document.querySelector('[aria-label="仅复制上传成功的书名 / 书城ID / 书城"]').click();await sleep(50);
+      if(writes.length!==1)throw Error('没有成功项时覆盖了剪贴板');
+      document.body.dataset.result='passed';
+    }run().catch(error=>document.body.dataset.error=error.message);
+  `);
+});

@@ -1,4 +1,13 @@
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactorySourceText } from './batchFactoryContentRange.js';
+import { batchFactoryBookState } from './batchFactoryBookState.js';
+
+export function batchFactoryUploadedBooksForCopy(books, runtime = {}, modeForBook) {
+  return (Array.isArray(books) ? books : []).filter(book => {
+    const productionMode = modeForBook ? modeForBook(book) : runtime.productionMode || 'video';
+    const state = batchFactoryBookState(book, {...runtime, productionMode, stageSummary:runtime.stageSummaries?.[book.id]});
+    return state.published === true && (productionMode !== 'text' || state.uploadStatus === 'completed');
+  });
+}
 
 function normalizedText(value) {
   return String(value ?? '').trim();
