@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/yzcmusage"
 )
 
 // NovelCreationTextResolver rechecks active membership and the current manager
@@ -29,13 +30,14 @@ func NovelCreationTextResolver(accounts auth.Store, profiles *MemberProfileStore
 		if err != nil || p == nil {
 			return p, err
 		}
-		return novelScopedTextProvider{DirectorProvider: p, owner: effective}, nil
+		return novelScopedTextProvider{DirectorProvider: p, owner: effective, actor: owner}, nil
 	}
 }
 
 type novelScopedTextProvider struct {
 	batchfactoryv11.DirectorProvider
 	owner string
+	actor string
 }
 
 func (p novelScopedTextProvider) TextModelMetadata() batchfactoryv11.TextModelMetadata {
@@ -45,4 +47,11 @@ func (p novelScopedTextProvider) TextModelMetadata() batchfactoryv11.TextModelMe
 	}
 	m.CatalogOwner = p.owner
 	return m
+}
+
+// The worker reconstructs its context from a durable job. Keep the caller
+// separately from the manager whose model settings supplied the credentials.
+func (p novelScopedTextProvider) Complete(ctx context.Context, input batchfactoryv11.TextCompletionRequest) (string, error) {
+	ctx = yzcmusage.WithIdentity(ctx, p.actor, "novel-creation")
+	return p.DirectorProvider.Complete(ctx, input)
 }
