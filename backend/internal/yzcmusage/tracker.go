@@ -35,6 +35,45 @@ type Tracker struct {
 	ResolveCredential func(context.Context, string, string) (string, error)
 	wake              chan struct{}
 	once              sync.Once
+	credentialMu      sync.Mutex
+	credentials       map[string]cachedCredential
+}
+
+type cachedCredential struct {
+	key   string
+	until time.Time
+}
+
+func (t *Tracker) remember(key string) {
+	t.credentialMu.Lock()
+	defer t.credentialMu.Unlock()
+	if t.credentials == nil {
+		t.credentials = map[string]cachedCredential{}
+	}
+	hash := Fingerprint(key)
+	if len(t.credentials) >= 256 {
+		for name, value := range t.credentials {
+			if time.Now().After(value.until) {
+				delete(t.credentials, name)
+			}
+		}
+		if len(t.credentials) >= 256 {
+			for name := range t.credentials {
+				delete(t.credentials, name)
+				break
+			}
+		}
+	}
+	t.credentials[hash] = cachedCredential{key: key, until: time.Now().Add(15 * time.Minute)}
+}
+func (t *Tracker) credential(hash string) string {
+	t.credentialMu.Lock()
+	defer t.credentialMu.Unlock()
+	if value, ok := t.credentials[hash]; ok && time.Now().Before(value.until) {
+		return value.key
+	}
+	delete(t.credentials, hash)
+	return ""
 }
 
 func (t *Tracker) Run(ctx context.Context) {
@@ -72,14 +111,25 @@ func (t *Tracker) reconcile(parent context.Context) {
 	}
 	groups := map[string][]Pending{}
 	for _, p := range pending {
-		groups[p.Owner+":"+p.CredentialHash] = append(groups[p.Owner+":"+p.CredentialHash], p)
+		groups[p.CredentialHash] = append(groups[p.CredentialHash], p)
 	}
 	for _, g := range groups {
-		if t.ResolveCredential == nil {
-			return
+		key := t.credential(g[0].CredentialHash)
+		if key == "" && t.ResolveCredential != nil {
+			owners := map[string]bool{}
+			for _, pending := range g {
+				if owners[pending.Owner] {
+					continue
+				}
+				owners[pending.Owner] = true
+				if resolved, resolveErr := t.ResolveCredential(ctx, pending.Owner, pending.CredentialHash); resolveErr == nil && resolved != "" {
+					key = resolved
+					t.remember(key)
+					break
+				}
+			}
 		}
-		key, err := t.ResolveCredential(ctx, g[0].Owner, g[0].CredentialHash)
-		if err != nil || key == "" {
+		if key == "" {
 			continue
 		}
 		for start := 0; start < len(g); start += 50 {
@@ -95,13 +145,19 @@ func (t *Tracker) reconcile(parent context.Context) {
 			if err != nil {
 				continue
 			}
-			entries, err := Match(g[0].Owner, requests, logs, rates)
-			if err != nil {
-				continue
+			owners := map[string]bool{}
+			for _, request := range requests {
+				owners[request.Owner] = true
 			}
-			for _, entry := range entries {
-				if err := t.Store.Settle(ctx, entry); err != nil {
-					log.Print("YZCM usage: settlement persistence failed")
+			for owner := range owners {
+				entries, err := Match(owner, requests, logs, rates)
+				if err != nil {
+					continue
+				}
+				for _, entry := range entries {
+					if err := t.Store.Settle(ctx, entry); err != nil {
+						log.Print("YZCM usage: settlement persistence failed")
+					}
 				}
 			}
 		}
@@ -142,6 +198,7 @@ func (t *trackedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if strings.Contains(path, "/audio/") {
 		feature = "audio"
 	}
+	t.t.remember(key)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	err = t.t.Store.Record(ctx, Request{ID: id, Owner: i.Owner, Feature: feature}, Fingerprint(key), response.StatusCode)
 	cancel()
