@@ -35,6 +35,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
       import React from 'react';
       import { createRoot } from 'react-dom/client';
       import TextMediaDialog from './TextMediaDialog.jsx';
+      window.addEventListener('error',event=>{document.body.dataset.runtimeError=event.error?.message || event.message});
       const root = createRoot(document.getElementById('root'));
       const sleep = t=>new Promise(r=>setTimeout(r,t));
       async function until(f){for(let i=0;i<300;i++){if(f())return;await sleep(20)}throw Error(document.body.innerText)}
@@ -93,7 +94,14 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         if(!button('在完整句子后拆页').disabled)throw Error('空句末列表仍可拆分');
         single=false;button('更新文字页').click();
         await until(()=>document.body.innerText.includes('第一段完整。'));
-        for(const label of ['本页背景','页面内容','封面','文字页','文本合集','展开','合成当前书','上传网络'])if(!document.body.innerText.includes(label))throw Error('缺少 '+label);
+        for(const label of ['本页背景','页面内容','封面','文字页','文本合集','页目录','合成当前书','上传网络','页面操作','拆分与合并','整书操作'])if(!document.body.innerText.includes(label))throw Error('缺少 '+label);
+        await sleep(350);
+        for(const group of document.querySelectorAll('.text-media-operation-grid')){
+          const boxes=[...group.children].map(item=>item.getBoundingClientRect());
+          if(boxes.some(box=>box.width<70 || box.height<35))throw Error('操作按钮尺寸不一致 '+boxes.map(box=>Math.round(box.width)+'x'+Math.round(box.height)).join(','));
+          if(Math.max(...boxes.map(box=>box.top))-Math.min(...boxes.map(box=>box.top))>1)throw Error('分组按钮未对齐');
+          if(group.scrollWidth>group.clientWidth+2)throw Error('操作分组横向溢出');
+        }
         if(!button('合成当前书').disabled)throw Error('文字页未就绪时未禁用合成');
         button('下一页').click();
         await until(()=>document.body.innerText.includes('第二段完整。'));
@@ -164,13 +172,15 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         if(requests.some(([url,m])=>m!=='PUT'&&!url.includes('/text-')&&!url.includes('/client-errors')))throw Error('文本库请求了其他模式接口');
         document.body.dataset.result='passed'
       }run().catch(e=>document.body.dataset.error=e.message+'（上传 '+publishes+' 次）');
-    `},bundle:true,write:false,format:'iife',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"production"'},minify:true});
+    `},bundle:true,jsx:'automatic',write:false,format:'iife',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"production"'},minify:true});
     writeFileSync(join(dir,'app.js'),result.outputFiles[0].contents);
     const html=join(dir,'index.html');
-    writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="app.js"></script>');
+    const styles=readFileSync(new URL('../shuihuo-production.css',import.meta.url),'utf8')+'\n'+readFileSync(new URL('./text-media-panel.css',import.meta.url),'utf8');
+    writeFileSync(join(dir,'styles.css'),styles);
+    writeFileSync(html,'<meta charset="utf-8"><link rel="stylesheet" href="styles.css"><style>.ant-modal{animation:none!important;transform:none!important;transition:none!important}</style><div id="root"></div><script>'+result.outputFiles[0].text.replaceAll('</script','<\\/script')+'</script>');
     const dom=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking',
       '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget=24000',
       '--dump-dom',pathToFileURL(html).href],{timeout:45000,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']});
-    assert.ok(dom.includes('data-result="passed"'), dom.match(/data-error="([^"]*)"/)?.[1] || '浏览器未完成验证');
+    assert.ok(dom.includes('data-result="passed"'), dom.match(/data-runtime-error="([^"]*)"/)?.[1] || dom.match(/data-error="([^"]*)"/)?.[1] || '浏览器未完成验证');
   } finally { rmSync(dir,{recursive:true,force:true,maxRetries:4,retryDelay:150}); }
 });

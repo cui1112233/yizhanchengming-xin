@@ -1,4 +1,5 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { ConfigProvider, Select } from 'antd';
 import { createTextCollection, getTextCollection, listTextCollections, listTextPages, prepareTextBook } from '../../../shared/api/batchFactoryText.js';
 import * as api from '../../../shared/api/batchFactoryText.js';
 import { getBatch, saveBookOverride, publishTextCollection, getTextPublishStatus } from '../../../shared/api/batchFactoryV12.js';
@@ -294,7 +295,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
     });
     chooseCollection(result.id); setCollectionDetail(result); setCollectionImage(''); setTab('collections');
   }
-  return <div className="text-media-panel" aria-label="文本媒体库">
+  return <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextPlaceholder:'var(--sh-muted)',colorBorder:'var(--sh-line)',controlItemBgActive:'var(--sh-panel-strong)',controlItemBgHover:'var(--sh-panel-strong)',colorPrimary:'var(--sh-accent)'}}}><div className="text-media-panel" aria-label="文本媒体库">
     <section className="text-media-preview" aria-label="成品预览">{live.url?<img src={live.url} alt="排版预览"/>:preview
       ? <AuthenticatedTextPageImage contentUrl={preview} alt={tab === 'pages' ? `文字页 ${page?.ordinal}` : tab === 'cover' ? '文本封面' : '文本合集预览'} />
       : <div className="text-media-empty">{loading ? '正在读取文本页…' : tab === 'cover' ? '暂无封面图' : tab === 'collections' ? '暂无合集预览' : state.error || state.label}</div>}
@@ -321,25 +322,29 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
         </> : <>
           <CandidateList items={candidates} selectedId={display?.id} activeId={activeId} onSelect={id=>{if(!busy && discard())selectCandidate(id);}}/>
           {tab === 'pages' ? <>
-            <section><h4>本页背景</h4>{background?.color ? <span><i className="text-media-swatch" style={{backgroundColor:background.color}}/>{background.color}</span> : background?.id ? '背景图片' : '继承整书背景'}</section>
+            <section className="text-media-background-summary"><h4>本页背景</h4><span>{background?.id ? '图库背景' : background?.color ? <><i className="text-media-swatch" style={{backgroundColor:background.color}}/>{background.color}</> : '继承整书背景'}</span></section>
             <section><h4>页面内容</h4><p className="text-media-copy">{page?.text || '尚未分页'}</p></section>
           </> : <section><h4>封面标题</h4><p>{doc?.configSnapshot?.cover?.title || title}</p>{doc?.coverLocked && <small>上传成品封面</small>}</section>}
-          {doc && (page || cover) && !session && <section className="text-editor-actions">
+          {doc && (page || cover) && !session && <section className="text-media-operation-section"><h4>{cover?'封面操作':'页面操作'}</h4><div className="text-media-operation-grid">
             <button type="button" disabled={!!busy || locked} onClick={edit}>{cover?'调整封面':'排版调整'}</button>
             <button type="button" disabled={!!busy || locked} onClick={()=>run('render',async()=>selectCandidate((await renderCurrent()).id))}>{cover?'生成封面':'生成本页'}</button>
             <label className="text-upload-input">{cover?'上传成品封面':'上传成品页'}<input type="file" disabled={!!busy} accept="image/png,image/jpeg,image/webp" aria-label={cover?'上传成品封面':'上传成品页'} onChange={e=>{const file=e.target.files[0];e.target.value='';uploadCurrent(file);}}/></label>
             {locked && <button type="button" disabled={!!busy} onClick={restoreCurrent}>恢复系统生成</button>}
-            {!cover && !locked && <>
-              {breaks.length>0 && <label>句末<select aria-label="拆页句末" value={split || breaks[0].offset} onChange={e=>setSplit(e.target.value)}>{breaks.map(b=><option key={b.offset} value={b.offset}>{b.label}</option>)}</select></label>}
+            </div>
+          </section>}
+          {doc && page && !cover && !locked && !session && <section className="text-media-operation-section"><h4>拆分与合并</h4>
+              {breaks.length>0 && <div className="text-media-split-field"><span>拆分位置</span><Select aria-label="拆页句末" disabled={!!busy} value={Number(split || breaks[0].offset)} onChange={value=>setSplit(String(value))} options={breaks.map(b=>({value:b.offset,label:b.label}))} getPopupContainer={trigger=>trigger.parentElement}/></div>}
+              <div className="text-media-operation-grid is-pair">
               <button type="button" disabled={!!busy || !breaks.length} onClick={()=>changePages(false)}>在完整句子后拆页</button>
               <button type="button" disabled={!!busy || !pages[pageIndex+1] || pages[pageIndex+1].locked} onClick={()=>changePages(true)}>与下一页合并</button>
-            </>}
+              </div>
           </section>}
           {session && <TextPageEditor key={session.id} session={session} fonts={snapshot.fonts} batchId={batchId} bookId={book.id} busy={!!busy} stale={stale} impact={impact} onUploading={value=>{backgroundUploading.current=value;}}
             onDraft={fn=>setSession(s=>s?.id===session.id?{...s,draft:fn(s.draft)}:s)} onCancel={discard}
             onSave={()=>run('save',saveEdit)} onApplyBackground={()=>run('background',applyBookBackground)}/>}
-          {!loading && !error && !session && <button type="button" disabled={!!busy} onClick={()=>run('prepare',()=>prepareTextBook(batchId,book.id,doc?{expectedRevision:doc.revision}:{}))}>{doc?'更新文字页':'准备文字页'}</button>}
+          {!loading && !error && !session && <section className="text-media-operation-section"><h4>整书操作</h4><div className="text-media-operation-grid is-pair"><button type="button" disabled={!!busy} onClick={()=>run('prepare',()=>prepareTextBook(batchId,book.id,doc?{expectedRevision:doc.revision}:{}))}>{doc?'更新文字页':'准备文字页'}</button>
           {doc && !session && <button type="button" disabled={!!busy} onClick={()=>{if(window.confirm('按当前排版重新分配页数？手动拆页位置可能变化。'))void run('reflow',()=>prepareTextBook(batchId,book.id,{expectedRevision:doc.revision,reflow:true}));}}>重新分页</button>}
+          </div></section>}
         </>}
         {tab==='collections' && pages.length>0 && <section className="text-layout-fields"><label>合集起始页<input type="number" min="1" max={pages.length} value={start} onChange={e=>setStart(Math.max(1,Math.min(pages.length,Number(e.target.value))))}/></label>
           <label>合集结束页<input type="number" min="1" max={pages.length} value={end ?? pages.length} onChange={e=>setEnd(Math.max(1,Math.min(pages.length,Number(e.target.value))))}/></label></section>}
@@ -350,12 +355,12 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
         <span>{pageNumber(pageIndex+1)} / {pageNumber(pages.length)}</span>
         <button type="button" aria-label="下一页" disabled={!!busy || pageIndex<0 || pageIndex>=pages.length-1} onClick={()=>move(pages[pageIndex+1].id)}>›</button>
       </div>}<div className="text-media-actions">
-        <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded ? '收起' : '展开'}</button>
+        <button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded ? '收起目录' : '页目录'}</button>
         <button type="button" disabled={!!busy || !!session || !canCompose} onClick={()=>run('compose',compose)}>{collections.length ? '重新合成' : '合成当前书'}</button>
         <button type="button" disabled={upload.disabled || !!selectedReceipt?.error || !!busy || !!session} onClick={publish}>{upload.label}</button>
       </div></footer>
     </aside>
-  </div>;
+  </div></ConfigProvider>;
 }
 
 export default function TextMediaPanel(props) {
