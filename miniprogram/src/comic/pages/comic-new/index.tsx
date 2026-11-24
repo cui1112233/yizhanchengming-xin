@@ -935,6 +935,7 @@ export default function ComicPrivatePage() {
   return <ThemedPage dynamicGlass={false} className={`mp-page comic-page comic-new comic-editor is-${content}${state.stage === "storyboard" ? " is-confirm" : ""}`}>
     <BrandHeader title="漫画生成" showBack />
     <View className="ce-project-bar"><View><Text className="ce-project-name">{title}</Text><Text className="ce-muted">一战晟铭 · 私人定制</Text></View>{finished || (state.stage === "source" && state.batchId) ? <Button disabled={running || Boolean(state.busy)} onClick={startAnother}>再做一本</Button> : null}<Button disabled={!downloadable || Boolean(state.busy)} onClick={() => { void downloadZip(); }}>导出</Button></View>
+    <ComicStageHeader compact stage={state.stage} title="漫画生成" subtitle="" hasResult={Boolean(state.pages.length)} canSelectStage={canSelectStage} onSelectStage={selectStage} />
     <View className="ce-workspace-body">
       {state.tab === "create" ? <ComicSettingsStage
         source={state.source} styleId={state.styleId} aspectRatio={state.aspectRatio}
@@ -997,7 +998,6 @@ export default function ComicPrivatePage() {
         </> : null}
       </> : null}
     </View>
-    <ComicStageHeader compact stage={state.stage} title="漫画生成" subtitle="" hasResult={Boolean(state.pages.length)} canSelectStage={canSelectStage} onSelectStage={selectStage} />
       {state.referenceOpen ? <>
         <View className="comic-sheet-mask" onClick={() => patch({ referenceOpen: false })} />
         <View className="comic-sheet">

@@ -113,11 +113,13 @@ export default function ComicSettingsStage({
     {error ? <Text className="mp-error comic-error">{error}</Text> : null}
 
 
+    <View className={`ce-source-card${tooLong || setupLoading ? " has-notice" : ""}`}>
     <View className="ce-source-head"><Text>故事正文</Text><View><Button onClick={onPasteSource}>粘贴内容</Button><Button onClick={onChooseExisting}>选择已有书籍</Button></View></View>
     <Textarea className="ce-source-input" value={source} maxlength={-1} placeholder="粘贴要生成漫画的正文…" onInput={event => onSourceChange(String(event.detail.value))} />
     <View className="ce-source-count"><Text>{length.toLocaleString()} 字</Text><Button onClick={() => onSourceChange("")}>清空</Button></View>
     {tooLong ? <Text className="comic-hint">内容较长，一次最多生成 35 页，请确认处理范围。</Text> : null}
     {setupLoading ? <Text className="comic-hint">正在读取画风和生成设置…</Text> : null}
+    </View>
     <View className="ce-tools ce-source-tools">
       <Button id="comic-tool-style" onClick={() => setTool("style")}><AppIcon name="sparkles" size={23} /><Text>画风</Text><Text className="ce-tool-value">{selectedStyle}</Text></Button>
       <Button id="comic-tool-ratio" onClick={() => setTool("ratio")}><AppIcon name="camera" size={23} /><Text>画幅</Text><Text className="ce-tool-value">{aspectRatio}</Text></Button>
