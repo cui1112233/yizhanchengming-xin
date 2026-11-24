@@ -5178,3 +5178,49 @@ body.shuihuo-reference-shell
   font-size: 11.5px;
   color: var(--sh-muted);
 }
+/* BF_COMPACT_ROW_CONTROLS_START */
+.batch-factory-workbench-table .shuihuo-workbench-head {
+  height: 40px;
+  min-height: 40px;
+}
+.batch-factory-workbench-table .shuihuo-workbench-head > div:first-child { font-size: 8px; }
+.batch-factory-workbench .batch-factory-book-title-row { align-items: center; min-height: 20px; }
+.batch-factory-workbench .batch-factory-book-title-row .batch-factory-production-source { align-items: center; }
+.batch-factory-workbench .batch-factory-book-content-actions { gap: 5px !important; margin-top: 6px; }
+.batch-factory-workbench .batch-factory-book-content-action.ant-btn {
+  height: 26px;
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
+  line-height: 24px;
+}
+.batch-factory-workbench .batch-factory-book-config-regions {
+  grid-template-rows: repeat(3, minmax(40px, 1fr)) !important;
+  gap: 4px !important;
+}
+.batch-factory-workbench .batch-factory-book-config-region { padding: 4px 6px !important; }
+.batch-factory-workbench .batch-factory-book-config-region b { font-size: 11px; }
+.batch-factory-workbench .batch-factory-book-config-region small { font-size: 10px; }
+.batch-factory-workbench .batch-factory-action-group.is-utility,
+.batch-factory-workbench .batch-factory-action-group.is-production,
+.batch-factory-workbench .batch-factory-action-group.is-recovery {
+  min-height: 26px;
+  padding-block: 2px;
+}
+.batch-factory-workbench .batch-factory-action-button-grid .ant-btn,
+.batch-factory-workbench .batch-factory-action-group > .ant-btn {
+  height: 24px;
+  min-height: 24px;
+  padding-inline: 6px;
+  font-size: 10px;
+  line-height: 22px;
+}
+.batch-factory-workbench .batch-factory-text-page-cell,
+.batch-factory-workbench .batch-factory-text-rendered-cell { display: grid; align-items: stretch; }
+.batch-factory-workbench .batch-factory-text-page-cell > .batch-factory-cell-shell,
+.batch-factory-workbench .batch-factory-text-rendered-cell > .batch-factory-cell-shell {
+  align-self: stretch;
+  height: 100% !important;
+  grid-template-rows: 36px minmax(0, 1fr) 32px !important;
+}
+/* BF_COMPACT_ROW_CONTROLS_END */
