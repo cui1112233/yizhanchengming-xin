@@ -5185,7 +5185,7 @@ body.shuihuo-reference-shell
 }
 .batch-factory-workbench-table .shuihuo-workbench-head > div:first-child { font-size: 8px; }
 .batch-factory-workbench .batch-factory-book-title-row { align-items: center; min-height: 20px; }
-.batch-factory-workbench .batch-factory-book-title-row .batch-factory-production-source { align-items: center; }
+.batch-factory-workbench .batch-factory-book-title-row .batch-factory-production-source { align-self: center; align-items: center; }
 .batch-factory-workbench .batch-factory-book-content-actions { gap: 5px !important; margin-top: 6px; }
 .batch-factory-workbench .batch-factory-book-content-action.ant-btn {
   height: 26px;
@@ -5195,7 +5195,8 @@ body.shuihuo-reference-shell
   line-height: 24px;
 }
 .batch-factory-workbench .batch-factory-book-config-regions {
-  grid-template-rows: repeat(3, minmax(40px, 1fr)) !important;
+  grid-template-rows: repeat(3, 40px) !important;
+  align-content: start;
   gap: 4px !important;
 }
 .batch-factory-workbench .batch-factory-book-config-region { padding: 4px 6px !important; }
