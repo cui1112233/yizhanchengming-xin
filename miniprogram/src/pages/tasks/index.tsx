@@ -1,5 +1,5 @@
 import { Button, Image, Text, View } from "@tarojs/components";
-import Taro, { useDidShow } from "@tarojs/taro";
+import Taro, { useDidHide, useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { API_ORIGIN_CONFIGURATION_ERROR, isApiOriginConfigured } from "../../config/runtime";
 import {onSessionInvalidated} from "../../services/sessionBoundary";
@@ -59,13 +59,16 @@ export default function TasksPage() {
 
     if (!isApiOriginConfigured()) { setConfigurationError(API_ORIGIN_CONFIGURATION_ERROR); setLoading(false); setRefreshing(false); return; }
     setPage(0);setConfigurationError(""); setLoading(!summary); setRefreshing(Boolean(summary));
-    void loadTaskSummary(apiRequest)
+    void loadTaskSummary(apiRequest,{shouldContinue:()=>version===requestVersion.current,onProgress:partial=>{
+      if(version===requestVersion.current&&partial.sources.some(source=>source.state==='ready')){setSummary(partial);setLoading(false);setRefreshing(true);}
+    }})
       .then((result) => {if (version === requestVersion.current) setSummary(result); })
       .catch(() => { if (version === requestVersion.current) setSummary(null); })
       .finally(() => { if (version === requestVersion.current) { setLoading(false); setRefreshing(false); } });
   };
 
   useDidShow(load);
+  useDidHide(()=>{requestVersion.current++;setLoading(false);setRefreshing(false);});
   const pageState = deriveTaskPageState({ loading, summary, configurationError });
   const entries = summary?.entries || [];
   const overallProgress = aggregateProgress(entries);
@@ -104,6 +107,7 @@ export default function TasksPage() {
     {pageState.kind === "all-error" ? <View className="task-studio-state liquid-glass--secondary"><View><Text className="task-studio-state-title">暂时无法读取任务</Text><Text>所有任务来源均未返回可展示数据。</Text></View><Button className="task-studio-retry" onClick={load}>重新读取</Button></View> : null}
 
     {summary && pageState.kind !== "configuration-error" && pageState.kind !== "all-error" ? <View className="task-studio-body">
+      {refreshing?<Text className="task-studio-sync-note">已返回的记录先显示，其余来源仍在同步，统计尚未完整。</Text>:null}
       <View className="task-studio-counts liquid-glass--secondary" data-glass-role="secondary">
         <View className="task-studio-count-item is-running"><Image className="task-studio-count-art" src={taskRunningArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.running}</Text><Text>进行中</Text></View></View><View className="task-studio-count-divider" />
         <View className="task-studio-count-item is-retry"><Image className="task-studio-count-art" src={taskAttentionArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.retry}</Text><Text>需重试</Text></View></View><View className="task-studio-count-divider" />

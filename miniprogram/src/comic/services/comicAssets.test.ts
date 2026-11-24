@@ -138,3 +138,5 @@ describe("漫画资产只读展示", () => {
     );
   });
 });
+
+test('empty successful asset-image responses are not accepted as completed work',async()=>{h.request.mockResolvedValueOnce({});await expect(generateComicAssetImages({batchId:'b',bookId:'k',assetIds:['a']})).rejects.toThrow('回执未确认');});

@@ -276,10 +276,23 @@ function errorMessage(cause: unknown) {
   return "服务端请求失败";
 }
 
-export async function loadTaskSummary(request: TaskRequest, options: { projectsOnly?: boolean } = {}): Promise<TaskSummary> {
+export async function loadTaskSummary(request: TaskRequest, options: { projectsOnly?: boolean; sources?: TaskSource[]; shouldContinue?: () => boolean; onProgress?: (summary:TaskSummary)=>void } = {}): Promise<TaskSummary> {
   const accountRevision=sessionRevision();
-  request=limitTaskRequests(request);
-  const settled = await Promise.allSettled(TASK_SOURCE_DEFINITIONS.map(async (definition) => {
+  const assertCurrent=()=>{if(accountRevision!==sessionRevision()||options.shouldContinue?.()===false)throw Error('页面已离开或账号已切换，已停止后续同步');};
+  const originalRequest=request;
+  // Check inside the limiter: queued reads must not start after the user leaves.
+  request=limitTaskRequests(async path=>{assertCurrent();const result=await originalRequest(path);assertCurrent();return result;});
+  const definitions=TASK_SOURCE_DEFINITIONS.filter(definition=>!options.sources||options.sources.includes(definition.source));
+  const partial:Array<PromiseSettledResult<unknown>|undefined>=definitions.map(()=>undefined);
+  const publish=(index:number,result:PromiseSettledResult<unknown>)=>{partial[index]=result;if(accountRevision===sessionRevision()&&options.shouldContinue?.()!==false)options.onProgress?.(summarize(partial));};
+  const settled = await Promise.allSettled(definitions.map(async (definition,index) => {
+    try {const result=await readSource(definition);publish(index,{status:'fulfilled',value:result});return result;}
+    catch(reason){publish(index,{status:'rejected',reason});throw reason;}
+  }));
+  assertCurrent();
+  return summarize(settled);
+
+  async function readSource(definition:SourceDefinition){
     const payload = await request(definition.path);
     if (!isRecord(payload) || !Array.isArray(payload[definition.collection])) throw new Error("服务端任务列表响应不完整");
 
@@ -310,18 +323,19 @@ export async function loadTaskSummary(request: TaskRequest, options: { projectsO
     if (options.projectsOnly) return { projects: collectionFrom(payload, "projects").map(project => ({ ...project, projectId: textValue(project.id) })) };
     const feed=await loadWaterTaskFeed(request,collectionFrom(payload,'projects'));
     return{projects:feed.rows,warning:feed.warning};
-  }));
-  if(accountRevision!==sessionRevision())throw Error('账号已切换，请重新读取任务');
+  }
+  function summarize(results:Array<PromiseSettledResult<unknown>|undefined>):TaskSummary{
   const entries: InternalTask[] = [];
-  const sources = settled.map((result, sourceOrder): TaskSourceResult => {
-    const definition = TASK_SOURCE_DEFINITIONS[sourceOrder];
+  const sources = results.flatMap((result, sourceOrder): TaskSourceResult[] => {
+    if(!result)return [];
+    const definition = definitions[sourceOrder];
     if (result.status === "rejected") {
-      return {
+      return [{
         source: definition.source,
         sourceLabel: definition.sourceLabel,
         state: "error",
         error: errorMessage(result.reason),
-      };
+      }];
     }
 
     collectionFrom(result.value, definition.collection).forEach((record, entryOrder) => {
@@ -329,18 +343,19 @@ export async function loadTaskSummary(request: TaskRequest, options: { projectsO
     });
 
     const warning=(result.value as Record<string,unknown>).warning;
-    return {
+    return [{
       source: definition.source,
       sourceLabel: definition.sourceLabel,
       state: warning ? "error" : "ready",
       error: typeof warning==='string'&&warning?`部分任务未同步：${warning}`:undefined,
-    };
+    }];
   });
 
   return {
     entries: entries.sort(compareEntries).map(({ sourceOrder: _sourceOrder, entryOrder: _entryOrder, ...entry }) => entry),
     sources,
   };
+  }
 }
 
 export function filterTaskEntries(entries: AggregatedTask[], filter: TaskFilter) {

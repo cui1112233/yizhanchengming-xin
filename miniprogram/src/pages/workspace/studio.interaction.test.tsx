@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const h = vi.hoisted(() => ({
-  slots: [] as any[], cursor: 0, show: undefined as any,
+  slots: [] as any[], cursor: 0, show: undefined as any, hide: undefined as any,
   navigate: vi.fn(), switchTab: vi.fn(), save: vi.fn(), session: vi.fn(), loadSummary: vi.fn(),
 }));
 
@@ -16,7 +16,7 @@ vi.mock("react", () => ({
 vi.mock("@tarojs/taro", () => ({
   default: { getStorageSync: () => "fetch", setStorageSync: h.save, navigateTo: h.navigate, switchTab: h.switchTab },
   useDidShow: (fn: any) => { h.show = fn; },
-  useDidHide: vi.fn(),
+  useDidHide: (fn:any)=>{h.hide=fn;},
 }));
 vi.mock("@tarojs/components", () => ({ Button: "Button", Image: "Image", Text: "Text", View: "View" }));
 vi.mock("../../theme", () => ({ ThemedPage: "ThemedPage" }));
@@ -56,6 +56,12 @@ test("workbench removes the duplicate function catalog and shows the selected wo
   expect(find("studio-choice-sheet")).toBeUndefined();
   expect(find("workbench-current-card")).toBeDefined();
   expect(text(find("workbench-current-title"))).toBe("小说创作");
+});
+
+test('workbench syncs only the selected source and stops reading after hide',async()=>{
+ await ready();const options=h.loadSummary.mock.calls[0][1];
+ expect(options.sources).toEqual(['fetch']);expect(options.shouldContinue()).toBe(true);
+ h.hide();expect(options.shouldContinue()).toBe(false);
 });
 
 test("an empty workspace starts configuration through the real module route", async () => {

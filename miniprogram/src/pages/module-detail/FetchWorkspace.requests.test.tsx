@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const harness = vi.hoisted(() => ({ slots: [] as any[], cursor: 0, show: () => {}, api: vi.fn(), toast: vi.fn() }));
+const harness = vi.hoisted(() => ({ slots: [] as any[], cursor: 0, show: () => {}, hide:()=>{}, api: vi.fn(), toast: vi.fn() }));
 vi.mock("react", () => ({
   useState: (initial: any) => { const i = harness.cursor++; if (!(i in harness.slots)) harness.slots[i] = typeof initial === "function" ? initial() : initial; return [harness.slots[i], (next: any) => { harness.slots[i] = typeof next === "function" ? next(harness.slots[i]) : next; }]; },
   useRef: (initial: any) => { const i = harness.cursor++; if (!(i in harness.slots)) harness.slots[i] = { current: initial }; return harness.slots[i]; },
   useEffect: () => {},
 }));
-vi.mock("@tarojs/taro", () => ({ default: { showToast: harness.toast, showModal: () => Promise.resolve({ confirm: true }) }, useDidHide:()=>{}, useDidShow: (callback: () => void) => { harness.show = callback; } }));
+vi.mock("@tarojs/taro", () => ({ default: { showToast: harness.toast, showModal: () => Promise.resolve({ confirm: true }) }, useDidHide:(callback:()=>void)=>{harness.hide=callback;}, useDidShow: (callback: () => void) => { harness.show = callback; } }));
 vi.mock("@tarojs/components", () => Object.fromEntries(["Button", "Checkbox", "CheckboxGroup", "Input", "Picker", "ScrollView", "Text", "Textarea", "View"].map((name) => [name, name])));
 vi.mock("../../theme", () => ({ withThemedPage: (page: any) => page }));
 vi.mock("../../components/AmbientStarfield", () => ({ default: "Starfield" }));
@@ -31,6 +31,13 @@ beforeEach(() => {
 });
 
 describe("FetchWorkspace deferred requests", () => {
+  test('slow history and schedules do not block ready creation options',async()=>{
+    const slow=deferred();
+    harness.api.mockImplementation((path:string)=>path.endsWith('/tasks')||path.endsWith('/schedules')?slow.promise:Promise.resolve(path.includes('/models')?models:config));
+    render();harness.show();await flush();
+    expect(pickers()[0].props.range).toEqual(['一','二']);
+    slow.resolve({tasks:[],schedules:[]});await flush();
+  });
   test("compact rows open one book detail without showing actions in the list", async () => {
     harness.api.mockImplementation((path: string) => Promise.resolve(path.includes("/models") ? models : path.endsWith("/config") ? config : path.endsWith("/tasks") ? { tasks: [{ book_id: "first", book_name: "小说甲" }, { book_id: "second", book_name: "小说乙" }] } : path.endsWith("/first") ? { original: "第一本正文" } : { schedules: [] }));
     render(); harness.show(); await flush(); click("任务"); await flush();
@@ -175,7 +182,7 @@ describe("FetchWorkspace deferred requests", () => {
     render(); harness.show(); await flush();
     const pending = deferred();
     harness.api.mockImplementation((path: string) => path.endsWith("/config") ? pending.promise : Promise.resolve(path.includes("/models") ? models : path.endsWith("/tasks") ? { tasks: [] } : { schedules: [] }));
-    harness.show();
+    harness.hide();harness.show();
     pickers()[0].props.onChange({ detail: { value: 1 } });
     click("处理参数4000 字");
     nodes(render()).find((node) => node.type === "Input").props.onInput({ detail: { value: "8000" } });
@@ -188,7 +195,7 @@ describe("FetchWorkspace deferred requests", () => {
     render(); harness.show(); await flush();
     const pending = deferred(); let reads = 0;
     harness.api.mockImplementation((path: string) => Promise.resolve(path.includes("/models") ? models : path.endsWith("/config") ? config : path.endsWith("/tasks") ? (++reads === 1 ? pending.promise : { tasks: [{ book_id: "new", book_name: "新任务", created_at: new Date().toISOString() }] }) : { schedules: [] }));
-    harness.show(); click("任务"); await flush();
+    harness.hide();harness.show(); click("任务"); await flush();
     pending.resolve({ tasks: [{ book_id: "old", book_name: "旧任务", created_at: new Date().toISOString() }] }); await flush();
     expect(text(render())).toContain("新任务"); expect(text(render())).not.toContain("旧任务");
   });
