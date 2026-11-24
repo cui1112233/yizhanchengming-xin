@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   shows: [] as Array<() => void>,
   read: vi.fn(),
   loadTasks: vi.fn(),
+  getStorageSync: vi.fn(),
   navigate: vi.fn(),
   switchTab: vi.fn(),
   showToast: vi.fn(),
@@ -36,7 +37,7 @@ vi.mock("react", () => ({
 
 vi.mock("@tarojs/taro", () => ({
   default: {
-    getStorageSync: vi.fn(),
+    getStorageSync: h.getStorageSync,
     setStorageSync: vi.fn(),
     navigateTo: h.navigate,
     reLaunch: h.reLaunch,
@@ -148,6 +149,26 @@ beforeEach(() => {
   h.reLaunch.mockResolvedValue({});
   h.logout.mockResolvedValue({ revoked: true });
   h.loadTasks.mockResolvedValue({ entries: [] });
+  h.getStorageSync.mockReturnValue(undefined);
+});
+
+test("identity atmosphere preserves the real avatar and renders seven reducible petals", async () => {
+  h.hasSession = true;
+  h.getStorageSync.mockReturnValue(true);
+  h.read.mockResolvedValue({
+    member: { username: "creator", displayName: "真实用户", avatarUrl: "/media/avatar.webp" },
+    usage: { month: { totalTokens: 0 } },
+  });
+  mount();
+  await flush();
+
+  const tree = render();
+  const identity = findByClass(tree, "profile-space-identity");
+  expect(identity.props.className.split(" ")).toContain("is-reduced-motion");
+  expect(findByClass(identity, "profile-space-avatar-image").props.src).toContain("/media/avatar.webp");
+  const petals = findAllByClass(identity, "profile-space-petal");
+  expect(petals).toHaveLength(7);
+  expect(new Set(petals.map(node => node.props.src)).size).toBe(1);
 });
 
 test("approved profile composition uses real account, task, and quota data", async () => {

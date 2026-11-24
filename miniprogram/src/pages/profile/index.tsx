@@ -23,7 +23,10 @@ import membershipIcon from "../../assets/profile/profile-membership-v1.webp";
 import securityIcon from "../../assets/profile/profile-security-v1.webp";
 import helpIcon from "../../assets/profile/profile-help-v1.webp";
 import transparencyIcon from "../../assets/profile/profile-transparency-v1.webp";
+import petalIcon from "../../assets/profile/profile-petal-v1.webp";
 import "./parity.scss";
+
+const PROFILE_PETALS = ["one", "two", "three", "four", "five", "six", "seven"] as const;
 
 const failureLabels: Record<ProfileFailureCategory, string> = {
   none: "", "session-missing": "未找到可用登录会话", "session-expired": "登录状态已失效",
@@ -188,7 +191,8 @@ export default function ProfilePage() {
         {loading ? <View className="mp-card mp-profile-state"><Text className="mp-row-title">正在读取账号资料</Text><Text className="mp-row-description">正在连接服务端，最多等待 15 秒；失败后可重试。</Text><Button className="mp-secondary mp-profile-cancel" onClick={cancelAndLogin}>取消并返回登录</Button></View> : null}
         {!loading && !memberLoaded ? <View className="mp-card mp-profile-state"><Text className="mp-row-title">无法读取当前账号资料</Text><Text className="mp-error">{failureLabels[diagnostic.failure]}</Text><View className="mp-profile-actions"><Button className="mp-primary mp-profile-retry" onClick={load}>重新读取</Button><Button className="mp-secondary mp-profile-cancel" onClick={cancelAndLogin}>返回登录</Button></View></View> : null}
         {memberLoaded ? <>
-          <View className="profile-space-identity mp-profile-hero liquid-glass--primary" data-glass-role="primary">
+          <View className={`profile-space-identity mp-profile-hero liquid-glass--primary${reducedGlass ? " is-reduced-motion" : ""}`} data-glass-role="primary">
+            <View className="profile-space-particles" ariaHidden>{PROFILE_PETALS.map(name => <Image key={name} className={`profile-space-petal is-${name}`} src={petalIcon} mode="aspectFit" />)}</View>
             <View className="profile-space-avatar" onClick={chooseAvatar}>{facts.avatarUrl ? <Image className="profile-space-avatar-image" src={apiUrl(facts.avatarUrl)} mode="aspectFill" /> : <Text>{displayName ? displayName.slice(0, 1).toUpperCase() : "?"}</Text>}<View className="profile-space-camera">{uploading ? <Text>上传中</Text> : <AppIcon name="camera" size={13} />}</View></View>
             <View className="profile-space-identity-copy">
               <View className="profile-space-name-line"><Text className="profile-space-name">{displayName || "未设置名称"}</Text><Text className="profile-space-badge">{facts.role || "创作者"}</Text></View>
