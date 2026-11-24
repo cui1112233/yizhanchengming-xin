@@ -10,7 +10,7 @@ import { build } from 'esbuild';
 const browser = [process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(path => path && existsSync(path));
 
-test('文本发布复用漫画配置，不显示旧网站映射，自动发布选项保存后保留', {skip:!browser}, async () => {
+test('文本发布复用漫画配置，不显示旧网站映射，不重复展示执行模式开关', {skip:!browser}, async () => {
   const dir = mkdtempSync(join(tmpdir(),'text-settings-browser-'));
   try {
     const bundle = await build({
@@ -65,20 +65,15 @@ test('文本发布复用漫画配置，不显示旧网站映射，自动发布�
           document.body.click();
           const publish=()=>waitFor(()=>byText('[role=tab]','发布配置'),'publish tab');
           (await publish()).click();
-          const publishGroup=await waitFor(()=>byText('.batch-factory-engine-group-title','自动发布'),'publish group');
-          const publishFields=[...publishGroup.closest('.batch-factory-engine-card').querySelectorAll('.batch-factory-engine-field')];
-          if(publishFields.length!==3) throw Error('automatic publish field count');
-          if(document.body.textContent.includes('发布映射') || document.querySelector('[aria-label="网站配置档"]') || byText('button','同步网站配置档'))throw Error('legacy website mapping still visible');
           await waitFor(()=>document.body.textContent.includes('文案来源') && document.body.textContent.includes('音频匹配方式') && document.body.textContent.includes('作品匹配方式'),'shared image publish controls');
-          document.querySelector('[aria-label="自动上传"]').click();
-          await waitFor(()=>document.querySelector('[aria-label="自动上传"]')?.getAttribute('aria-checked')==='true','auto upload enabled');
+          for(const label of ['自动生成合集','自动上传','上传失败重试次数','网站配置档'])if(document.querySelector('[aria-label="'+label+'"]'))throw Error('duplicate control '+label);
+          if(document.body.textContent.includes('自动发布') || document.body.textContent.includes('发布映射'))throw Error('text-only publish card remains');
           document.querySelector('#toggle').click();
           await waitFor(()=>!document.querySelector('[role=tab]'),'closing dialog');
           document.querySelector('#toggle').click();
           (await publish()).click();
-          await waitFor(()=>document.querySelector('[aria-label="自动上传"]')?.getAttribute('aria-checked')==='true','upload flag on reopen');
+          await waitFor(()=>document.body.textContent.includes('文案来源'),'shared controls on reopen');
           if(!JSON.parse(window.saved).textHighlightRules.includes('dialogue') || JSON.parse(window.saved).textHighlightLines!=='1,3')throw Error('highlight rules not persisted');
-          if(!JSON.parse(window.saved).textAutoUpload || window.synced)throw Error('unexpected profile sync or missing upload flag');
           document.body.dataset.result='passed';
         }
         run().catch(err=>{ document.body.dataset.error=err.message; });

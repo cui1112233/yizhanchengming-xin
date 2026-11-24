@@ -126,13 +126,13 @@ test('run ID cannot override conflicting attempt or request key', () => {
   }
 });
 
-test('collection-only progress respects each book upload setting', () => {
+test('collection-only progress follows execution mode despite legacy book upload settings', () => {
   const runtime={productionMode:'text',runMode:'video_no_submit',textAutoUpload:true,
     stageSummary:{runs:[{stage:'text_collection',status:'succeeded'}]}};
   const progress=batchFactoryBatchProgress([{id:'a',settingsState:{patch:{textAutoUpload:false}}},{id:'b'}],runtime);
-  assert.equal(progress.collectionReady,1);
-  assert.equal(progress.awaitingUpload,1);
-  assert.equal(progress.completionPercent,50);
+  assert.equal(progress.collectionReady,2);
+  assert.equal(progress.awaitingUpload,0);
+  assert.equal(progress.completionPercent,100);
 });
 
 test('previous confirmed upload stays available for republish while current receipt is pending or failed', () => {
@@ -248,7 +248,7 @@ test('a ready text collection is terminal only for a non-submit job and remains 
   assert.equal(batchFactoryBatchProgress([book], runtime).awaitingUpload, 1);
   stageSummary.runMode = 'video_no_submit';
   stageSummary.textAutoUpload = true;
-  assert.equal(batchFactoryBookState(book, runtime).terminal, false);
+  assert.equal(batchFactoryBookState(book, runtime).terminal, true);
   stageSummary.textAutoUpload = false;
   const state = batchFactoryBookState(book, runtime);
   assert.equal(state.label, '合集就绪');

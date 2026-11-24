@@ -74,9 +74,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
       {title:'正文排版',fields:section.fields.filter(field=>field.key!=='textBackground' && !field.key.startsWith('textCover.'))},
       {title:'背景与标题',fields:section.fields.filter(field=>field.key==='textBackground' || field.key.startsWith('textCover.'))}
     ];
-    if(section.key==='publish') return [
-      {title:'自动发布',fields:section.fields.filter(field=>field.key.startsWith('text'))}
-    ];
+    if(section.key==='publish') return [];
     return [{title:'',fields:section.fields}];
   };
   const renderField=field=>{
@@ -91,12 +89,12 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
   const panel=section=><>{section.key==='publish' && <Suspense fallback={null}><SharedImagePublishSettings productionMode="text" singleBook={scope==='book'} value={{comicPublishSettings:sharedPublishValue}} onChange={next=>{
     const changes=Object.fromEntries(Object.entries(next.comicPublishSettings || {}).filter(([key,v])=>JSON.stringify(v)!==JSON.stringify(sharedPublishValue[key])).map(([key,v])=>['comicPublishSettings.'+key,v]));
     if(Object.keys(changes).length)onChange(changes);
-  }}/></Suspense>}{section.key==='publish' && scope==='book' && <div className="text-publish-restores">{publishOverrideRestores(explicitKeys).map(group=><Button key={group.label} size="small" onClick={()=>onChange(Object.fromEntries(group.keys.map(key=>[key,undefined])))}>{group.label} · 恢复继承</Button>)}</div>}{section.key==='layout' && <div className="text-layout-presets"><b>排版预设</b>{TEXT_LAYOUT_TEMPLATES.map(preset=><Button key={preset.id} onClick={()=>onChange(structuredClone(preset.values))}>{preset.label}</Button>)}<Button onClick={()=>onChange(textColorScheme('dark'))}>深色文字</Button><Button onClick={()=>onChange(lightTextChanges(value.textHighlightRules || (value.highlightReuseEnabled?'keywords':'')))}>浅色文字</Button></div>}<div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
+  }}/></Suspense>}{section.key==='publish' && scope==='book' && <div className="text-publish-restores">{publishOverrideRestores(explicitKeys).map(group=><Button key={group.label} size="small" onClick={()=>onChange(Object.fromEntries(group.keys.map(key=>[key,undefined])))}>{group.label} · 恢复继承</Button>)}</div>}{section.key==='layout' && <div className="text-layout-presets"><b>排版预设</b>{TEXT_LAYOUT_TEMPLATES.map(preset=><Button key={preset.id} onClick={()=>onChange(structuredClone(preset.values))}>{preset.label}</Button>)}<Button onClick={()=>onChange(textColorScheme('dark'))}>深色文字</Button><Button onClick={()=>onChange(lightTextChanges(value.textHighlightRules || (value.highlightReuseEnabled?'keywords':'')))}>浅色文字</Button></div>}{section.key!=='publish' && <div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
     {fieldGroups(section).map(group=><section className="batch-factory-engine-group" key={group.title || section.key}>
       {group.title ? <div className="batch-factory-engine-group-title">{group.title}</div> : null}
       {group.fields.filter(field=>!field.hidden).map(renderField)}
     </section>)}
-  </div></div></>;
+  </div></div>}</>;
   return <>{error && <Alert type="warning" showIcon message={error} action={tab==='models' ? <Button size="small" onClick={()=>setModelRetry(value=>value+1)}>重新读取</Button> : undefined}/>}
     {tab==='layout' && batchId && bookId && <Suspense fallback={null}><SettingsPreview key={batchId+bookId} batchId={batchId} bookId={bookId} value={value}/></Suspense>}
     <Tabs activeKey={tab} onChange={setTab} items={TEXT_PRODUCTION_SECTIONS.map(s=>({key:s.key,label:s.label,children:panel(s)}))}/>

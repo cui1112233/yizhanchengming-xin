@@ -3996,7 +3996,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						persist()
 					}
 					target := "collection"
-					upload := pinned != "" || jobRunMode == "full_submit" || jobAutoPublish || string(settings["textAutoUpload"]) == "true"
+					upload := pinned != "" || jobRunMode == "full_submit" || jobAutoPublish
 					if upload && !jobSubmitDeferred {
 						target = "published"
 					}

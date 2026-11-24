@@ -308,8 +308,7 @@ function textBookState(book, summary, runMode, textAutoUpload, automationBook, m
   if (active) return { ...base, ...active, tone: 'blue' };
   const last = timeline.filter(step => step.status === 'completed').at(-1);
   if (!last) return { ...base, status: 'pending', label: '等待处理', detail: '等待文本处理', tone: 'default' };
-  const collectionOnly = ['video_no_submit', 'storyboard_only'].includes(summary?.runMode ?? runMode)
-    && (summary?.textAutoUpload ?? textAutoUpload) !== true;
+  const collectionOnly = ['video_no_submit', 'storyboard_only'].includes(summary?.runMode ?? runMode);
   const terminal = last.key === 'text_collection' && collectionOnly;
   return { ...base, ...last, terminal, status: terminal ? 'completed' : 'pending', tone: terminal ? 'green' : 'cyan' };
 }

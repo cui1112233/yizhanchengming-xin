@@ -26,7 +26,7 @@ func TestSignedSelectedTextAutomationUsesOnlyRequestedBook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	preset, err := presets.Create("alice", "文本合集", map[string]any{"productionMode": "text", "sensitiveMode": "off"})
+	preset, err := presets.Create("alice", "文本合集", map[string]any{"productionMode": "text", "sensitiveMode": "off", "textAutoUpload": true, "textAutoCollection": false})
 	if err != nil {
 		t.Fatal(err)
 	}
