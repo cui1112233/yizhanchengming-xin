@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import { ConfigProvider, Select } from 'antd';
 import * as api from '../../../shared/api/batchFactoryText.js';
 import {layoutFields,pageControls} from './textMediaActions.js';
+import TextBackgroundGallery from './TextBackgroundGallery.jsx';
 
 export function useDraftPreview(batchId,bookId,session) {
   const [view,setView]=useState({});
@@ -66,9 +67,7 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     })}</div>
     <div className="text-layout-fields">
       <label>背景色<input type="color" value={draft.background.color || '#111318'} onChange={e=>setBackground({kind:'color',color:e.target.value})}/></label>
-      <label>背景图库<Select aria-label="背景图库" disabled={busy || fileBusy} loading={bgLoading} value={draft.background.id || ''} getPopupContainer={trigger=>trigger.parentElement}
-        options={[{value:'',label:'纯色背景'},{label:'我的图库',options:items.length ? items.map(i=>({value:i.id,label:i.name})) : [{value:'__empty__',label:'暂无背景，请上传背景图',disabled:true}]}]}
-        onChange={id=>setBackground(id ? {kind:'library',id}:{kind:'color',color:'#111318'})}/></label>
+      <div><span>背景图库</span><TextBackgroundGallery value={draft.background} items={items} loading={bgLoading} disabled={busy || fileBusy} onChange={setBackground}/></div>
     </div>
     <label className="text-upload-input">上传背景图<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files[0];e.target.value='';void upload(file);}}/></label>
     {bgError && <p role="alert">{bgError}</p>}

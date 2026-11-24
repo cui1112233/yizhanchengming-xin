@@ -6,6 +6,7 @@ import { syncWebSubmitConfigs } from '../../../shared/api/novelFetch';
 import { listPersonalTextBackgrounds, uploadPersonalTextBackground } from '../../../shared/api/batchFactoryText';
 import { producerAccountOptions } from './batchFactoryComicPublishAccounts';
 import { TEXT_PRODUCTION_SECTIONS, textProductionInitialSection, textProfileChanges } from './textProductionConfig';
+import TextBackgroundGallery from './TextBackgroundGallery.jsx';
 
 const SharedImagePublishSettings = lazy(() => import('./BatchFactoryImagePublishSettingsForm').then(module => ({default:module.BatchFactoryComicPublishSettingsForm})));
 
@@ -42,10 +43,7 @@ function BackgroundPicker({value,items,onChange,onUploaded}) {
   };
   return <Space wrap>
     <ColorPicker label="背景颜色" value={value?.color || '#111318'} onChange={color=>onChange({kind:'color',color})}/>
-    {image && <Button onClick={()=>onChange({kind:'color',color:'#111318'})}>使用纯色背景</Button>}
-    <Select aria-label="个人背景库" showSearch optionFilterProp="label" style={{minWidth:150}} placeholder="我的图库" value={image ? value.id : undefined}
-      notFoundContent="我的图库暂无背景，可点击上传背景"
-      options={[{label:'我的图库',options:items.map(x=>({value:x.id,label:x.name || x.id}))}]} onChange={id=>onChange({kind:'library',id})}/>
+    <TextBackgroundGallery value={value} items={items} onChange={onChange}/>
     <Upload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={file=>{void upload(file);return false;}}><Button loading={busy}>上传背景</Button></Upload>
   </Space>;
 }
