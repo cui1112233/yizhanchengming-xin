@@ -361,8 +361,9 @@ function TextBookSettingsModal({batch,book,onClose,onSaved}) {
     }catch(e){setError(Number(e.status)===409?'本书配置已更新，请重新打开后核对。':e.message || '保存失败');}
     finally{setSaving(false);}
   }
-  return <Modal open title={`单书配置 · ${book.title || '文本'}`} width={980} onCancel={onClose} onOk={save} confirmLoading={saving} okText="保存单书配置" cancelText="取消" className="batch-factory-unified-settings-modal">
+  return <Modal open title={`单书配置 · ${book.title || '文本'}`} width={980} onCancel={onClose} onOk={save} confirmLoading={saving} okText="保存当前书配置" cancelText="取消" className="batch-factory-unified-settings-modal">
     {error && <Alert type="error" showIcon message={error}/>}
+    <Alert type="info" showIcon message="引擎配置、排版配置和发布配置均默认继承批次统一配置" description="只会保存当前书改过的字段；可按字段恢复继承。" />
     <TextProductionSettingsForm scope="book" value={value} explicitKeys={explicitKeys} onChange={change} onRestore={key=>change({[key]:undefined})}/>
   </Modal>;
 }

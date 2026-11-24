@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { TEXT_PRODUCTION_CONFIG_KEYS, TEXT_PRODUCTION_SECTIONS, applyTextProductionChanges, defaultTextProductionConfig, normalizeTextProductionConfig, textProductionBookOverride, updateTextProductionSettings, textProfileChanges } from './textProductionConfig.js';
 
+test('文本单书配置固定分为引擎、排版、发布三个区块', () => {
+  assert.deepEqual(TEXT_PRODUCTION_SECTIONS.map(section => section.label), ['引擎配置', '排版配置', '发布配置']);
+});
+
 test('新建及统一保存配置档后重新打开有名称、组织、分类及发布参数，单书覆盖可独立还原', () => {
   const id = 'publishSettings.websiteProfileId';
   const catalog = 'publishSettings.websiteProfiles';

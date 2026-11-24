@@ -291,3 +291,12 @@ test('uses the current Personal Center TTS defaults for each book and persists o
   assert.match(source, /const nextTts = \{ \.\.\.DEFAULT_TTS, \.\.\.\(config\?\.tts \|\| \{\}\), \.\.\.\(form\.tts \|\| \{\}\) \}/);
   assert.match(source, /当前书 TTS/);
 });
+
+test('text single-book modal presents engine layout and publish as one inherited configuration', () => {
+  assert.match(source, /单书配置 · \$\{book\.title \|\| '文本'\}/);
+  assert.match(source, /引擎配置、排版配置和发布配置均默认继承批次统一配置/);
+  assert.match(source, /保存当前书配置/);
+  assert.match(source, /scope="book"/);
+  assert.match(source, /explicitKeys=\{explicitKeys\}/);
+  assert.match(source, /onRestore=\{key=>change\(\{\[key\]:undefined\}\)\}/);
+});

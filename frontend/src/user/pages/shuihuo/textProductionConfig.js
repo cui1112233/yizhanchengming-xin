@@ -8,7 +8,7 @@ const field = (key, label, type, initial, extra = {}) => ({key, label, type, ini
 const solid = { kind: 'color', color: '#111318' };
 
 export const TEXT_PRODUCTION_SECTIONS = [
-  { key: 'models', label: '模型配置', fields: [
+  { key: 'models', label: '引擎配置', fields: [
     field('textModelId','文本模型','model',''),
     field('sensitiveMode','敏感内容处理','choice','system',{options:SENSITIVE_MODE_OPTIONS,aiHint:'生产阶段会调用文本模型。AI 优化失败会停止生产并显示失败原因。'}),
     field('sensitiveAIModels','AI 修复模型','models',[]),
