@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ value: "fetch", reduced: false, slots: [] as any[], cursor: 0, show: null as any, navigate: vi.fn(), switchTab: vi.fn(), save: vi.fn() }));
+const h = vi.hoisted(() => ({ value: "novel", reduced: false, slots: [] as any[], cursor: 0, show: null as any, navigate: vi.fn(), switchTab: vi.fn(), save: vi.fn() }));
 vi.mock("react", () => ({ useState: (initial: any) => {
   const i = h.cursor++;
   if (!(i in h.slots)) h.slots[i] = typeof initial === "function" ? initial() : initial;
@@ -20,7 +20,7 @@ const galleryStyles = readFileSync(new URL("./gallery.scss", import.meta.url), "
 
 const nodes = (tree: any): any[] => !tree || typeof tree !== "object" ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)];
 const render = () => { h.cursor = 0; return nodes(FunctionsPage()); };
-beforeEach(() => { h.slots = []; h.value = "fetch"; h.reduced = false; h.navigate.mockReset(); h.switchTab.mockReset(); h.save.mockReset(); });
+beforeEach(() => { h.slots = []; h.value = "novel"; h.reduced = false; h.navigate.mockReset(); h.switchTab.mockReset(); h.save.mockReset(); });
 
 test("each grouped entry opens its real function and remembers the choice", () => {
   expect(render().filter(n => n.type === "Button" && n.props.className.split(" ").includes('tools-entry'))).toHaveLength(9);
@@ -53,7 +53,7 @@ test("gallery uses the selected visual hierarchy instead of category filters", (
 test("matches the approved nine-card copy and visual order", () => {
   const entries = render().filter(n => n.type === "Button" && n.props.className.split(" ").includes("tools-entry"));
   expect(entries.map(entry => MODULES.find(item => entry.props.className.includes(`tools-entry-${item.key}`))?.key)).toEqual([
-    "script", "fetch", "batch", "shuihuo", "aicut", "comic", "agent", "voice", "plugins",
+    "script", "novel", "batch", "shuihuo", "aicut", "comic", "agent", "voice", "plugins",
   ]);
   const allText = render().map(n => typeof n.props?.children === "string" ? n.props.children : "").join(" ");
   expect(allText).toContain("私人定制");
@@ -85,7 +85,7 @@ test("returning to the page refreshes the last-used marker from other workspaces
 
 test("function entry keeps its routes without an appearance preference control", () => {
   expect(render().find(n => n.type === "Switch")).toBeUndefined();
-  expect(render().find(n => n.props?.className?.includes("is-recent")).props.className).toContain("tools-entry-fetch");
+  expect(render().find(n => n.props?.className?.includes("is-recent")).props.className).toContain("tools-entry-novel");
   expect(h.navigate).not.toHaveBeenCalled();
 });
 
@@ -110,4 +110,12 @@ test("uses WeChat-safe sizing instead of auto-height images or CSS grid", () => 
   expect(galleryStyles).toContain("transform:scale(1.25)");
   expect(galleryStyles).toContain(".tools-entry-script.gallery-feature-art{left:auto;right:-10px;bottom:-15px;width:160px;height:160px;transform:none}");
   expect(galleryStyles).toContain(".tools-entry-comic.gallery-feature-art{left:auto;right:-35px;bottom:-42px;width:210px;height:210px;transform:none}");
+});
+
+
+test("legacy fetch resume preserves its real route without marking novel creation as the old task", () => {
+  h.value = "fetch";
+  expect(render().filter(n => n.type === "Button" && n.props.className.includes("is-recent"))).toHaveLength(0);
+  render().find(n => n.props.className === "gallery-resume").props.onClick();
+  expect(h.navigate).toHaveBeenLastCalledWith({url: "/pages/module-detail/index?key=fetch"});
 });

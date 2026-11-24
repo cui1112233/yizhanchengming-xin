@@ -28,7 +28,7 @@ export default function ModuleDetailPage() {
     setHistoryId(String(params?.historyId || ""));
     setTaskId(String(params?.taskId || ""));
     setProjectId(String(params?.projectId || ""));
-    if (requestedKey === "batch" || requestedKey === "comic" || requestedKey === "aicut") {
+    if (requestedKey === "batch" || requestedKey === "comic" || requestedKey === "aicut" || requestedKey === 'novel') {
       void Taro.redirectTo({ url: moduleRoute(requestedKey) });
       return;
     }

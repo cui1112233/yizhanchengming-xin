@@ -34,7 +34,7 @@ export default function WorkspacePage() {
   useEffect(() => () => { readVersion.current += 1; }, []);
 
   const currentTask = selectCurrentTask(activeModule.key, records);
-  const currentStatus = workbenchStatus(currentTask);
+  const currentStatus = activeModule.key === 'novel' ? {label:'在作品内查看进度',tone:'unknown' as const} : workbenchStatus(currentTask);
   const progress = workbenchProgress(currentTask);
   const visual = FUNCTION_VISUALS[activeModule.key];
 
@@ -139,8 +139,8 @@ export default function WorkspacePage() {
 
       {!summaryLoading && !summaryError && !currentTask ? <View className="workbench-empty liquid-glass--secondary" data-glass-role="secondary">
         <Image className="workbench-empty-art" src={visual.asset} mode="aspectFit" />
-        <Text className="workbench-section-title">当前功能还没有可继续的任务</Text>
-        <Text className="workbench-note">点击“开始配置”进入 {visual.label}，真正提交后任务会同步到这里。</Text>
+        <Text className="workbench-section-title">{activeModule.key==='novel'?'小说创作进度保存在对应作品内':'当前功能还没有可继续的任务'}</Text>
+        <Text className="workbench-note">{activeModule.key==='novel'?'进入小说创作，打开作品查看讨论、写作阶段和已保存章节。':`点击“开始配置”进入 ${visual.label}，真正提交后任务会同步到这里。`}</Text>
       </View> : null}
 
       {summaryWarning ? <View className="workbench-warning"><Text>{summaryWarning}</Text><Button className="workbench-retry" onClick={loadSummary}>重试</Button></View> : null}

@@ -23,6 +23,7 @@ export default {
       pages: [
         "pages/index/index",
         "pages/aicut/index",
+        "pages/novel/index",
         "pages/member-center/index",
         "pages/usage-stats/index",
         "pages/tts/index",

@@ -1,0 +1,63 @@
+.nw-page {
+  --nw-bg: #171a1c; --nw-card: #24282b; --nw-ink: #f3f6f5; --nw-muted: #9ba8a4; --nw-line: rgba(255,255,255,.1); --nw-accent: #45cdbd; --nw-soft: rgba(65,200,180,.11);
+  min-height: 100vh; font-size: 14px; color: var(--nw-ink);
+  button { min-height: 44px; padding: 8px 12px; line-height: 1.6; font-size: 13px; margin: 0; border-radius: 12px; color: var(--nw-ink); background: var(--nw-card); border: 1px solid var(--nw-line); }
+  button::after { border: 0; }
+  button[disabled] { opacity: .4; }
+  .nw-primary { display: flex; align-items: center; justify-content: center; background: var(--nw-accent); color: #092f28; font-weight: 600; }
+  .nw-link { color: var(--nw-accent); border: 0; background: transparent; font-size: 12px; padding: 8px 3px; }
+}
+.mp-theme.mp-page.nw-page, .mp-theme .mp-page.nw-page { padding: 0 0 calc(144px + env(safe-area-inset-bottom)); background: var(--nw-bg); color: var(--nw-ink); }
+.mp-theme-light.nw-page, .mp-theme-light .nw-page { --nw-bg: #f5f7f6; --nw-card: #fff; --nw-ink: #26312e; --nw-muted: #72817b; --nw-line: rgba(25,50,40,.12); --nw-accent: #36c6b1; --nw-soft: #e3f2ed; }
+.mp-theme .nw-page .mp-brand-header,.mp-theme.nw-page .mp-brand-header { margin: 0; padding-left: 16px; padding-right: 16px; }
+.nw-content { padding: 16px; }
+.nw-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+.nw-heading > view { min-width: 0; flex: 1; }
+.nw-title { display: block; font-size: 18px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+.nw-subtitle { display: block; font-size: 15px; font-weight: 600; line-height: 1.7; margin-bottom: 8px; }
+.nw-caption { display: block; font-size: 12px; line-height: 1.7; color: var(--nw-muted); font-weight: 400; }
+.nw-label { display: block; font-size: 12px; color: var(--nw-muted); line-height: 1.7; margin: 8px 0 6px; }
+.nw-error { display: block; margin: 10px 0; padding: 10px; border-radius: 10px; background: rgba(210,100,85,.09); color: #e2948a; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.nw-notice { display: block; padding: 12px; margin: 10px 0; border: 1px solid var(--nw-line); background: var(--nw-soft); border-radius: 12px; font-size: 13px; line-height: 1.8; }
+.nw-section { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 12px; font-size: 14px; font-weight: 600; }
+.nw-modes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 18px; }
+.nw-page .nw-mode { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; padding: 14px; min-height: 126px; }
+.nw-mode-icon { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 11px; background: var(--nw-soft); margin-bottom: 10px; }
+.nw-mode-icon.tone-1 { background: rgba(90,140,170,.13); }
+.nw-mode-icon.tone-2 { background: rgba(200,160,90,.12); }
+.nw-mode-name { font-size: 14px; font-weight: 600; line-height: 1.7; }
+.nw-mode .nw-caption { margin-top: 3px; font-size: 11px; }
+.nw-field { margin: 14px 0; }
+.nw-input { display: block; width: 100%; height: 44px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--nw-line); border-radius: 12px; color: var(--nw-ink); background: var(--nw-card); font-size: 14px; line-height: 1.8; }
+.nw-textarea { min-height: 160px; height: 160px; padding: 12px; }
+.nw-select { min-height: 62px; padding: 8px 12px; border: 1px solid var(--nw-line); border-radius: 12px; background: var(--nw-card); margin: 10px 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.nw-select .nw-label { margin: 0 0 3px; font-size: 11px; }
+.nw-two { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.nw-two > view { min-width: 0; }
+.nw-empty { min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 20px; box-sizing: border-box; font-size: 14px; }
+.nw-page .nw-library-row { display: flex; align-items: center; width: 100%; gap: 12px; padding: 14px; margin: 10px 0; text-align: left; }
+.nw-library-row > view { flex: 1; min-width: 0; }
+.nw-library-row text { display: block; overflow-wrap: anywhere; }
+.nw-page .nw-row-button { width: 100%; margin: 16px 0; text-align: left; }
+.nw-card { padding: 14px; margin: 14px 0; border: 1px solid var(--nw-line); border-radius: 14px; background: var(--nw-card); }
+.nw-card > button { margin: 8px 0; }
+.nw-page .nw-chip { display: inline-block; min-height: 40px; margin: 5px; padding: 7px 12px; font-size: 12px; border-radius: 20px; background: transparent; }
+.nw-page .is-selected { color: var(--nw-accent); background: var(--nw-soft); border-color: var(--nw-accent); }
+.nw-dock { position: fixed; z-index: 20; bottom: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--nw-line); background: var(--nw-bg); }
+.nw-dock > text { flex-basis: 100%; font-size: 11px; }
+.nw-dock > button { flex: 1; }
+.nw-prose { display: block; font-size: 14px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.nw-message { padding: 12px 14px; margin: 12px 0; border: 1px solid var(--nw-line); border-radius: 14px; background: var(--nw-card); }
+.nw-message.role-user { border-color: rgba(60,200,180,.25); background: var(--nw-soft); }
+.nw-message .nw-label { margin-top: 0; }
+.nw-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.nw-actions > button { flex: 1; }
+.nw-tabs { display: flex; gap: 8px; margin: 16px 0 8px; }
+.nw-tabs > button { flex: 1; }
+.nw-wide { width: 100%; margin: 12px 0 !important; }
+.nw-version { padding: 12px 0; border-top: 1px solid var(--nw-line); margin-top: 10px; }
+.nw-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; }
+.nw-mask { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+.nw-sheet { position: relative; width: 100%; background: var(--nw-bg); border-radius: 22px 22px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+.nw-sheet-body { height: 62vh; overflow-y: auto; }
+.nw-sheet-body .nw-textarea { height: 260px; }

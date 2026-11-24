@@ -5,7 +5,7 @@ describe("小程序功能目录", () => {
   it("与网页功能目录保持一致", () => {
     expect(MODULES.map((item) => item.key)).toEqual([
       "script",
-      "fetch",
+      "novel",
       "batch",
       "shuihuo",
       "comic",

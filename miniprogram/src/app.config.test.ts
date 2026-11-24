@@ -37,6 +37,7 @@ describe("小程序页面配置", () => {
     expect(subPackage?.pages).toEqual([
       "pages/index/index",
       "pages/aicut/index",
+      "pages/novel/index",
       "pages/member-center/index",
       "pages/usage-stats/index",
       "pages/tts/index",
