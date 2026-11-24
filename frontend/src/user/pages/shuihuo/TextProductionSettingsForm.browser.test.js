@@ -45,6 +45,7 @@ test('文本发布复用漫画配置，不显示旧网站映射，不重复展�
           (await waitFor(()=>byText('[role=tab]','排版配置'),'layout tab')).click();
           await waitFor(()=>byText('.batch-factory-engine-group-title','正文排版'),'layout group');
           document.body.dataset.step='layout';
+          if(document.querySelector('[aria-label="最多页数"]')?.value!=='35')throw Error('default page cap is not 35');
           const layoutGrid=document.querySelector('.batch-factory-engine-grid');
           const layoutColumns=getComputedStyle(layoutGrid).gridTemplateColumns;
           if(!layoutColumns.startsWith('repeat(2,') && layoutColumns.split(' ').length!==2) throw Error('layout is not two columns: '+layoutColumns);

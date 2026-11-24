@@ -81,7 +81,7 @@ test('同一套字段覆盖三个表单，实际边距、段距和标红保留�
   for (const key of ['textModelId','sensitiveMode','sensitiveAIModels','sensitiveAIOnFailure','highlightReuseEnabled','contentRange','textPageTarget','imageAspectRatio','textFontId','textFontSize','textFontWeight','textLineHeight','textParagraphSpacing','textPadding','textAlign','textColor','textHighlightColor','textMaxHeightRatio','textBackground','textCover.layout.fontId','textCover.layout.fontSize','textCover.layout.align','comicPublishSettings.producerAdminName','comicPublishSettings.organizationId','publishSettings.websiteProfileId','publishSettings.bookCategory','textAutoCollection','textAutoUpload','textUploadRetryLimit']) assert.ok(TEXT_PRODUCTION_CONFIG_KEYS.includes(key),key);
   assert.ok(!TEXT_PRODUCTION_CONFIG_KEYS.includes('textCover.background'));
   const d=defaultTextProductionConfig();
-  assert.deepEqual([d.textPageTarget,d.contentRange,d.imageAspectRatio,d.textMaxHeightRatio],[150,4000,'3:4',0.75]);
+  assert.deepEqual([d.textPageTarget,d.textMaxPages,d.contentRange,d.imageAspectRatio,d.textMaxHeightRatio],[150,35,4000,'3:4',0.75]);
   const off=normalizeTextProductionConfig({textPadding:0,textParagraphSpacing:0,highlightReuseEnabled:false,publishSettings:{biaohongReuse:true}});
   assert.deepEqual([off.textPadding,off.textParagraphSpacing,off.highlightReuseEnabled],[0,0,false]);
   assert.equal(normalizeTextProductionConfig({publishSettings:{biaohongReuse:true}}).highlightReuseEnabled,true);

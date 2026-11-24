@@ -425,6 +425,25 @@ func (a textAPI) verifyCollectionFiles(x textRequest, in textInput) (txt.Documen
 	for _, id := range in.PageIDs {
 		selected[id] = true
 	}
+	var snapshot textSnapshot
+	if len(d.ConfigSnapshot) > 0 {
+		if err := json.Unmarshal(d.ConfigSnapshot, &snapshot); err != nil {
+			return d, txt.ErrInvalid
+		}
+	}
+	limit := snapshot.Layout.MaxPages
+	if limit == 0 {
+		limit = txt.DefaultMaxPages
+	}
+	count := 0
+	for _, p := range pages {
+		if len(selected) == 0 || selected[p.ID] {
+			count++
+		}
+	}
+	if count > limit {
+		return d, &txt.PageLimitError{Pages: count, Limit: limit}
+	}
 	for _, p := range pages {
 		if len(selected) == 0 || selected[p.ID] {
 			if err := verify(p.ActiveArtifactID, fmt.Sprintf("第 %d 页", p.Ordinal)); err != nil {

@@ -158,7 +158,7 @@ func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 	var s textSnapshot
 	raw := map[string]json.RawMessage{}
 	raw["paginationMode"] = json.RawMessage(`"auto"`)
-	for k, d := range map[string]string{"textPaginationMode": "paginationMode", "textPageTarget": "targetCharacters", "imageAspectRatio": "aspectRatio", "textFontId": "fontId", "textFontSize": "fontSize", "textFontWeight": "fontWeight", "textLineHeight": "lineHeight", "textParagraphSpacing": "paragraphSpacing", "textPadding": "padding", "textAlign": "align", "textColor": "textColor", "textHighlightColor": "highlightColor", "textHighlightRules": "highlightRules", "textHighlightLines": "highlightLines", "textMaxHeightRatio": "maxHeightRatio"} {
+	for k, d := range map[string]string{"textPaginationMode": "paginationMode", "textPageTarget": "targetCharacters", "textMaxPages": "maxPages", "imageAspectRatio": "aspectRatio", "textFontId": "fontId", "textFontSize": "fontSize", "textFontWeight": "fontWeight", "textLineHeight": "lineHeight", "textParagraphSpacing": "paragraphSpacing", "textPadding": "padding", "textAlign": "align", "textColor": "textColor", "textHighlightColor": "highlightColor", "textHighlightRules": "highlightRules", "textHighlightLines": "highlightLines", "textMaxHeightRatio": "maxHeightRatio"} {
 		if v := x.settings[k]; len(v) > 0 {
 			raw[d] = v
 		}

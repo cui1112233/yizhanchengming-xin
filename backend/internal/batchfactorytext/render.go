@@ -107,7 +107,7 @@ type MeasureResult struct {
 }
 
 func DefaultRenderLayout() LayoutConfig {
-	return LayoutConfig{AspectRatio: "3:4", TargetCharacters: DefaultTargetCharacters, PaginationMode: "auto", FontID: renderfont.Noto, FontSize: 44, FontWeight: 400, LineHeight: 1.65, ParagraphSpacing: 24, Padding: 96, Align: "left", TextColor: "#FFFFFF", HighlightColor: "#E53935", MaxHeightRatio: .75, paddingSet: true, paragraphSpacingSet: true}
+	return LayoutConfig{AspectRatio: "3:4", TargetCharacters: DefaultTargetCharacters, MaxPages: DefaultMaxPages, PaginationMode: "auto", FontID: renderfont.Noto, FontSize: 44, FontWeight: 400, LineHeight: 1.65, ParagraphSpacing: 24, Padding: 96, Align: "left", TextColor: "#FFFFFF", HighlightColor: "#E53935", MaxHeightRatio: .75, paddingSet: true, paragraphSpacingSet: true}
 }
 
 var canvasSizes = map[string]image.Point{
@@ -245,6 +245,7 @@ func layoutText(ctx context.Context, text string, c LayoutConfig, size image.Poi
 	var prev rune
 	var top, lastHeight int
 	var hasGlyph bool
+	var hasVisibleGlyph bool
 	shapes := make(map[rune]glyphShape)
 	flush := func() error {
 		ascent := max(metrics.Ascent.Ceil(), line.above.Ceil())
@@ -271,6 +272,7 @@ func layoutText(ctx context.Context, text string, c LayoutConfig, size image.Poi
 		line = lineGeometry{glyphs: line.glyphs[:0]}
 		prev = 0
 		hasGlyph = false
+		hasVisibleGlyph = false
 		return nil
 	}
 	runeIndex := 0
@@ -288,6 +290,15 @@ func layoutText(ctx context.Context, text string, c LayoutConfig, size image.Poi
 			}
 		}
 		if r == '\n' {
+			// Blank source separators retain their offsets but do not add another
+			// empty line on top of the configured paragraph spacing.
+			if !hasVisibleGlyph {
+				line = lineGeometry{glyphs: line.glyphs[:0]}
+				prev = 0
+				hasGlyph = false
+				runeIndex++
+				continue
+			}
 			if err := flush(); err != nil {
 				return m, err
 			}
@@ -357,6 +368,7 @@ func layoutText(ctx context.Context, text string, c LayoutConfig, size image.Poi
 		}
 		prev = display
 		hasGlyph = true
+		hasVisibleGlyph = hasVisibleGlyph || strings.TrimSpace(string(r)) != ""
 		runeIndex++
 	}
 	if hasGlyph {

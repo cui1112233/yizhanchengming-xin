@@ -25,6 +25,7 @@ export const TEXT_PRODUCTION_SECTIONS = [
   { key:'layout', label:'排版配置', fields:[
     field('textPaginationMode','分页方式','choice','auto',{options:[{value:'auto',label:'智能排版'},{value:'target',label:'目标字数'}]}),
     field('textPageTarget','单页目标字数','number',150,{min:1,max:100000}),
+    field('textMaxPages','最多页数','number',35,{min:1,max:1000}),
     field('contentRange','内容截取','choice',4000,{options:options([1000,2000,4000,8000,12000,20000,50000,100000])}),
     field('imageAspectRatio','画幅','choice','3:4',{options:options(['3:4','9:16','1:1','4:3','16:9','21:9','3:2','2:3'])}),
     field('textFontId','正文字体','choice','noto-sans-sc',{options:fonts}),

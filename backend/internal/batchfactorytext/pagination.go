@@ -9,6 +9,15 @@ import (
 )
 
 const DefaultTargetCharacters = 150
+const DefaultMaxPages = 35
+
+type PageLimitError struct{ Pages, Limit int }
+
+func (e *PageLimitError) Unwrap() error { return ErrInvalid }
+
+func (e *PageLimitError) Error() string {
+	return fmt.Sprintf("当前排版需要 %d 页，超过设置的 %d 页上限。正文未截断，请减小字号、行距或段距，或提高最多页数后重新分页", e.Pages, e.Limit)
+}
 
 // SentenceBreaks reports legal manual split points in the same coordinate space as Paginate.
 func SentenceBreaks(text string) []int {
@@ -80,6 +89,13 @@ func Paginate(ctx context.Context, input PaginationInput, measure MeasureFunc) (
 	if input.Layout.TargetCharacters == 0 {
 		input.Layout.TargetCharacters = DefaultTargetCharacters
 	}
+	limit := input.Layout.MaxPages
+	if limit == 0 {
+		limit = DefaultMaxPages
+	}
+	if limit < 1 || limit > 1000 {
+		return nil, ErrInvalid
+	}
 	p := pagePacker{ctx: ctx, runes: []rune(NormalizeLineEndings(input.Text)), layout: input.Layout, measure: measure}
 	reading := map[int]bool{}
 	if resolved, size, err := resolveLayout(input.Layout); err == nil {
@@ -118,6 +134,9 @@ func Paginate(ctx context.Context, input PaginationInput, measure MeasureFunc) (
 		start = end
 	}
 	p.flush()
+	if len(p.pages) > limit {
+		return nil, &PageLimitError{Pages: len(p.pages), Limit: limit}
+	}
 	if err := validateDrafts(input.Text, p.pages); err != nil {
 		return nil, err
 	}

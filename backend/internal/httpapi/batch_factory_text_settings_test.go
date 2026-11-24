@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/png"
 	"net/http/httptest"
@@ -89,6 +90,13 @@ func TestBatchFactoryTextPersonalSettingsLibrary(t *testing.T) {
 }
 
 func TestBatchFactoryTextPaginationModeSettings(t *testing.T) {
+	for _, limit := range []int{35, 50} {
+		settings := batchfactoryv11.SettingsPatch{"textMaxPages": json.RawMessage(fmt.Sprint(limit))}
+		snap, err := bookTextSnapshot(textRequest{settings: settings})
+		if err != nil || snap.Layout.MaxPages != limit {
+			t.Fatalf("page limit not passed to paginator: %+v %v", snap.Layout, err)
+		}
+	}
 	for _, mode := range []string{"auto", "target"} {
 		settings := batchfactoryv11.SettingsPatch{"textPaginationMode": json.RawMessage(`"` + mode + `"`), "textPageTarget": json.RawMessage(`150`)}
 		snap, err := bookTextSnapshot(textRequest{settings: settings})
