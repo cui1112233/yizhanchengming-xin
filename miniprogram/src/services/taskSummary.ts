@@ -224,6 +224,17 @@ function batchRuntimeRecords(batch: Record<string, unknown>, runtime: unknown) {
   return rows;
 }
 
+function batchListRecord(batch: Record<string, unknown>) {
+  return {
+    id: firstText(batch, ["id"]),
+    title: firstText(batch, ["title", "name"]),
+    createdAt: firstText(batch, ["updatedAt", "updated_at", "createdAt", "created_at"]),
+    status: firstText(batch, ["status", "state"]),
+    kind: firstText(batch, ["productionMode", "production_mode"]) || "batch",
+    stage: "batch",
+  };
+}
+
 function timestamp(entry: AggregatedTask) {
   if (!entry.createdAt) return undefined;
   const value = new Date(entry.createdAt).getTime();
@@ -256,8 +267,16 @@ export async function loadTaskSummary(request: TaskRequest, options: { projectsO
       const batches = collectionFrom(payload, "batches");
       const runtimeRows = await Promise.all(batches.map(async (batch) => {
         const id = firstText(batch, ["id"]); if (!id) throw new Error("批量工厂批次缺少 ID");
-        const runtime = await request(`/api/batch-factory/v12/batches/${encodeURIComponent(id)}/runtime-summary`);
-        return batchRuntimeRecords(batch, runtime);
+        try {
+          const runtime = await request(`/api/batch-factory/v12/batches/${encodeURIComponent(id)}/runtime-summary`);
+          const rows = batchRuntimeRecords(batch, runtime);
+          return rows.length ? rows : [batchListRecord(batch)];
+        } catch {
+          // The summary list is already durable server truth. Runtime summary is
+          // a heavier optional enrichment and one slow batch must not erase all
+          // of the user's existing task records.
+          return [batchListRecord(batch)];
+        }
       }));
       return { batches: runtimeRows.flat() };
     }
