@@ -40,6 +40,11 @@ export const TEXT_PRODUCTION_SECTIONS = [
   {key:'publish',label:'发布配置',fields:[
     field('comicPublishSettings.producerAdminName','上传人','producer',''),
     field('comicPublishSettings.organizationId','组织归属','organization',''),
+    ...[
+      ['copySource','original'],['materialSource','ORIGINAL'],['creativeAdminName',''],['organizationName',''],
+      ['audioCategorySelectionMode','auto'],['audioCategoryId',null],['audioCategoryName',''],['audioCandidates',[]],
+      ['specifiedAudioId',''],['specifiedAudioName',''],['workMatchMode','title_auto']
+    ].map(([key,initial])=>field('comicPublishSettings.'+key,key,'publishShared',initial)),
     field('publishSettings.websiteProfileId','网站配置档','profile',''),
     field('publishSettings.bookCategory','书籍分类','input',''),
     field('textAutoCollection','自动生成合集','switch',true),

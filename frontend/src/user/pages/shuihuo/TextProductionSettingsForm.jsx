@@ -1,11 +1,13 @@
 import { Alert, Button, ColorPicker as ThemeColorPicker, ConfigProvider, Input, InputNumber, Select, Space, Switch, Tabs, Upload, message } from 'antd';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { getAvailableModelCatalog, modelSelectOptions } from '../../../shared/api/modelCatalog';
 import { getN8ComicPublishStatus } from '../../../shared/api/batchFactoryV12';
 import { syncWebSubmitConfigs } from '../../../shared/api/novelFetch';
 import { listPersonalTextBackgrounds, uploadPersonalTextBackground } from '../../../shared/api/batchFactoryText';
 import { producerAccountOptions } from './batchFactoryComicPublishAccounts';
 import { TEXT_PRODUCTION_SECTIONS, textProductionInitialSection, textProfileChanges } from './textProductionConfig';
+
+const SharedImagePublishSettings = lazy(() => import('./BatchFactoryImagePublishSettingsForm').then(module => ({default:module.BatchFactoryComicPublishSettingsForm})));
 
 function ColorPicker({ label, value, onChange }) {
   const [draft, setDraft] = useState(value);
@@ -125,8 +127,8 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
       {title:'背景与标题',fields:section.fields.filter(field=>field.key==='textBackground' || field.key.startsWith('textCover.'))}
     ];
     if(section.key==='publish') return [
-      {title:'发布映射',fields:section.fields.slice(0,4)},
-      {title:'自动发布',fields:section.fields.slice(4)}
+      {title:'发布映射',fields:section.fields.filter(field=>field.key.startsWith('publishSettings.'))},
+      {title:'自动发布',fields:section.fields.filter(field=>field.key.startsWith('text'))}
     ];
     return [{title:'',fields:section.fields}];
   };
@@ -139,12 +141,16 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
         {scope==='book' && own && <Button size="small" type="link" onClick={()=>onRestore(field.key)}>恢复继承</Button>}
       </div>;
   };
-  const panel=section=><div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
+  const sharedPublishValue = Object.fromEntries(Object.entries(value).filter(([key])=>key.startsWith('comicPublishSettings.')).map(([key,v])=>[key.slice('comicPublishSettings.'.length),v]));
+  const panel=section=><>{section.key==='publish' && <Suspense fallback={null}><SharedImagePublishSettings productionMode="text" singleBook={scope==='book'} value={{comicPublishSettings:sharedPublishValue}} onChange={next=>{
+    const changes=Object.fromEntries(Object.entries(next.comicPublishSettings || {}).filter(([key,v])=>JSON.stringify(v)!==JSON.stringify(sharedPublishValue[key])).map(([key,v])=>['comicPublishSettings.'+key,v]));
+    if(Object.keys(changes).length)onChange(changes);
+  }}/></Suspense>}<div className={`batch-factory-engine-card batch-factory-settings-card is-${section.key}`}><div className="batch-factory-engine-card-body batch-factory-engine-grid">
     {fieldGroups(section).map(group=><section className="batch-factory-engine-group" key={group.title || section.key}>
       {group.title ? <div className="batch-factory-engine-group-title">{group.title}</div> : null}
       {group.fields.map(renderField)}
     </section>)}
-  </div></div>;
+  </div></div></>;
   return <>{error && <Alert type="warning" showIcon message={error}/>}
     <Tabs activeKey={tab} onChange={setTab} items={TEXT_PRODUCTION_SECTIONS.map(s=>({key:s.key,label:s.label,children:panel(s)}))}/>
   </>;

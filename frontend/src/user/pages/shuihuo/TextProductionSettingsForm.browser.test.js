@@ -56,7 +56,8 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
           const publishGroup=await waitFor(()=>byText('.batch-factory-engine-group-title','发布映射'),'publish group');
           document.body.dataset.step='publish';
           const publishFields=[...publishGroup.closest('.batch-factory-engine-card').querySelectorAll('.batch-factory-engine-field')];
-          if(publishFields.length!==7) throw Error('publish fields escaped the shared grid');
+          if(publishFields.length!==5) throw Error('text upload controls escaped the shared grid');
+          await waitFor(()=>document.body.textContent.includes('文案来源') && document.body.textContent.includes('音频匹配方式') && document.body.textContent.includes('作品匹配方式'),'shared image publish controls');
           (await waitFor(()=>byText('button','同步网站配置档'),'sync button')).click();
           await waitFor(()=>window.synced,'sync request');
           document.body.dataset.step='synced';
