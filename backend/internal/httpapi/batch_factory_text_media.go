@@ -402,9 +402,6 @@ func (a textAPI) verifyCollectionFiles(x textRequest, in textInput) (txt.Documen
 	if d.ActiveVersionID != in.VersionID || d.PaginationVersion != in.PaginationVersion || in.ExpectedRevision > 0 && in.ExpectedRevision != d.Revision {
 		return d, txt.ErrConflict
 	}
-	if d.CoverArtifactID == "" {
-		return d, fmt.Errorf("%w（封面）", txt.ErrNotReady)
-	}
 	artifacts, err := a.repo.ListArtifacts(x, x.scope)
 	if err != nil {
 		return d, err
@@ -419,9 +416,6 @@ func (a textAPI) verifyCollectionFiles(x textRequest, in textInput) (txt.Documen
 			return fmt.Errorf("%w（%s）", txt.ErrNotReady, label)
 		}
 		return a.verifyArtifactFile(x, art, label)
-	}
-	if err := verify(d.CoverArtifactID, "封面"); err != nil {
-		return d, err
 	}
 	pages, err := a.repo.ListPages(x, x.scope)
 	if err != nil {

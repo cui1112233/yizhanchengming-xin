@@ -297,16 +297,6 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 		if head.ActiveVersionID != doc.ActiveVersionID || head.PaginationVersion != doc.PaginationVersion {
 			return ErrConflict
 		}
-		if head.CoverArtifactID != doc.CoverArtifactID || head.CoverLocked != doc.CoverLocked {
-			return ErrConflict
-		}
-		if cause := repairs[""]; cause != nil {
-			if head.CoverLocked {
-				failures = append(failures, fmt.Errorf("封面上传图已锁定，请重新上传：%w", cause))
-			} else if err := w.Render(ctx, req, head, Page{}); err != nil {
-				failures = append(failures, fmt.Errorf("封面：%w", err))
-			}
-		}
 		return errors.Join(failures...)
 	})
 	if err != nil {
