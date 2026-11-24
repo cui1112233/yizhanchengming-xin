@@ -6028,6 +6028,9 @@ func (c *BatchAutomationCoordinator) control(owner, batchID, nextState string, a
 		c.mu.Unlock()
 		return nil, err
 	}
+	// Callbacks run after releasing c.mu. Never expose the shared state map
+	// while workers can update its nested book/page ledgers.
+	target = cloneAutomationEntry(target)
 	c.mu.Unlock()
 	if after != nil {
 		if err := after(target); err != nil {
@@ -6037,7 +6040,10 @@ func (c *BatchAutomationCoordinator) control(owner, batchID, nextState string, a
 			return nil, err
 		}
 	}
-	return publicAutomationJob(target), nil
+	c.mu.Lock()
+	response := publicAutomationJob(target)
+	c.mu.Unlock()
+	return response, nil
 }
 
 func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordinator *BatchAutomationCoordinator, version string) {
