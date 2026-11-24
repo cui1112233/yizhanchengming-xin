@@ -20,6 +20,7 @@ import './style.scss';
 export default function NovelPage(){
   const [projects,setProjects]=useState<NovelRecord[]>([]),[studios,setStudios]=useState<NovelRecord[]>([]),[models,setModels]=useState<NovelRecord[]>([]);
   const [journal,setJournal]=useState<NovelJournal|null>(null),[view,setView]=useState<NovelRecord>({kind:'library'}),[loaded,setLoaded]=useState(false),[query,setQuery]=useState('');
+  const [archived,setArchived]=useState(false);
   const op=useNovelOperations(),epoch=useRef(0),client=createNovelClient(apiRequest);
   const reload=()=>op.run('读取作品',async()=>{
     const ticket=epoch.current;
@@ -38,13 +39,13 @@ export default function NovelPage(){
   const back=()=>{setView({kind:'library'});void reload();};
   const openMode=(mode:NovelMode)=>setView({kind:isNovelStudio(mode)?'studio':'create',mode});
   const accept=(result:NovelRecord)=>{const project=result.project||result.book;if(!project?.id)throw Error('作品创建结果尚未确认，请核对原提交');setProjects(value=>[project,...value.filter(item=>item.id!==project.id)]);setView({kind:'project',project,session:result.productionSession||result.session,run:result.run,mode:result.session?.mode||result.productionSession?.mode||'continuation'});};
-  const active=projects.filter(item=>!['archived','purging'].includes(item.status)&&String(item.title||'').includes(query));
+  const active=projects.filter(item=>item.status!=='purging'&&(archived?item.status==='archived':item.status!=='archived')&&String(item.title||'').includes(query));
   return <ThemedPage className="mp-page nw-page" dynamicGlass={false}><BrandHeader title="小说创作" showBack/><View className="nw-content">
     {view.kind==='library'?<>
       <View className="nw-heading"><View><Text className="nw-title">写下你的下一个故事</Text><Text className="nw-caption">原创、仿写、番外与续写</Text></View><Button className="nw-link" disabled={Boolean(op.busy)} onClick={()=>void reload()}>刷新</Button></View>
       <NovelNotice busy={op.busy} error={op.error}/>
       <View className="nw-modes">{NOVEL_MODES.map((item,index)=><Button id={`novel-mode-${item.id}`} key={item.id} disabled={!journal||Boolean(op.busy)} className="nw-mode" onClick={()=>openMode(item.id)}><View className={`nw-mode-icon tone-${index%3}`}><AppIcon name={index<2?'file-pen-line':index<4?'book-open':index===4?'users-round':'notebook-tabs'} size={23}/></View><Text className="nw-mode-name">{item.name}</Text><Text className="nw-caption">{item.description}</Text></Button>)}</View>
-      <View className="nw-section"><Text>我的作品 · {loaded?active.length:'—'}</Text></View><Input id="novel-search" className="nw-input" value={query} onInput={event=>setQuery(event.detail.value)} placeholder="搜索作品名称"/>
+      <View className="nw-actions"><Button className="nw-link" disabled={Boolean(op.busy)} onClick={()=>setArchived(value=>!value)}>{archived?'返回常用作品':'查看归档作品'}</Button></View><View className="nw-section"><Text>{archived?'归档作品':'我的作品'} · {loaded?active.length:'—'}</Text></View><Input id="novel-search" className="nw-input" value={query} onInput={event=>setQuery(event.detail.value)} placeholder="搜索作品名称"/>
       {!op.busy&&loaded&&!active.length?<View className="nw-empty"><AppIcon name="book-open" size={32}/><Text>{query?'没有找到匹配的作品':'还没有作品'}</Text><Text className="nw-caption">{query?'试试其他名称':'选择上方的创作方式开始构思'}</Text></View>:null}
       {active.map(item=><Button className="nw-library-row" key={item.id} onClick={()=>setView({kind:'project',project:item})}><AppIcon name="book-open" size={23}/><View><Text>{item.title||'未命名作品'}</Text><Text className="nw-caption">{item.genre||'小说作品'} · {item.updatedAt?new Date(item.updatedAt).toLocaleDateString():'时间未返回'}</Text></View><Text>打开</Text></Button>)}
       {studios.length?<><View className="nw-section"><Text>创作讨论</Text><Text className="nw-caption">讨论确认后才建立作品</Text></View>{studios.map(item=><Button className="nw-library-row" key={item.id} onClick={()=>setView({kind:'studio',mode:item.mode,session:item.id})}><AppIcon name="file-pen-line" size={22}/><View><Text>{item.title||'创作讨论'}</Text><Text className="nw-caption">{NOVEL_MODES.find(mode=>mode.id===item.mode)?.name||'原创讨论'}</Text></View><Text>继续</Text></Button>)}</>:null}

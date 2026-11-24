@@ -1,3 +1,4 @@
+import NovelManagement from './NovelManagement';
 import Taro from '@tarojs/taro';
 import {Button,ScrollView,Text,View} from '@tarojs/components';
 import {useEffect,useRef,useState} from 'react';
@@ -10,6 +11,7 @@ import {NovelBack,NovelField,NovelNotice,NovelSelect,THINKING,novelConfirm,useNo
 const object=(value:any):NovelRecord=>{if(value&&typeof value==='object')return value;try{return JSON.parse(value||'{}');}catch{return {};}};
 export default function NovelProject({project,initialSession,mode,models,journal,onBack,onCreate}:{project:NovelRecord;initialSession?:NovelRecord;mode?:NovelMode;models:NovelRecord[];journal:NovelJournal;onBack:()=>void;onCreate:(mode:NovelMode)=>void}){
   const [sessions,setSessions]=useState<NovelRecord[]>([]),[session,setSession]=useState(initialSession?.id||''),[snapshot,setSnapshot]=useState<NovelRecord|null>(null),[chapters,setChapters]=useState<NovelRecord[]>([]);
+  const [management,setManagement]=useState(false);
   const [tab,setTab]=useState('create'),[chapterId,setChapterId]=useState(''),[edit,setEdit]=useState<NovelRecord|null>(null),[versions,setVersions]=useState<NovelRecord[]|null>(null),[blueprint,setBlueprint]=useState<NovelRecord|null>(null),[short,setShort]=useState<NovelRecord|null>(null);
   const [sessionMode,setSessionMode]=useState<NovelMode>(mode||initialSession?.mode||'continuation');
   const cache=`project:${project.id}:${session||'new'}`,saved=journal.read(cache);
@@ -46,7 +48,7 @@ export default function NovelProject({project,initialSession,mode,models,journal
     if(intent&&!replay){const value=await client.snapshot(intent.sessionId);if(!op.current())return;if(value.run?.idempotencyKey===intent.data.idempotencyKey){persist(null);setIntent(null);setSnapshot(value);await refresh();return;}if(value.run&&!NOVEL_TERMINAL.has(value.run.status))throw Error('当前会话仍有任务执行，请先核对它的结果');const checked={...intent,allowResubmit:true};persist(checked);setIntent(checked);throw Error('当前快照未找到原请求。可手动以原编号重试，不会更改参数。');}
     if(!session)throw Error('请先选择或创建创作会话');if(!draft.content.trim())throw Error('请输入创作要求');if(!models.some(item=>item.id===draft.modelId))throw Error('请选择当前可用文本模型');
     const input=activeMode==='continuation'?continuationMessage(chapters,draft.content,draft.modelId,novelUID()):{content:draft.content.trim(),modelId:draft.modelId,idempotencyKey:novelUID(),modeInputs:activeMode.includes('imitation')?{referenceText:draft.referenceText||''}:activeMode==='fanfiction'?{existingSetting:draft.existingSetting||''}:{}};
-    const pending=replay&&intent?intent:{sessionId:session,data:{...input,projectId:project.id,thinkingLevel:draft.thinkingLevel,knowledgeIds:[],noteIds:[]}};
+    const pending=replay&&intent?intent:{sessionId:session,data:{...input,projectId:project.id,thinkingLevel:draft.thinkingLevel,knowledgeIds:draft.knowledgeIds||[],noteIds:draft.noteIds||[],styleProfileId:draft.styleProfileId||''}};
     persist(pending);setIntent(pending);const result=await client.send(session,pending.data);if(!op.current())return;
     if(!result.run?.id)throw Error('未确认创作任务，原请求已保存');persist(null,{...draft,content:''});setIntent(null);setDraft(value=>({...value,content:''}));setSnapshot(value=>({...value,run:result.run}));await refresh();
   });
@@ -61,7 +63,8 @@ export default function NovelProject({project,initialSession,mode,models,journal
   const chapter=chapters.find(item=>item.id===chapterId)||chapters[0];
   const saveChapter=()=>op.run('保存章节',async()=>{if(!edit||readonly)return;const result=await client.saveChapter(project.id,edit);if(!op.current())return;if(!result.chapter?.id)throw Error('保存结果未确认，请保留草稿再刷新');setEdit(null);await refresh();});
   const exportBook=()=>op.run('导出已保存正文',async()=>{if(!chapters.length)throw Error('还没有已保存的正文');let index:number;try{index=(await Taro.showActionSheet({itemList:['导出TXT','导出Markdown']})).tapIndex;}catch{return;}const format=index===0?'txt':'md';const file=await loadAuthenticatedMedia(`/api/novel-creation/projects/${novelID(project.id)}/export?format=${format}`,format);if(!op.current())return;if(typeof Taro.shareFileMessage!=='function')throw Error('当前微信版本不支持发送文件，可先复制章节正文');try{await Taro.shareFileMessage({filePath:file.path,fileName:`${String(project.title||'小说').replace(/[\\/:*?"<>|]/g,'_')}.${format}`});}catch(cause:any){if(!/cancel/i.test(cause.errMsg||''))throw cause;}});
-  return <><NovelBack title={project.title||'小说作品'} onBack={onBack} disabled={Boolean(op.busy)}/><NovelNotice busy={op.busy} error={op.error}/>{readonly?<Text className="nw-notice">归档作品仅查看，不提交创作或修改。</Text>:null}
+  if(management)return <NovelManagement project={project} session={session} mode={activeMode} models={models} references={draft} journal={journal} onBack={()=>setManagement(false)} onLibrary={onBack} onOpenSession={id=>{setSession(id);setManagement(false);}} onApply={values=>{if(intent){op.setError('原创作请求尚待核对，请先处理原请求再修改参考');return;}change(values);setManagement(false);}} onRun={value=>{setSnapshot(v=>({...v,run:value}));setManagement(false);void refresh();}}/>;
+  return <><NovelBack title={project.title||'小说作品'} onBack={onBack} disabled={Boolean(op.busy)}/><NovelNotice busy={op.busy} error={op.error}/><Button className="nw-link nw-wide" disabled={Boolean(op.busy)||Boolean(intent)} onClick={()=>setManagement(true)}>作品管理 · 资料与自动写作</Button>{readonly?<Text className="nw-notice">归档作品仅查看，不提交创作或修改。</Text>:null}
     <View className="nw-tabs"><Button className={tab==='create'?'is-selected':''} onClick={()=>setTab('create')}>创作与进度</Button><Button className={tab==='chapters'?'is-selected':''} onClick={()=>setTab('chapters')}>已保存章节 · {loaded?chapters.length:'—'}</Button></View>
     <Button className="nw-link" disabled={Boolean(op.busy)} onClick={()=>void refresh()}>刷新作品与结果</Button>
     {tab==='create'?<>
