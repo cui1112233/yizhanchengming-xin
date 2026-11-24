@@ -1,6 +1,7 @@
 import { TEXT_PRODUCTION_SECTIONS } from './textProductionConfig.js';
 
 export const layoutFields = {
+  textPaginationMode:'paginationMode', textPageTarget:'targetCharacters',
   imageAspectRatio:'aspectRatio', textFontId:'fontId', textFontSize:'fontSize', textFontWeight:'fontWeight',
   textLineHeight:'lineHeight', textParagraphSpacing:'paragraphSpacing', textPadding:'padding',
   textAlign:'align', textColor:'textColor', textHighlightColor:'highlightColor', textMaxHeightRatio:'maxHeightRatio',

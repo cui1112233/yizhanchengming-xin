@@ -103,7 +103,7 @@ type MeasureResult struct {
 }
 
 func DefaultRenderLayout() LayoutConfig {
-	return LayoutConfig{AspectRatio: "3:4", TargetCharacters: DefaultTargetCharacters, FontID: renderfont.Noto, FontSize: 44, FontWeight: 400, LineHeight: 1.65, ParagraphSpacing: 24, Padding: 96, Align: "left", TextColor: "#FFFFFF", HighlightColor: "#E53935", MaxHeightRatio: .75, paddingSet: true, paragraphSpacingSet: true}
+	return LayoutConfig{AspectRatio: "3:4", TargetCharacters: DefaultTargetCharacters, PaginationMode: "auto", FontID: renderfont.Noto, FontSize: 44, FontWeight: 400, LineHeight: 1.65, ParagraphSpacing: 24, Padding: 96, Align: "left", TextColor: "#FFFFFF", HighlightColor: "#E53935", MaxHeightRatio: .75, paddingSet: true, paragraphSpacingSet: true}
 }
 
 var canvasSizes = map[string]image.Point{
@@ -112,6 +112,9 @@ var canvasSizes = map[string]image.Point{
 
 func resolveLayout(c LayoutConfig) (LayoutConfig, image.Point, error) {
 	defaults := DefaultRenderLayout()
+	if c.PaginationMode != "" && c.PaginationMode != "auto" && c.PaginationMode != "target" {
+		return c, image.Point{}, fmt.Errorf("不支持分页方式 %q", c.PaginationMode)
+	}
 	// Sparse book snapshots inherit missing spacing. The layout editor starts
 	// from DefaultRenderLayout and can set either measurement explicitly to zero.
 	if c.Padding == 0 && !c.paddingSet {

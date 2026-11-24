@@ -6208,7 +6208,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     {productionMode === "comic"
                       ? `正文总字数 ${batchFactoryCleanSourceText(book.sourceText).length} 字 · 漫画分析 ${comicAnalysisCharactersForBook(book)} 字`
                       : productionMode === "text"
-                        ? `正文总字数 ${batchFactoryCleanSourceText(book.sourceText).length} 字 · 单页约 ${Number(settings.textPageTarget || 150)} 字`
+                        ? `正文总字数 ${batchFactoryCleanSourceText(book.sourceText).length} 字 · ${settings.textPaginationMode==='target' ? `单页约 ${Number(settings.textPageTarget || 150)} 字` : '智能排版'}`
                         : `生产前 ${rangeLines} 行`}
                   </span>
                   <p className={!previewText ? `batch-factory-source-empty is-${sourceStatus.tone}` : ""}>{previewText || sourceStatus.label}</p>

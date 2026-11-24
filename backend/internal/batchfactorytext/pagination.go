@@ -74,6 +74,9 @@ func Paginate(ctx context.Context, input PaginationInput, measure MeasureFunc) (
 	if measure == nil || input.Layout.TargetCharacters < 0 || !utf8.ValidString(input.Text) || strings.TrimSpace(input.Text) == "" {
 		return nil, ErrInvalid
 	}
+	if mode := input.Layout.PaginationMode; mode != "" && mode != "auto" && mode != "target" {
+		return nil, ErrInvalid
+	}
 	if input.Layout.TargetCharacters == 0 {
 		input.Layout.TargetCharacters = DefaultTargetCharacters
 	}
@@ -134,7 +137,7 @@ func (p *pagePacker) flush() {
 func (p *pagePacker) accept(end int) (bool, float64, error) {
 	target := p.layout.TargetCharacters
 	before, after := p.end-p.start, end-p.start
-	if before > 0 && after > target && (before >= target || after-target > target-before) {
+	if p.layout.PaginationMode != "auto" && before > 0 && after > target && (before >= target || after-target > target-before) {
 		p.flush()
 	}
 	for {

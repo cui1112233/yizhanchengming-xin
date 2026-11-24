@@ -72,6 +72,20 @@ func TestBatchFactoryTextPersonalSettingsLibrary(t *testing.T) {
 	}
 }
 
+func TestBatchFactoryTextPaginationModeSettings(t *testing.T) {
+	for _, mode := range []string{"auto", "target"} {
+		settings := batchfactoryv11.SettingsPatch{"textPaginationMode": json.RawMessage(`"` + mode + `"`), "textPageTarget": json.RawMessage(`150`)}
+		snap, err := bookTextSnapshot(textRequest{settings: settings})
+		if err != nil || snap.Layout.PaginationMode != mode || snap.Layout.TargetCharacters != 150 {
+			t.Fatalf("pagination mode not carried into renderer: %+v %v", snap.Layout, err)
+		}
+	}
+	snap, err := bookTextSnapshot(textRequest{settings: batchfactoryv11.SettingsPatch{}})
+	if err != nil || snap.Layout.PaginationMode != "auto" {
+		t.Fatalf("expected smart default: %+v %v", snap.Layout, err)
+	}
+}
+
 func TestBatchFactoryTextCoverSparseSettings(t *testing.T) {
 	batch := batchfactoryv11.SettingsPatch{"textFontSize": json.RawMessage("56"), "textPadding": json.RawMessage("0"), "textCover": json.RawMessage(`{"layout":{"fontId":"ma-shan-zheng"},"background":{"kind":"color","color":"#123456"}}`)}
 	book := batchfactoryv11.SettingsPatch{"textCover": json.RawMessage(`{"layout":{"align":"right"}}`)}

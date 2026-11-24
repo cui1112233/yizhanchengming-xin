@@ -13,6 +13,7 @@ type Scope struct{ Owner, BatchID, BookID string }
 type LayoutConfig struct {
 	AspectRatio                     string  `json:"aspectRatio"`
 	TargetCharacters                int     `json:"targetCharacters"`
+	PaginationMode                  string  `json:"paginationMode,omitempty"`
 	FontID                          string  `json:"fontId"`
 	FontSize                        float64 `json:"fontSize"`
 	FontWeight                      int     `json:"fontWeight"`

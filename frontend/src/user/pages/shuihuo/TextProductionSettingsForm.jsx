@@ -111,6 +111,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
     if(field.type==='number' || field.type==='percent'){
       const percent=field.type==='percent';
       return <InputNumber {...attrs} min={field.min} max={field.max} step={field.step || 1} addonAfter={percent ? '%' : undefined}
+        disabled={field.key==='textPageTarget' && value.textPaginationMode!=='target'}
         value={percent ? Math.round(v*100) : v} onChange={n=>{if(n!=null)set(percent ? n/100 : n);}}/>;
     }
     if(field.type==='input')return <Input {...attrs} value={v} onChange={e=>set(e.target.value)}/>;

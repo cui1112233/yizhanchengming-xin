@@ -50,7 +50,7 @@ export function canCreateTextCollection(pages = [], ids, document, artifacts) {
 // Compare editable properties, ignoring server-generated revisions and IDs.
 // Accept the server page layout or the equivalent flattened settings form.
 const geometryKeys = {
-  aspectRatio: 'imageAspectRatio', targetCharacters: 'textPageTarget', fontId: 'textFontId',
+  paginationMode:'textPaginationMode', aspectRatio: 'imageAspectRatio', targetCharacters: 'textPageTarget', fontId: 'textFontId',
   fontSize: 'textFontSize', fontWeight: 'textFontWeight', lineHeight: 'textLineHeight',
   paragraphSpacing: 'textParagraphSpacing', padding: 'textPadding', maxHeightRatio: 'textMaxHeightRatio',
 };

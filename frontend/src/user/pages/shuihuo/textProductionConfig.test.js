@@ -7,6 +7,17 @@ test('文本单书配置固定分为引擎、排版、发布三个区块', () =>
   assert.deepEqual(TEXT_PRODUCTION_SECTIONS.map(section => section.label), ['引擎配置', '排版配置', '发布配置']);
 });
 
+test('智能排版默认开启，目标字数保留但仅在目标模式生效，单书可独立覆盖',()=>{
+  assert.equal(defaultTextProductionConfig().textPaginationMode,'auto');
+  const batch=applyTextProductionChanges({textPageTarget:150},{textPaginationMode:'auto'});
+  const book=applyTextProductionChanges({},{textPaginationMode:'target',textPageTarget:200});
+  const reopened=textProductionBookOverride(batch,JSON.parse(JSON.stringify(book)));
+  assert.equal(reopened.value.textPaginationMode,'target');
+  assert.equal(reopened.value.textPageTarget,200);
+  const restored=applyTextProductionChanges(book,{textPaginationMode:undefined});
+  assert.equal(textProductionBookOverride(batch,restored).value.textPaginationMode,'auto');
+});
+
 test('工作台单书配置显示三个入口并分别打开对应页签', () => {
   assert.deepEqual(TEXT_PRODUCTION_BOOK_REGIONS.map(region => [region.key,region.label]), [
     ['models','引擎配置'],

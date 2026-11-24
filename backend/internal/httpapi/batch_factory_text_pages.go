@@ -155,7 +155,8 @@ type textSnapshot struct {
 func bookTextSnapshot(x textRequest) (textSnapshot, error) {
 	var s textSnapshot
 	raw := map[string]json.RawMessage{}
-	for k, d := range map[string]string{"textPageTarget": "targetCharacters", "imageAspectRatio": "aspectRatio", "textFontId": "fontId", "textFontSize": "fontSize", "textFontWeight": "fontWeight", "textLineHeight": "lineHeight", "textParagraphSpacing": "paragraphSpacing", "textPadding": "padding", "textAlign": "align", "textColor": "textColor", "textHighlightColor": "highlightColor", "textMaxHeightRatio": "maxHeightRatio"} {
+	raw["paginationMode"] = json.RawMessage(`"auto"`)
+	for k, d := range map[string]string{"textPaginationMode": "paginationMode", "textPageTarget": "targetCharacters", "imageAspectRatio": "aspectRatio", "textFontId": "fontId", "textFontSize": "fontSize", "textFontWeight": "fontWeight", "textLineHeight": "lineHeight", "textParagraphSpacing": "paragraphSpacing", "textPadding": "padding", "textAlign": "align", "textColor": "textColor", "textHighlightColor": "highlightColor", "textMaxHeightRatio": "maxHeightRatio"} {
 		if v := x.settings[k]; len(v) > 0 {
 			raw[d] = v
 		}
