@@ -6,7 +6,7 @@ describe("小程序功能目录", () => {
     expect(MODULES.map((item) => item.key)).toEqual([
       "script",
       "novel",
-      "batch",
+      "booktest",
       "shuihuo",
       "comic",
       "aicut",

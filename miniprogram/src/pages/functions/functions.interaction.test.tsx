@@ -53,7 +53,7 @@ test("gallery uses the selected visual hierarchy instead of category filters", (
 test("matches the approved nine-card copy and visual order", () => {
   const entries = render().filter(n => n.type === "Button" && n.props.className.split(" ").includes("tools-entry"));
   expect(entries.map(entry => MODULES.find(item => entry.props.className.includes(`tools-entry-${item.key}`))?.key)).toEqual([
-    "script", "novel", "batch", "shuihuo", "aicut", "comic", "agent", "voice", "plugins",
+    "script", "novel", "booktest", "shuihuo", "aicut", "comic", "agent", "voice", "plugins",
   ]);
   const allText = render().map(n => typeof n.props?.children === "string" ? n.props.children : "").join(" ");
   expect(allText).toContain("私人定制");
@@ -77,10 +77,10 @@ test("uses the approved immersive hero and a dedicated illustration on every car
 });
 
 test("returning to the page refreshes the last-used marker from other workspaces", () => {
-  render(); h.value = "batch"; h.show();
+  render(); h.value = "booktest"; h.show();
   const selected = render().filter(n => n.type === "Button" && n.props.className.includes("is-recent"));
   expect(selected).toHaveLength(1);
-  expect(selected[0].props.className).toContain("tools-entry-batch");
+  expect(selected[0].props.className).toContain("tools-entry-booktest");
 });
 
 test("function entry keeps its routes without an appearance preference control", () => {

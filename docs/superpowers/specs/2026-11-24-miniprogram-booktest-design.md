@@ -9,3 +9,5 @@
 新增booktest目录key指向测书工作区；旧batch仍保留工厂任务路径，旧fetch链接仍可恢复。工作台booktest只匹配fetch任务，不能匹配工厂进度。任务深链带真实taskId，读取成功后定位对应书籍；失败、加载和真实空列表区分。正文保留处理后与完整原文的区别，并显示真实计数。高级网页全自动队列、直属组员切换、当前批次入厂暂不宣称完成。
 
 复用/api/batch-rewrite及既有受保护提交接口；平台/模型按ID，不加系统提示词；既有同步操作锁、结果未知先核对规则保留。不调用收费模型、不抓测试书、不改配置、不网站提交、不创建定时、不发布。以接口模拟测试、构建和微信只读核对为验收。
+
+接口复核补充：同步/process仅导入输入，并不按AI版本执行。新booktest与旧fetch别名的公开页面统一使用/process/start及同作业GET读取，启动前明确说明会调用模型并自动提交视频管理系统。改文方式为auto/high_imitation/opening_instruction/instruction，按各AI版本选择；定时创建用扁平inputText/selected_versions/rewrite_methods/text_model_id/run_at/auto_submit。取消使用专属cancel端点，未终止记录不得删除，不用enabled字段冒充暂停。

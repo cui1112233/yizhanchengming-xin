@@ -6,6 +6,7 @@ export type WorkbenchStatusTone = "idle" | "running" | "failed" | "completed" | 
 const MODULE_SOURCES: Partial<Record<ModuleKey, TaskSource>> = {
   script: "script",
   fetch: "fetch",
+  booktest: "fetch",
   batch: "batch",
   shuihuo: "shuihuo",
   agent: "agent",

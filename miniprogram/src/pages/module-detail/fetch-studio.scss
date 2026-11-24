@@ -1,0 +1,119 @@
+.mp-page.fetch-studio {
+  .fetch-book-row { display: block; width: 100%; margin: 0; padding: 22rpx 4rpx; border: 0; border-bottom: 1rpx solid var(--studio-line); border-radius: 0; background: transparent; color: var(--studio-ink); text-align: left; line-height: 1.5; }
+  .fetch-book-row .mp-row-title { font-size: 25rpx; font-weight: 600; }
+  .fetch-book-row .mp-row-description { display: block; margin-top: 4rpx; font-size: 20rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fetch-book-row .mp-fetch-mini-progress { margin-top: 10rpx; gap: 7rpx; }
+  .fetch-book-row .mp-fetch-stage-dot { width: 12rpx; height: 12rpx; }
+  .fetch-detail-title { display: block; font-size: 32rpx; line-height: 1.6; margin-bottom: 6rpx; }
+  .studio-sheet .mp-fetch-stage-graph { padding-top: 30rpx; }
+  .fetch-detail-submit { width: 100%; margin: 20rpx 0; }
+  .mp-fetch-hero { min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--studio-ink); box-shadow: none; overflow: visible; }
+  .mp-fetch-meta { display: flex; gap: 20rpx; margin-top: 12rpx; color: var(--studio-muted); font-size: 21rpx; }
+  .mp-fetch-meta text { padding: 0; border: 0; background: transparent; color: inherit; }
+  .mp-fetch-content { display: block; }
+  .fetch-core-settings { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12rpx; }
+  .fetch-core-settings picker { min-width: 0; }
+  .fetch-core-settings .mp-fetch-setting { display: block; padding: 16rpx 14rpx; min-height: 104rpx; border: 1rpx solid var(--studio-line); border-radius: 16rpx; }
+  .fetch-core-settings .mp-fetch-setting > text { display: block; color: var(--studio-muted); font-size: 20rpx; }
+  .fetch-core-settings .mp-fetch-setting > view { display: flex; gap: 3rpx; margin-top: 8rpx; color: var(--studio-ink); font-size: 23rpx; min-width: 0; }
+  .fetch-core-settings .mp-fetch-setting > view > text { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-fetch-setting { box-sizing: border-box; background: transparent; color: var(--studio-ink); }
+  button.mp-fetch-setting { width: 100%; margin: 0; line-height: 1.6; text-align: left; }
+  .mp-fetch-setting > text:first-child { color: var(--studio-ink); font-weight: 500; }
+  .mp-fetch-setting > view { max-width: 100%; }
+  .fetch-core-settings .mp-fetch-setting > text:first-child { color: var(--studio-muted); }
+  .fetch-version-entry { border-bottom: 1rpx solid var(--studio-line); margin-top: 8rpx; }
+  .fetch-version-entry .mp-fetch-setting { padding: 24rpx 0; border: 0; font-size: 23rpx; gap: 14rpx; }
+  .fetch-version-entry .mp-fetch-setting > view { min-width: 0; flex: 1; justify-content: flex-end; color: var(--studio-muted); font-size: 21rpx; }
+  .fetch-version-entry .mp-fetch-setting > view > text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fetch-tool-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12rpx; }
+  .fetch-tool-grid .mp-fetch-setting { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8rpx; min-height: 124rpx; padding: 20rpx; border: 1rpx solid var(--studio-line); border-radius: 18rpx; font-size: 23rpx; }
+  .fetch-tool-grid .mp-fetch-setting > image { position: absolute; top: 20rpx; right: 16rpx; opacity: .45; }
+  .fetch-tool-grid .mp-fetch-setting > view { color: var(--studio-muted); font-size: 21rpx; }
+  .fetch-tool-grid .mp-fetch-setting > view > image { display: none; }
+  .fetch-tool-grid .mp-fetch-setting .fetch-tool-title { max-width: 220rpx; }
+  .mp-card { background: var(--studio-paper); border: 1rpx solid var(--studio-line); border-radius: 20rpx; padding: 24rpx; box-shadow: none; }
+  .mp-fetch-panel { margin: 0; border: 0; padding: 0; background: transparent; }
+  .mp-row-title { color: var(--studio-ink); font-size: 26rpx; }
+  .mp-row-description { color: var(--studio-muted); font-size: 22rpx; line-height: 1.7; }
+  .mp-fetch-alert { margin-bottom: 20rpx; background: var(--studio-soft); color: var(--studio-ink); border: 1rpx solid var(--studio-line); border-radius: 16rpx; }
+  .mp-fetch-alert-action { color: var(--studio-accent); }
+  .mp-primary { background: var(--studio-button); color: var(--studio-on-button); border-radius: 18rpx; }
+  .mp-secondary, .mp-fetch-toolbar-button, .mp-fetch-filter-button { border: 1rpx solid var(--studio-line); background: transparent; color: var(--studio-ink); border-radius: 14rpx; font-size: 22rpx; }
+  .mp-fetch-task-toolbar { padding: 6rpx 0 24rpx; color: var(--studio-ink); gap: 12rpx; }
+  .mp-fetch-task-toolbar > view:first-child { flex: 1; min-width: 0; }
+  .mp-fetch-task-toolbar > view:last-child { flex-shrink: 0; }
+  .mp-fetch-task-filter { padding: 18rpx 0; background: transparent; border-top: 1rpx solid var(--studio-line); border-bottom: 1rpx solid var(--studio-line); border-radius: 0; color: var(--studio-muted); gap: 12rpx; }
+  .mp-fetch-task-date { color: var(--studio-ink); background: var(--studio-paper); border-color: var(--studio-line); }
+  .mp-fetch-task-day-summary { color: var(--studio-muted); margin: 18rpx 0; font-size: 21rpx; }
+  .mp-fetch-task-card { margin: 0 0 16rpx; }
+  .mp-fetch-task-head { gap: 14rpx; }
+  .mp-fetch-task-head > view { min-width: 0; flex: 1; }
+  .mp-fetch-task-head .mp-row-title { display: block; line-height: 1.6; }
+  .mp-status-pill { flex-shrink: 0; padding: 6rpx 12rpx; background: var(--studio-soft); color: var(--studio-accent); border: 0; font-size: 19rpx; }
+  .mp-fetch-expand { color: var(--studio-accent); background: transparent; border-color: var(--studio-line); }
+  .mp-fetch-task-detail, .mp-fetch-detail-panel { border-color: var(--studio-line); background: transparent; }
+  .mp-fetch-task-states, .mp-fetch-stage-item { color: var(--studio-muted); }
+  .mp-fetch-task-actions { gap: 10rpx; flex-wrap: wrap; }
+  .mp-fetch-task-actions button { padding: 0 16rpx; min-height: 64rpx; }
+  .mp-fetch-delete { background: transparent; color: #bb6960; border-color: var(--studio-line); }
+  .mp-fetch-stage-dot, .mp-fetch-stage-node, .mp-fetch-stage-line { background: var(--studio-line); }
+  .mp-fetch-stage-dot.is-success, .mp-fetch-stage-item.is-success .mp-fetch-stage-node { background: var(--studio-accent); }
+  .mp-fetch-detail-text { color: var(--studio-ink); background: var(--studio-bg); border-color: var(--studio-line); }
+  .mp-fetch-toggle-row, .mp-fetch-schedule { border-color: var(--studio-line); }
+  .mp-fetch-version-list { color: var(--studio-ink); }
+  .mp-fetch-version-list checkbox { border-color: var(--studio-line); background: var(--studio-paper); color: var(--studio-ink); }
+  .mp-fetch-task-toolbar > view:first-child { flex-direction: column; gap: 4rpx; }
+  .mp-fetch-task-day-summary text:last-child { color: var(--studio-muted); }
+  .mp-fetch-task-states text { background: var(--studio-soft); color: var(--studio-muted); }
+  .mp-fetch-detail-panel .mp-field-label { color: var(--studio-ink); }
+  .mp-fetch-icon-button { background: var(--studio-paper); color: var(--studio-ink); border-color: var(--studio-line); }
+  .mp-fetch-summary-grid > view { background: var(--studio-soft); }
+  .mp-fetch-summary-grid text:first-child { color: var(--studio-ink); }
+  .mp-fetch-summary-grid text:last-child { color: var(--studio-muted); }
+  .mp-fetch-stage-dot.is-done, .mp-fetch-stage-item.is-done .mp-fetch-stage-node { background: var(--studio-accent); border-color: var(--studio-accent); }
+  .mp-fetch-stage-item.is-done { color: var(--studio-accent); }
+  .studio-primary { gap: 10rpx; }
+  .studio-sheet .mp-card { margin: 0 0 18rpx; }
+}
+
+.mp-page.fetch-studio.fetch-booktest {
+  .booktest-job { margin: 0 16px 14px; padding: 0 12px 12px; background: var(--studio-paper); border: 1px solid var(--studio-line); border-radius: 12px; }
+  .booktest-job .studio-section-head { margin-top: 2px; }
+  .booktest-method { margin: 10px 0; padding: 12px; border: 1px solid var(--studio-line); border-radius: 12px; font-size: 13px; }
+  .booktest-method > text { display: block; font-size: 12px; color: var(--studio-muted); }
+  .booktest-date { display: flex; gap: 10px; margin: 12px 0; }
+  .booktest-date > picker { flex: 1; min-width: 0; }
+  .studio-titlebar { margin: 0; padding: 16px 16px 12px; }
+  .studio-eyebrow { display: none; }
+  .studio-title { font-size: 18px; }
+  .mp-fetch-meta { font-size: 11px; margin-top: 5px; }
+  .studio-tabs { margin: 0 16px 16px; }
+  .mp-fetch-content { padding: 0 16px; }
+  .studio-source-input { height: 155px; font-size: 14px; }
+  .fetch-core-settings { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fetch-core-settings > picker { flex: 1; min-width: 120px; }
+  .fetch-core-settings > button { flex-basis: 100%; }
+  .fetch-core-settings .mp-fetch-setting { min-height: 62px; padding: 10px 12px; border-radius: 12px; }
+  .fetch-core-settings .mp-fetch-setting > text { font-size: 11px; }
+  .fetch-core-settings .mp-fetch-setting > view { font-size: 13px; margin-top: 4px; }
+  .fetch-version-entry .mp-fetch-setting { min-height: 48px; font-size: 13px; }
+  .booktest-tools-toggle { width: 100%; justify-content: flex-start; min-height: 44px; margin: 10px 0; }
+  .fetch-tool-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fetch-tool-grid > button { flex: 1 1 40%; min-width: 0; min-height: 64px; font-size: 12px; }
+  .studio-dock { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); gap: 10px; }
+  .studio-dock-copy > text:first-child { font-size: 12px; }
+  .studio-primary { min-height: 44px; font-size: 14px; }
+  .mp-fetch-alert { margin: 0 16px 14px; padding: 12px; font-size: 12px; }
+  .mp-fetch-task-toolbar { flex-wrap: wrap; font-size: 14px; }
+  .mp-fetch-task-toolbar .booktest-task-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .mp-fetch-task-filter { flex-wrap: wrap; font-size: 12px; }
+  .mp-fetch-task-filter button, .mp-fetch-task-toolbar button { min-height: 40px; }
+  .fetch-book-row { padding: 14px 0; }
+  .fetch-book-row .mp-row-title { font-size: 14px; }
+  .fetch-book-row .mp-row-description { font-size: 11px; }
+  .mp-status-pill { font-size: 11px; max-width: 96px; white-space: normal; }
+  .studio-sheet .mp-fetch-task-actions button { min-height: 44px; font-size: 12px; }
+  .studio-sheet .fetch-detail-title { font-size: 17px; }
+  .studio-sheet .mp-fetch-detail-text { font-size: 14px; line-height: 1.9; }
+}

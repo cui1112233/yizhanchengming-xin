@@ -50,7 +50,7 @@ type InternalTask = AggregatedTask & {
 const TASK_SOURCE_DEFINITIONS: SourceDefinition[] = [
   { source: "script", sourceLabel: "剧本", path: "/api/history", collection: "entries" },
   { source: "agent", sourceLabel: "Agent", path: "/api/studio/runs", collection: "runs" },
-  { source: "fetch", sourceLabel: "小说获取", path: "/api/batch-rewrite/tasks", collection: "tasks" },
+  { source: "fetch", sourceLabel: "批量测书", path: "/api/batch-rewrite/tasks", collection: "tasks" },
   { source: "batch", sourceLabel: "批量工厂", path: "/api/batch-factory/v12/batches/summary", collection: "batches" },
   { source: "shuihuo", sourceLabel: "水货生产", path: "/api/shuihuo-production/projects", collection: "projects" },
 ];
@@ -61,7 +61,7 @@ const ATTENTION_STATUSES = new Set(["waiting-review", "waiting_review", "pending
 const RUNNING_STATUSES = new Set(["queued", "pending", "running", "processing", "executing", "waiting", "scheduled_waiting", "ai_processing", "retrying", "进行中", "处理中", "排队中", "等待中"]);
 
 const STATUS_DETAILS: Record<string, string> = {
-  scheduled_waiting: "等待定时启动", input_ready: "待开始", waiting_retry: "需重试",
+  scheduled_waiting: "等待定时启动", input_ready: "分类信息已就绪", waiting_retry: "需重试",
   waiting_classification: "待确认分类", waiting_sensitive_ai: "等待敏感词处理",
   waiting_configuration: "待配置", waiting_login: "待登录", pending_submit: "待提交",
   upload_pending: "提交结果待确认", stopped: "已停止", queued: "排队中", pending: "排队中",
@@ -345,6 +345,6 @@ export function taskDestination(entry: AggregatedTask) {
   if (entry.source === 'batch') return `/pages/batch/index?batchId=${id}`;
   if (entry.source === 'shuihuo') return `/pages/module-detail/index?key=shuihuo&projectId=${encodeURIComponent(entry.projectId || '')}`;
   if (entry.source === 'agent') return `/pages/module-detail/index?key=agent&taskId=${id}`;
-  if (entry.source === 'fetch') return `/pages/module-detail/index?key=fetch&taskId=${id}`;
+  if (entry.source === 'fetch') return `/pages/module-detail/index?key=booktest&taskId=${id}`;
   return `/pages/module-detail/index?key=script&entryId=${id}`;
 }

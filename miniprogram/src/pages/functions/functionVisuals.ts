@@ -17,9 +17,10 @@ export type FunctionVisual = {
 
 export const FUNCTION_VISUALS: Record<CatalogModuleKey, FunctionVisual> = {
   script: { asset: privateBook, label: "私人定制", description: "按你的想法，生成专属内容" },
-  fetch: { asset: novelBook, label: "小说获取", description: "获取、改文与提交" },
+  fetch: { asset: batchBooks, label: "批量测书", description: "获取、改文与提交" },
   novel: { asset: novelBook, label: "小说创作", description: "从灵感到完整故事" },
-  batch: { asset: batchBooks, label: "批量测书", description: "批量获取与生产" },
+  batch: { asset: batchBooks, label: "批量工厂", description: "批量生产与任务恢复" },
+  booktest: { asset: batchBooks, label: "批量测书", description: "获取、分类与改文" },
   shuihuo: { asset: videoClapper, label: "水货生产", description: "漫剧项目与素材生产" },
   comic: { asset: comicFilm, label: "漫画生成", description: "从故事正文到漫画页图" },
   aicut: { asset: aiCut, label: "AI-CUT", description: "智能剪辑与成片" },

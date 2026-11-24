@@ -9,7 +9,7 @@ import heroArtwork from "../../assets/functions/functions-hero-reference-hd.webp
 import "./gallery.scss";
 
 const ACTIVE_MODULE_KEY = "yzcm.mobile.activeModule";
-const CONTENT_KEYS: CatalogModuleKey[] = ["script", "novel", "batch"];
+const CONTENT_KEYS: CatalogModuleKey[] = ["script", "novel", "booktest"];
 const PRODUCTION_KEYS: CatalogModuleKey[] = ["shuihuo", "comic", "aicut"];
 const TOOL_KEYS: CatalogModuleKey[] = ["agent", "voice", "plugins"];
 

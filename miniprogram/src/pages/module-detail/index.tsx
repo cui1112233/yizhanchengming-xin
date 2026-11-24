@@ -36,7 +36,8 @@ export default function ModuleDetailPage() {
   });
 
   if (key === "script") return <ScriptWorkspace historyId={historyId} />;
-  if (key === "fetch") return <FetchWorkspace />;
+  if (key === "fetch") return <FetchWorkspace title="批量测书" compact initialTaskId={taskId} />;
+  if (key === "booktest") return <FetchWorkspace title="批量测书" compact initialTaskId={taskId} />;
   if (key === "agent") return <AgentWorkspace taskId={taskId} projectId={projectId} />;
   if (key === "panel") return <PanelWorkspace />;
   if (key === "shuihuo") return <ShuihuoWorkspace projectId={projectId} />;
