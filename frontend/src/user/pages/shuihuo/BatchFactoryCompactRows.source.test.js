@@ -12,5 +12,6 @@ test('batch factory row controls share one compact workbench-scoped contract', (
   assert.match(block, /\.batch-factory-book-content-action\.ant-btn\s*\{[^}]*height:\s*26px/);
   assert.match(block, /\.batch-factory-book-config-region\s*\{[^}]*padding:\s*4px 6px/);
   assert.match(block, /\.batch-factory-text-page-cell\s*>\s*\.batch-factory-cell-shell/);
+  assert.match(block, /\.batch-factory-text-rendered-cell\s*\{[^}]*display:\s*grid\s*!important;[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\)/);
   assert.doesNotMatch(block, /\.shuihuo-workbench-toolbar|\.batch-factory-text-page-content\s+p|\.batch-factory-text-page-image\s+img/);
 });

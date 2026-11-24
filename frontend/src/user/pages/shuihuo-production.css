@@ -5216,7 +5216,12 @@ body.shuihuo-reference-shell
   line-height: 22px;
 }
 .batch-factory-workbench .batch-factory-text-page-cell,
-.batch-factory-workbench .batch-factory-text-rendered-cell { display: grid; align-items: stretch; }
+.batch-factory-workbench .batch-factory-text-rendered-cell {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  align-content: stretch !important;
+  align-items: stretch;
+}
 .batch-factory-workbench .batch-factory-text-page-cell > .batch-factory-cell-shell,
 .batch-factory-workbench .batch-factory-text-rendered-cell > .batch-factory-cell-shell {
   align-self: stretch;
