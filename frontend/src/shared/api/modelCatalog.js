@@ -2,8 +2,10 @@ import { apiRequest } from './client.js';
 
 const AVAILABLE_MODEL_KINDS = Object.freeze(['text', 'image', 'video', 'asr']);
 const AVAILABLE_MODEL_TIMEOUT_MS = 8000;
-let availableModelCatalogResult = null;
-let availableModelCatalogPromise = null;
+const availableModelKinds = new Map();
+const pendingModelKinds = new Map();
+let catalogGeneration = 0;
+const MODEL_CATALOG_TTL_MS = 60_000;
 
 const MODEL_KIND_LABELS = Object.freeze({
   text: '文本',
@@ -65,32 +67,59 @@ export async function listAvailableModels(kind, request = apiRequest) {
 // Account models are one shared directory. Batch Factory video, comic, create,
 // unified and single-book forms must consume this same snapshot instead of
 // starting their own three-request chains every time a modal opens.
-export function peekAvailableModelCatalog() {
-  return availableModelCatalogResult;
+export function peekAvailableModelCatalog(kinds = AVAILABLE_MODEL_KINDS) {
+  const entries = kinds.map(kind => availableModelKinds.get(kind));
+  if (entries.some(entry => !entry || Date.now() - entry.time >= MODEL_CATALOG_TTL_MS)) return null;
+  return { models: entries.flatMap(entry => entry.models), failedKinds: [], failures: {} };
 }
 
 export function invalidateAvailableModelCatalog() {
-  availableModelCatalogResult = null;
-  availableModelCatalogPromise = null;
+  catalogGeneration += 1;
+  availableModelKinds.clear();
+  pendingModelKinds.clear();
 }
 
-export function getAvailableModelCatalog({ force = false, loadKind = listAvailableModels } = {}) {
+export function getAvailableModelCatalog({ force = false, kinds = AVAILABLE_MODEL_KINDS, loadKind = listAvailableModels } = {}) {
   if (force) invalidateAvailableModelCatalog();
-  if (availableModelCatalogResult) return Promise.resolve(availableModelCatalogResult);
-  if (availableModelCatalogPromise) return availableModelCatalogPromise;
-  availableModelCatalogPromise = Promise.allSettled(AVAILABLE_MODEL_KINDS.map(kind => loadKind(kind)))
+  const requested = [...new Set(kinds.map(assertModelKind))];
+  const generation = catalogGeneration;
+  return Promise.allSettled(requested.map(kind => {
+    const cached = availableModelKinds.get(kind);
+    if (cached && Date.now() - cached.time < MODEL_CATALOG_TTL_MS) return cached.models;
+    if (pendingModelKinds.has(kind)) return pendingModelKinds.get(kind);
+    const pending = Promise.resolve().then(() => loadKind(kind)).then(rows => {
+      const models = Array.isArray(rows) ? rows : [];
+      if (generation === catalogGeneration) availableModelKinds.set(kind, {models, time: Date.now()});
+      return models;
+    }).finally(() => { if (pendingModelKinds.get(kind) === pending) pendingModelKinds.delete(kind); });
+    pendingModelKinds.set(kind, pending);
+    return pending;
+  }))
     .then(results => {
       const models = [];
       const failedKinds = [];
+      const failures = {};
       results.forEach((result, index) => {
         if (result.status === 'fulfilled') models.push(...(Array.isArray(result.value) ? result.value : []));
-        else failedKinds.push(AVAILABLE_MODEL_KINDS[index]);
+        else { failedKinds.push(requested[index]); failures[requested[index]] = result.reason; }
       });
-      availableModelCatalogResult = Object.freeze({ models, failedKinds });
-      return availableModelCatalogResult;
-    })
-    .finally(() => { availableModelCatalogPromise = null; });
-  return availableModelCatalogPromise;
+      return { models, failedKinds, failures };
+    });
+}
+
+export function productionModelKinds(mode) {
+  return mode === 'text' ? ['text'] : mode === 'comic' ? ['text', 'image'] : ['text', 'image', 'video'];
+}
+
+export function describeModelCatalogFailure(result) {
+  return (result.failedKinds || []).map(kind => {
+    const error = result.failures?.[kind];
+    const status = Number(error?.status || 0);
+    const reason = status === 401 ? '登录已失效，请重新登录' : status === 403 ? '没有读取权限，请检查账号权限'
+      : error?.code === 'timeout' ? '读取超时，请重试' : status >= 500 ? '服务暂时不可用，请重试'
+      : error?.message || '读取失败，请重试';
+    return `${modelKindLabel(kind)}：${reason}`;
+  }).join('；');
 }
 
 export async function refreshAvailableModels(kind, request = apiRequest) {

@@ -13,7 +13,7 @@ import {
 import { BatchFactoryNovelList } from './shuihuo/BatchFactoryNovelList';
 import { BatchFactoryCreateModal } from './shuihuo/BatchFactoryCreateModal';
 import { batchFactoryBatchFromResponse } from './shuihuo/batchFactoryProjects';
-import { getAvailableModelCatalog } from '../../shared/api/modelCatalog';
+import { getAvailableModelCatalog, productionModelKinds } from '../../shared/api/modelCatalog';
 import { getProjectRetention, indexRetention } from '../../shared/api/projectRetention';
 import {
   BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY,
@@ -137,7 +137,9 @@ export default function BatchFactoryWorkbenchPage() {
 
   // Warm the one account-level model directory while the workbench opens, so
   // every later video/comic dropdown can render from the same ready snapshot.
-  useEffect(() => { void getAvailableModelCatalog(); }, []);
+  useEffect(() => {
+    if (activeBatch) void getAvailableModelCatalog({ kinds: productionModelKinds(activeBatch.settingsState?.patch?.productionMode) });
+  }, [activeBatch?.id, activeBatch?.settingsState?.patch?.productionMode]);
 
   useEffect(() => {
     if (activeBatch) return undefined;

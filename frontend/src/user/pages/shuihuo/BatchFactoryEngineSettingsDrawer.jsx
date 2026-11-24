@@ -1,6 +1,6 @@
 import { Alert, Button, Input, InputNumber, Modal, Popover, Segmented, Select, Space, Switch, Tabs, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { getAvailableModelCatalog, peekAvailableModelCatalog } from '../../../shared/api/modelCatalog';
+import { describeModelCatalogFailure, productionModelKinds, getAvailableModelCatalog, peekAvailableModelCatalog } from '../../../shared/api/modelCatalog';
 import { getConfig } from '../../../shared/api/config';
 import { checkWebSubmitEnvironment, getWebSubmitConfig, saveWebSubmitConfig, syncWebSubmitConfigs, syncWebSubmitStyles, testWebSubmitVisible } from '../../../shared/api/novelFetch';
 import { apiErrorMessage } from '../../../shared/apiErrors';
@@ -54,6 +54,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   const [models, setModels] = useState(() => cachedModels?.models || []);
   const [modelsLoading, setModelsLoading] = useState(() => !cachedModels);
   const [modelsError, setModelsError] = useState('');
+  const [modelRetry, setModelRetry] = useState(0);
   const [syncing, setSyncing] = useState('');
   const [account, setAccount] = useState(null);
   const [publishSession, setPublishSession] = useState(null);
@@ -77,21 +78,21 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   useEffect(() => {
     if (!open) return undefined;
     let active = true;
-    const cached = peekAvailableModelCatalog();
+    const cached = peekAvailableModelCatalog(productionModelKinds(batch?.settingsState?.patch?.productionMode));
     if (cached) setModels(cached.models);
     setModelsLoading(!cached);
     setModelsError('');
-    getAvailableModelCatalog().then(result => {
+    getAvailableModelCatalog({ kinds: productionModelKinds(batch?.settingsState?.patch?.productionMode) }).then(result => {
       if (!active) return;
       setModels(result.models);
-      if (result.failedKinds.length) setModelsError(`部分模型目录暂不可用：${result.failedKinds.join('、')}`);
+      setModelsError(describeModelCatalogFailure(result));
     }).catch(error => {
       if (active) {
         setModelsError(error?.message || '未能读取个人中心已启用模型');
       }
     }).finally(() => { if (active) setModelsLoading(false); });
     return () => { active = false; };
-  }, [open]);
+  }, [open, batch?.settingsState?.patch?.productionMode, modelRetry]);
   useEffect(() => {
     if (!open) return undefined;
     let active = true;
@@ -286,7 +287,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
               <Tag color={localExecutors.some(item => item.online) ? 'green' : 'default'}>豆包执行器 {localExecutors.some(item => item.online) ? '在线' : '未在线'}</Tag>
               <Typography.Text type="secondary">图片和视频都可以选择豆包执行器；执行前请先在设置页完成配对。</Typography.Text>
             </Space>
-            {modelsError ? <Alert type="warning" showIcon message="模型目录暂不可用" description={modelsError} /> : null}
+            {modelsError ? <Alert type="warning" showIcon message="模型目录暂不可用" description={modelsError} action={<Button size="small" loading={modelsLoading} onClick={() => setModelRetry(value => value + 1)}>重新读取</Button>} /> : null}
             {!modelsLoading && !modelsError && !models.length ? <Alert type="warning" showIcon message="个人中心没有已启用模型" description={<Space direction="vertical"><span>请先在个人中心按文本、图片、视频类型新增并启用模型，再返回当前批量作品选择。</span><Button type="link" href="/api-config">前往个人中心配置模型</Button></Space>} /> : null}
           </EngineCard>
         </div>

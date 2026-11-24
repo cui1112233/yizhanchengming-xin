@@ -96,6 +96,7 @@ test('文本统一配置可同步选档，关闭再打开显示保存的名称�
           args=>({path:args.path,namespace:'directory'}));
         plugin.onLoad({filter:/.*/,namespace:'directory'},()=>({contents:`
           export const getAvailableModelCatalog=async()=>({models:[]});
+          export const describeModelCatalogFailure=()=>'';
           export const modelSelectOptions=()=>[];
           export const getN8ComicPublishStatus=async()=>({});
           export const listPersonalTextBackgrounds=async()=>({items:[]});

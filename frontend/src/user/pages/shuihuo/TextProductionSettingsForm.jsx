@@ -1,7 +1,7 @@
 import ColorPicker from './TextColorPicker.jsx';
 import { Alert, Button, Input, InputNumber, Select, Switch, Tabs, message } from 'antd';
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { getAvailableModelCatalog, modelSelectOptions } from '../../../shared/api/modelCatalog';
+import { describeModelCatalogFailure, getAvailableModelCatalog, modelSelectOptions } from '../../../shared/api/modelCatalog';
 import { getN8ComicPublishStatus } from '../../../shared/api/batchFactoryV12';
 import { syncWebSubmitConfigs } from '../../../shared/api/novelFetch';
 import { listPersonalTextBackgrounds, uploadPersonalTextBackground } from '../../../shared/api/batchFactoryText';
@@ -37,6 +37,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
   const [backgrounds,setBackgrounds]=useState([]);
   const [syncedProfiles,setSyncedProfiles]=useState(null);
   const [error,setError]=useState('');
+  const [modelRetry,setModelRetry]=useState(0);
   const [syncing,setSyncing]=useState(false);
   const profileId = 'publishSettings.websiteProfileId';
   const profiles = syncedProfiles ?? value['publishSettings.websiteProfiles'] ?? [];
@@ -47,16 +48,16 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
     if (!open) return;
     let alive=true;
     setError('');
-    const load=tab==='models' ? getAvailableModelCatalog().then(catalog=>{
+    const load=tab==='models' ? getAvailableModelCatalog({kinds:['text']}).then(catalog=>{
       if (!alive) return;
       setModels(modelSelectOptions(catalog.models,'text'));
-      if (catalog.failedKinds?.includes('text')) setError('文本模型目录读取失败，请稍后重试');
+      setError(describeModelCatalogFailure(catalog));
     })
       : tab==='layout' ? listPersonalTextBackgrounds().then(x=>{if(alive)setBackgrounds(x.items || []);})
       : getN8ComicPublishStatus({silent:true,suppressGlobalError:true}).then(x=>{if(alive)setDirectory(x || {});});
     load.catch(e=>{if(alive)setError(e.message || '目录读取失败，请稍后重试');});
     return ()=>{alive=false;};
-  },[tab,open]);
+  },[tab,open,modelRetry]);
   const syncProfiles=async()=>{
     setSyncing(true);
     try {
@@ -132,7 +133,7 @@ export default function TextProductionSettingsForm({value, explicitKeys=[], onCh
       {group.fields.filter(field=>!field.hidden).map(renderField)}
     </section>)}
   </div></div></>;
-  return <>{error && <Alert type="warning" showIcon message={error}/>}
+  return <>{error && <Alert type="warning" showIcon message={error} action={tab==='models' ? <Button size="small" onClick={()=>setModelRetry(value=>value+1)}>重新读取</Button> : undefined}/>}
     {tab==='layout' && batchId && bookId && <Suspense fallback={null}><SettingsPreview key={batchId+bookId} batchId={batchId} bookId={bookId} value={value}/></Suspense>}
     <Tabs activeKey={tab} onChange={setTab} items={TEXT_PRODUCTION_SECTIONS.map(s=>({key:s.key,label:s.label,children:panel(s)}))}/>
   </>;

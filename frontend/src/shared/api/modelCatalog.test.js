@@ -50,9 +50,28 @@ test('one shared catalog keeps successful model kinds and is reused by every dro
   assert.deepEqual(first.models.map(model => model.id), ['text-configured', 'image-configured', 'asr-configured']);
   assert.deepEqual(first.failedKinds, ['video']);
 
-  const second = await modelCatalogModule.getAvailableModelCatalog({ loadKind: async () => {
-    throw new Error('the shared result should have been reused');
+  const second = await modelCatalogModule.getAvailableModelCatalog({ loadKind: async kind => {
+    calls.push(kind);
+    return [{ id: `${kind}-configured`, kind }];
   } });
-  assert.strictEqual(second, first);
-  assert.deepEqual(calls, ['text', 'image', 'video', 'asr']);
+  assert.deepEqual(second.failedKinds, []);
+  assert.deepEqual(calls, ['text', 'image', 'video', 'asr', 'video']);
+});
+
+test('requests only relevant kinds and shares simultaneous requests', async () => {
+  modelCatalogModule.invalidateAvailableModelCatalog();
+  const calls = [];
+  const loadKind = async kind => { calls.push(kind); return [{ id: kind, kind }]; };
+  await Promise.all([
+    modelCatalogModule.getAvailableModelCatalog({ kinds: ['text', 'image'], loadKind }),
+    modelCatalogModule.getAvailableModelCatalog({ kinds: ['text'], loadKind })
+  ]);
+  assert.deepEqual(calls, ['text', 'image']);
+});
+
+test('failures retain readable reasons without caching a failed request', async () => {
+  modelCatalogModule.invalidateAvailableModelCatalog();
+  const result = await modelCatalogModule.getAvailableModelCatalog({ kinds: ['video'], loadKind: async () => { throw Object.assign(new Error('unauthorized'), {status:401}); } });
+  assert.match(modelCatalogModule.describeModelCatalogFailure(result), /视频：登录已失效/);
+  assert.equal(modelCatalogModule.peekAvailableModelCatalog(['video']), null);
 });

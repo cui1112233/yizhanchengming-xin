@@ -1,7 +1,7 @@
 import { SettingOutlined } from '@ant-design/icons';
 import { Alert, Button, Divider, Input, InputNumber, Modal, Segmented, Select, Space, Switch, Tabs, Tooltip, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { getAvailableModelCatalog, modelSelectOptions, peekAvailableModelCatalog } from '../../../shared/api/modelCatalog';
+import { describeModelCatalogFailure, productionModelKinds, getAvailableModelCatalog, modelSelectOptions, peekAvailableModelCatalog } from '../../../shared/api/modelCatalog';
 import { checkWebSubmitEnvironment, getWebSubmitConfig, saveWebSubmitConfig, syncWebSubmitConfigs, syncWebSubmitStyles, testWebSubmitVisible } from '../../../shared/api/novelFetch';
 import { apiErrorMessage } from '../../../shared/apiErrors';
 import { IMAGE_ASPECT_RATIOS } from '../../../shared/imageAspectRatios';
@@ -99,6 +99,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
   const cachedModels = peekAvailableModelCatalog();
   const [models, setModels] = useState(() => cachedModels?.models || []);
   const [modelsError, setModelsError] = useState('');
+  const [modelRetry, setModelRetry] = useState(0);
   const [modelsLoading, setModelsLoading] = useState(() => !cachedModels);
   const patch = next => onChange({ ...value, ...next });
   const tts = { ...DEFAULT_TTS, ...(value.tts || {}) };
@@ -116,14 +117,14 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
   useEffect(() => {
     if (!active || !modelSettingsEnabled) return undefined;
     let alive = true;
-    const cached = peekAvailableModelCatalog();
+    const cached = peekAvailableModelCatalog(productionModelKinds(value.productionMode));
     if (cached) setModels(cached.models);
     setModelsLoading(!cached);
     setModelsError('');
-    getAvailableModelCatalog().then(result => {
+    getAvailableModelCatalog({ kinds: productionModelKinds(value.productionMode) }).then(result => {
       if (!alive) return;
       setModels(result.models);
-      if (result.failedKinds.length) setModelsError(`部分模型目录暂不可用：${result.failedKinds.join('、')}`);
+      setModelsError(describeModelCatalogFailure(result));
     }).catch(error => {
       if (!alive) return;
       setModelsError(error?.message || '未能读取个人中心已启用模型');
@@ -131,7 +132,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
       if (alive) setModelsLoading(false);
     });
     return () => { alive = false; };
-  }, [active, modelSettingsEnabled]);
+  }, [active, modelSettingsEnabled, value.productionMode, modelRetry]);
   const publish = value.publishSettings || {};
   return <Space direction="vertical" size={16} style={{ width: '100%' }}>
     <Alert type="info" showIcon message={<span>当前批次统一生产参数 <HelpTip title="当前批次统一生产参数">保存后作为全部小说的默认值；单书已保存的显式覆盖不会被预设载入或本页保存清空。</HelpTip></span>} />
@@ -159,7 +160,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
       <label className="batch-factory-engine-field"><span><b>语速</b></span><InputNumber min={0.5} max={2} step={0.1} value={tts.speed} onChange={speed => patch({ tts: { ...tts, speed: speed ?? DEFAULT_TTS.speed } })} /></label>
       </> : null}
     </div></section>
-    {modelsError ? <Alert type="warning" showIcon message="部分模型目录暂不可用" description={modelsError} /> : null}
+    {modelsError ? <Alert type="warning" showIcon message="部分模型目录暂不可用" description={modelsError} action={<Button size="small" loading={modelsLoading} onClick={() => setModelRetry(value => value + 1)}>重新读取</Button>} /> : null}
     {!modelsLoading && !modelsError && !models.length ? <Alert type="warning" showIcon message="后台没有已启用模型" description="请先在模型配置中新增并启用模型。" /> : null}
     </> : null}
     {sections.includes('sensitive') ? <section className="batch-factory-engine-card"><header><b>敏感词处理</b><HelpTip title="敏感词处理">系统优化在本地执行，不消耗 AI 额度。选“关闭”时跳过敏感词处理。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
