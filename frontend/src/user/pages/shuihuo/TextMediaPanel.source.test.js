@@ -116,6 +116,13 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         const area=()=>document.querySelector('textarea[aria-label="页面正文"]');
         await until(area);
         const originalDraft=area().value;
+        const target=document.querySelector('input[aria-label="单页目标字数"]');
+        if(target.disabled)throw Error('目标字数仍然不可调整');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(target,'200');target.dispatchEvent(new Event('input',{bubbles:true}));
+        await until(()=>previewBodies.at(-1)?.layout.targetCharacters===200);
+        if(previewBodies.at(-1).text!=='第一段完整。后句。第二段完整。')throw Error('整本分页预览仍只使用当前页正文');
+        if(!button('保存并整本重新分页'))throw Error('未说明目标字数作用于整本分页');
+        confirmRestore=true;button('关闭调整').click();await until(()=>button('排版调整'));confirmRestore=false;button('排版调整').click();await until(area);
         if(document.querySelector('.text-page-editor input[type=color]'))throw Error('颜色控件仍是原生横条');
         if(document.querySelector('.text-page-editor input[type=file]'))throw Error('编辑区仍有重复的背景上传入口');
         const colorTrigger=document.querySelector('button[aria-label="文字颜色"]');colorTrigger.click();
@@ -131,13 +138,12 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
           if(previewBodies.at(-1).layout.fontId!==fontId)throw Error('预设没有更新实际预览字体');
         }
         button('浅色文字').click();await until(()=>previewBodies.at(-1)?.layout.highlightRules==='dialogue');
-        const highlightSelect=document.querySelector('[aria-label="标红规则"]');
-        highlightSelect.closest('.ant-select').querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-        await until(()=>[...document.querySelectorAll('.ant-select-item-option-content')].some(el=>el.textContent==='对话'));
-
-        await until(()=>previewBodies.at(-1)?.layout.highlightRules?.includes('dialogue'));
-        [...document.querySelectorAll('.ant-select-item-option-content')].find(el=>el.textContent==='指定行').click();
-        await until(()=>previewBodies.at(-1)?.layout.highlightRules?.includes('dialogue') && previewBodies.at(-1)?.layout.highlightRules?.includes('lines'));
+        const lineInput=document.querySelector('input[aria-label="标红行号"]');
+        if(lineInput.disabled)throw Error('仅选对话时行号无法编辑');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(lineInput,'2,4');lineInput.dispatchEvent(new Event('input',{bubbles:true}));
+        await until(()=>previewBodies.at(-1)?.layout.highlightLines==='2,4' && previewBodies.at(-1)?.layout.highlightRules?.includes('lines'));
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(lineInput,'1,3');lineInput.dispatchEvent(new Event('input',{bubbles:true}));
+        await until(()=>previewBodies.at(-1)?.layout.highlightRules?.includes('dialogue') && previewBodies.at(-1)?.layout.highlightRules?.includes('lines') && previewBodies.at(-1)?.layout.highlightLines==='1,3');
         if(previewBodies.at(-1).layout.highlightLines!=='1,3')throw Error('单页没有传递实际标红行号');
         document.body.click();
         button('深色文字').click();await until(()=>previewBodies.at(-1)?.layout.textColor==='#222222');
@@ -222,7 +228,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
     writeFileSync(html,'<meta charset="utf-8"><link rel="stylesheet" href="styles.css"><style>:root{--sh-panel:#202633;--sh-panel-strong:#293241;--sh-text:#eeeeee;--sh-muted:#bec8d5;--sh-line:#546078;--sh-accent:#67dac1}.ant-modal{animation:none!important;transform:none!important;transition:none!important}</style><div id="root"></div><script>'+result.outputFiles[0].text.replaceAll('</script','<\\/script')+'</script>');
     const dom=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking',
       '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget=24000',
-      '--dump-dom',pathToFileURL(html).href],{timeout:45000,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']});
+      '--dump-dom',pathToFileURL(html).href],{timeout:45000,maxBuffer:8*1024*1024,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']});
     assert.ok(dom.includes('data-result="passed"'), dom.match(/data-runtime-error="([^"]*)"/)?.[1] || dom.match(/data-error="([^"]*)"/)?.[1] || '浏览器未完成验证');
   } finally { rmSync(dir,{recursive:true,force:true,maxRetries:4,retryDelay:150}); }
 });

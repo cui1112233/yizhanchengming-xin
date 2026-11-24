@@ -519,7 +519,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, videoProviderRegistry, options.Store, "v12", runtimeCatalogStore)
 	if options.Store != nil {
 		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: batchProduction, ImageReady: shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner), VideoReady: shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, batchProduction)}
-		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, batchProduction, mergeStatus, options.AutomationStatusReader, "v12")
+		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, batchProduction, mergeStatus, options.AutomationStatusReader, "v12", options.TextRepository)
 	}
 	mfaFile := ""
 	if options.MemberProfileStore != nil {

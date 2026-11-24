@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"time"
 
+	"qiantie/backend/internal/batchfactorytext"
 	"qiantie/backend/internal/batchfactoryv11"
 )
 
-func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, stageService *batchfactoryv11.BookStageService, production *batchfactoryv11.ProductionService, merge *batchfactoryv11.MergeService, automation *FileAutomationStatusReader, version string) {
+func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, stageService *batchfactoryv11.BookStageService, production *batchfactoryv11.ProductionService, merge *batchfactoryv11.MergeService, automation *FileAutomationStatusReader, version string, textRepo batchfactorytext.Repository) {
 	if mux == nil || store == nil {
 		return
 	}
@@ -60,6 +61,14 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 			stageService = &batchfactoryv11.BookStageService{Store: store}
 		}
 		stageSummaries := result["stageSummaries"].(map[string]any)
+		textCounts := map[string]batchfactorytext.PageCounts{}
+		if reader, ok := textRepo.(interface {
+			BatchPageCounts(context.Context, string, string) (map[string]batchfactorytext.PageCounts, error)
+		}); ok {
+			if counts, err := reader.BatchPageCounts(r.Context(), owner, batch.ID); err == nil {
+				textCounts = counts
+			}
+		}
 		comicStore, hasComicPages := store.(batchfactoryv11.ComicPageStore)
 		// Stage availability is owner-level. Evaluate it once per request instead
 		// of reloading the owner settings for every book in the batch.
@@ -78,6 +87,10 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 				"bookId":       summary.BookID,
 				"runs":         summary.Runs,
 				"availability": summary.Availability,
+			}
+			if counts, ok := textCounts[book.ID]; ok {
+				stageSummary["textImageTotalCount"] = counts.Total
+				stageSummary["textImageReadyCount"] = counts.Ready
 			}
 			if err := addWorkflowPublishSummary(r.Context(), store, owner, batch.ID, book.ID, book.SourceMetadata, summary.Runs, stageSummary); err != nil {
 				stageSummary["textPublishReadError"] = err.Error()

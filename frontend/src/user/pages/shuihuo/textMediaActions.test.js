@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as api from '../../../shared/api/batchFactoryText.js';
 
+test('输入标红行号自动启用指定行并保留对话规则', async () => {
+  const { layoutWithHighlightLines, paginationSettingsChanged, textCharacterCount } = await import('./textMediaActions.js');
+  assert.deepEqual(layoutWithHighlightLines({highlightRules:'dialogue'}, '1,3'), {highlightRules:'dialogue,lines',highlightLines:'1,3'});
+  assert.deepEqual(layoutWithHighlightLines({highlightRules:'dialogue,lines'}, ''), {highlightRules:'dialogue',highlightLines:''});
+  assert.equal(paginationSettingsChanged({paginationMode:'auto',targetCharacters:150},{paginationMode:'target',targetCharacters:200}),true);
+  assert.equal(paginationSettingsChanged({paginationMode:'auto',targetCharacters:150},{paginationMode:'auto',targetCharacters:150,fontSize:50}),false);
+  assert.equal(textCharacterCount('甲😀乙\n丙'),5);
+});
+
 test('预览请求传递取消信号和服务端对比度提示', async () => {
   globalThis.localStorage = {getItem: () => null};
   const controller = new AbortController();

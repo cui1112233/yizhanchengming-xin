@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import { ConfigProvider, Select } from 'antd';
 import * as api from '../../../shared/api/batchFactoryText.js';
-import {layoutFields,pageControls} from './textMediaActions.js';
+import {layoutFields,pageControls,layoutWithHighlightLines,paginationSettingsChanged} from './textMediaActions.js';
 import TextBackgroundGallery from './TextBackgroundGallery.jsx';
 import {TEXT_LAYOUT_TEMPLATES,textColorScheme,lightTextChanges} from './textLayoutTemplates.js';
 import TextContrastNotice from './TextContrastNotice.jsx';
@@ -39,6 +39,7 @@ export function useDraftPreview(batchId,bookId,session) {
 
 export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackground,onUploading,busy,stale,impact,fonts,batchId,bookId,contrastWarning=''}) {
   const {draft,cover}=session;
+  const bookPagination = !cover && paginationSettingsChanged(session.base.layout,draft.layout);
   const [items,setItems]=useState([]);
   const [bgError,setBgError]=useState('');
   const [bgLoading,setBgLoading]=useState(false);
@@ -63,19 +64,19 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     } catch(e){setBgError(e.message);throw e;} finally{onUploading(false);setFileBusy(false);}
   };
   return <ConfigProvider theme={{token:{colorBgElevated:'var(--sh-panel)',colorBgContainer:'var(--sh-panel-strong)',colorText:'var(--sh-text)',colorTextPlaceholder:'var(--sh-muted)',colorBorder:'var(--sh-line)',controlItemBgActive:'var(--sh-panel-strong)',controlItemBgHover:'var(--sh-panel-strong)',colorPrimary:'var(--sh-accent)'}}}><fieldset className="text-page-editor" disabled={busy || fileBusy}>
-    <legend>{cover?'封面排版':'排版调整 · 仅本页'}</legend>
+    <legend>{cover?'封面排版':bookPagination?'排版调整 · 整本分页':'排版调整 · 仅本页'}</legend>
     {!cover && <small className="text-editor-scope">字号和段距只调整本页内容，放不下的句子会顺延；不会从下一页补字。整书重排请在统一配置或单书配置中调整后重新分页。</small>}
     {!cover && <label>页面正文<textarea aria-label="页面正文" rows={6} value={draft.text} onChange={e=>{const text=e.target.value;onDraft(old=>({...old,text}));}}/></label>}
     {!cover && <div className="text-layout-presets">{TEXT_LAYOUT_TEMPLATES.map(preset=><button key={preset.id} type="button" onClick={()=>onDraft(old=>({...old,layout:{...old.layout,...Object.fromEntries(Object.entries(preset.values).filter(([key])=>layoutFields[key]).map(([key,value])=>[layoutFields[key],value]))},background:{...preset.values.textBackground}}))}>{preset.label}</button>)}<button type="button" onClick={()=>setColors(textColorScheme('dark'))}>深色文字</button><button type="button" onClick={()=>setColors(lightTextChanges(draft.layout.highlightRules))}>浅色文字</button></div>}
     <div className="text-layout-fields">{pageControls.filter(f=>!cover || ['fontId','fontSize','fontWeight','align','textColor'].includes(layoutFields[f.key])).map(f=>{
       const key=layoutFields[f.key], value=draft.layout[key];
       if(f.type==='highlightRules')return <label key={key}>{f.label}<TextHighlightRuleSelect value={value} disabled={busy || fileBusy} onChange={next=>setLayout(key,next)}/></label>;
-      if(f.type==='input')return <label key={key}>{f.label}<input type="text" aria-label={f.label} placeholder="如 1,3（定位整句）" value={value || ''} disabled={!draft.layout.highlightRules?.split(',').includes('lines')} onChange={e=>setLayout(key,e.target.value)}/></label>;
+      if(f.type==='input')return <label key={key}>{f.label}<input type="text" aria-label={f.label} placeholder="如 1,3（定位整句）" value={value || ''} onChange={e=>onDraft(old=>({...old,layout:layoutWithHighlightLines(old.layout,e.target.value)}))}/></label>;
       if(f.type==='color')return <div className="text-editor-field" key={key}><span>{f.label}</span><TextColorPicker label={f.label} value={value} onChange={next=>setLayout(key,next)}/></div>;
       const opts=key==='fontId' && fonts?.length ? fonts.filter(v=>v.available!==false).map(v=>({value:v.id,label:f.options?.find(option=>option.value===v.id)?.label || v.name})) : f.options;
       return <label key={key}>{f.label}{opts ? <Select aria-label={f.label} disabled={busy || fileBusy} value={value} options={opts} getPopupContainer={trigger=>trigger.parentElement} onChange={next=>setLayout(key,typeof f.initial==='number'?Number(next):next)}/>
-        : <input disabled={key==='targetCharacters' && draft.layout.paginationMode!=='target'} type="number" min={f.min} max={f.max} step={f.step || 1} value={f.type==='percent'?Math.round(value*100):value}
-            onChange={e=>setLayout(key,Number(e.target.value)/(f.type==='percent'?100:1))}/>}</label>;
+        : <input aria-label={f.label} type="number" min={f.min} max={f.max} step={f.step || 1} value={f.type==='percent'?Math.round(value*100):value}
+            onChange={e=>key==='targetCharacters'?onDraft(old=>({...old,layout:{...old.layout,targetCharacters:Number(e.target.value),paginationMode:'target'}})):setLayout(key,Number(e.target.value)/(f.type==='percent'?100:1))}/>}</label>;
     })}</div>
     {!cover && <TextContrastNotice color={draft.layout.textColor} background={draft.background} warning={contrastWarning} onChange={setColors}/>}
     {!cover && <><div className="text-layout-fields">
@@ -86,7 +87,7 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
     {bgError && <p role="alert">{bgError}</p>}
     {stale && <p role="alert">此页版本已更新。请复制需要保留的修改，再重新打开排版调整。</p>}
     <div className="text-editor-actions">
-      <button type="button" disabled={stale||impact==='none'||(!cover&&!draft.text.trim())} onClick={onSave}>{cover?'保存封面设置':'保存本页'}</button>
+      <button type="button" disabled={stale||impact==='none'||(!cover&&!draft.text.trim())} onClick={onSave}>{cover?'保存封面设置':bookPagination?'保存并整本重新分页':'保存本页'}</button>
       {!cover && <button type="button" title="更新使用整书背景的文字页，保留单页背景和已锁定的图片。" disabled={stale || draft.text!==session.base.text || Object.keys(draft.layout).some(k=>draft.layout[k]!==session.base.layout[k])} onClick={onApplyBackground}>背景应用到整本书</button>}
       <button type="button" onClick={onCancel}>关闭调整</button>
     </div>

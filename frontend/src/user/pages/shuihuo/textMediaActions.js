@@ -9,6 +9,14 @@ export const layoutFields = {
 };
 export const pageControls = TEXT_PRODUCTION_SECTIONS.find(s=>s.key==='layout').fields.filter(f=>layoutFields[f.key]);
 
+export const textCharacterCount = text => Array.from(text || '').length;
+export const paginationSettingsChanged = (before, after) => ['paginationMode','targetCharacters'].some(key => before[key] !== after[key]);
+export function layoutWithHighlightLines(layout, value) {
+  const rules = (layout.highlightRules || '').split(',').filter(rule => rule && rule !== 'off' && rule !== 'lines');
+  if (value.trim()) rules.push('lines');
+  return {...layout, highlightLines:value, highlightRules:rules.join(',') || 'off'};
+}
+
 export function initialPageDraft(doc,page,cover=false) {
   const snapshot=doc?.configSnapshot || {};
   const source=cover ? snapshot.cover : page;

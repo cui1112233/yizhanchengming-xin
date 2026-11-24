@@ -1,11 +1,11 @@
-import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ConfigProvider, Select } from 'antd';
 import { createTextCollection, getTextCollection, listTextCollections, listTextPages, prepareTextBook } from '../../../shared/api/batchFactoryText.js';
 import * as api from '../../../shared/api/batchFactoryText.js';
 import { getBatch, saveBookOverride, publishTextCollection, getTextPublishStatus } from '../../../shared/api/batchFactoryV12.js';
 import AuthenticatedTextPageImage from './AuthenticatedTextPageImage.jsx';
 import { canCreateTextCollection, textBookCompletion, textPagePresentation, textPageDirtyImpact } from './textMediaState.js';
-import { initialPageDraft,pageChanges,splitChoices,uploadLabel } from './textMediaActions.js';
+import { initialPageDraft,pageChanges,splitChoices,uploadLabel,paginationSettingsChanged,textCharacterCount,layoutFields } from './textMediaActions.js';
 import { TextPageEditor,useDraftPreview } from './TextPageEditor.jsx';
 import { textPublishImageProgress, textPublishStatus } from './batchFactoryBookState.js';
 import { textRetryConfirmation, textUploadControl } from './batchFactoryNovelListHelpers.js';
@@ -87,7 +87,6 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
   const backgroundUploading=useRef(false);
   const [savedSettings,setSavedSettings]=useState(null);
   const bookSettings=savedSettings?.revision>=book.revision?savedSettings:{revision:book.revision,patch:book.settingsState?.patch};
-  const live=useDraftPreview(batchId,book.id,session);
   const { snapshot, collections, loading, error } = useTextLibrary(batchId, book.id, refresh);
   const doc = snapshot.document;
   const pages = snapshot.pages || [];
@@ -97,6 +96,9 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
   const state = textPagePresentation(page, artifacts);
   const completion = textBookCompletion(pages);
   const collection = collections.find(item => item.id === chosenCollection) || collections[0];
+  const previewSession=useMemo(()=>session && !session.cover && paginationSettingsChanged(session.base.layout,session.draft.layout)
+    ? {...session,draft:{...session.draft,text:pages.map(item=>item.text).join('')}} : session,[session,pages]);
+  const live=useDraftPreview(batchId,book.id,previewSession);
   useEffect(() => {
     if (tab !== 'collections' || !collection?.id) return;
     const controller = new AbortController();
@@ -209,7 +211,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
     catch (e) { setActionError(e.message || '操作失败'); reload(); }
     finally { actionLock.current=false;setBusy(''); }
   }
-  async function saveBookPatch(changes) {
+  async function saveBookPatch(changes, reflow = false) {
     const update=updateTextProductionSettings(session.bookSettings.patch,changes);
     try {
       const saved=await saveBookOverride(batchId,book.id,{...update,expectedRevision:session.bookSettings.revision});
@@ -224,7 +226,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
       throw e;
     }
     try {
-      return await prepareTextBook(batchId,book.id,{expectedRevision:session.docRev});
+      return await prepareTextBook(batchId,book.id,{expectedRevision:session.docRev,...(reflow?{reflow:true}:{})});
     } catch(e) {
       setSession(null);
       await onSaved?.();
@@ -244,6 +246,16 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
         try {selectCandidate((await api.renderTextCover(batchId,book.id,{expectedRevision:result.document.revision})).id);}
         catch(e){throw Error('封面设置已保存，生成失败：'+e.message);}
       }
+    } else if (paginationSettingsChanged(session.base.layout,session.draft.layout)) {
+      if(session.base.text!==session.draft.text)throw Error('请先保存正文修改，再调整整本分页。');
+      if(pages.some(item=>item.locked))throw Error('有手动上传图已锁定，请先核对并解除锁定，再整本重新分页。');
+      const config={};
+      for(const [formKey,layoutKey] of Object.entries(layoutFields))if(session.base.layout[layoutKey]!==session.draft.layout[layoutKey])config[formKey]=session.draft.layout[layoutKey];
+      if(['kind','color','id'].some(key=>session.base.background[key]!==session.draft.background[key]))config.textBackground=session.draft.background;
+      const result=await saveBookPatch(config,true);
+      setSession(null);selectCandidate('');
+      setPageId(result.pages?.[0]?.id || '');
+      await renderUpdated(result.pages || []);
     } else {
       const payload=impact==='reflow'?{...changes,text:session.draft.text,reflow:true}:changes;
       const result=await api.patchTextPage(batchId,book.id,session.id,payload);
@@ -345,7 +357,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
           <CandidateList items={candidates} selectedId={display?.id} activeId={activeId} onSelect={id=>{if(!busy && discard())selectCandidate(id);}}/>
           {tab === 'pages' ? <>
             <section className="text-media-background-summary"><h4>本页背景</h4><span>{background?.id ? '图库背景' : background?.color ? <><i className="text-media-swatch" style={{backgroundColor:background.color}}/>{background.color}</> : '继承整书背景'}</span></section>
-            <section><h4>页面内容</h4><p className="text-media-copy">{page?.text || '尚未分页'}</p></section>
+            <section><h4>页面内容 · {textCharacterCount(page?.text)} 字</h4><p className="text-media-copy">{page?.text || '尚未分页'}</p></section>
           </> : <section><h4>封面标题</h4><p>{doc?.configSnapshot?.cover?.title || title}</p>{doc?.coverLocked && <small>上传成品封面</small>}</section>}
           {doc && (page || cover) && !session && <section className="text-media-operation-section"><h4>{cover?'封面操作':'页面操作 · 仅当前页'}</h4><div className="text-media-operation-grid">
             <button type="button" disabled={!!busy || locked} onClick={edit}>{cover?'调整封面':'排版调整'}</button>
