@@ -1,5 +1,7 @@
 # YZCM API 用量与制作 Implementation Plan
 
+> 已由用户交接的 `yzcm-usage-intake-20261124` 实现取代此早期分工方案。实际代码使用 `backend/internal/yzcmusage`，迁移 8800402 只建立 `yzcm_usage_requests`，不再另建 `memberusage` 绑定或账本。当前验收范围以 `docs/integrations/yzcm-usage-20261124.md` 为准：复用管理员现有模型 Key，按本站真实操作者核对消费日志；不要求用户另外填写统计令牌，不把历史共享用量猜分给成员。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** 接通管理员共享 YZCM API 账单，并准确记录组员在本站的调用归属。

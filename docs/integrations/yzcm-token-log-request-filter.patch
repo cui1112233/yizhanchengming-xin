@@ -8,17 +8,38 @@
  
  	"github.com/QuantumNous/new-api/common"
  	"github.com/QuantumNous/new-api/model"
-@@ -78,7 +79,16 @@
+@@ -71,14 +72,36 @@
+ 
+ func GetLogByKey(c *gin.Context) {
+ 	tokenId := c.GetInt("token_id")
+-	if tokenId == 0 {
++	if tokenId <= 0 {
+ 		c.JSON(200, gin.H{
+ 			"success": false,
+ 			"message": "无效的令牌",
  		})
  		return
  	}
 -	logs, err := model.GetLogByTokenId(tokenId)
 +	var logs []*model.Log
 +	var err error
-+	if raw := c.Query("request_ids"); raw != "" {
-+		ids := strings.Split(raw, ",")
-+		if len(ids) > 50 { common.ApiErrorMsg(c, "at most 50 request IDs are allowed"); return }
-+		for _, id := range ids { if id == "" || len(id) > 64 || strings.ContainsAny(id, "\r\n") { common.ApiErrorMsg(c, "invalid request ID"); return } }
++	query := c.Request.URL.Query()
++	if raw, provided := query["request_ids"]; provided {
++		if len(raw) != 1 {
++			common.ApiErrorMsg(c, "invalid request ID filter")
++			return
++		}
++		ids := strings.Split(raw[0], ",")
++		if len(ids) > 50 {
++			common.ApiErrorMsg(c, "at most 50 request IDs are allowed")
++			return
++		}
++		for _, id := range ids {
++			if id == "" || len(id) > 64 || strings.ContainsAny(id, "\r\n") {
++				common.ApiErrorMsg(c, "invalid request ID")
++				return
++			}
++		}
 +		logs, err = model.GetLogsByTokenRequestIDs(tokenId, ids)
 +	} else {
 +		logs, err = model.GetLogByTokenId(tokenId)
@@ -28,7 +49,7 @@
  			"success": false,
 --- a/model/log.go
 +++ b/model/log.go
-@@ -67,6 +67,15 @@
+@@ -67,6 +67,17 @@
  
  func GetLogByTokenId(tokenId int) (logs []*Log, err error) {
  	err = LOG_DB.Model(&Log{}).Where("token_id = ?", tokenId).Order("id desc").Limit(common.MaxRecentItems).Find(&logs).Error
@@ -39,7 +60,9 @@
 +// Billing reconciliation remains scoped to the authenticated token. Request IDs
 +// only narrow that scope; they never select another account's records.
 +func GetLogsByTokenRequestIDs(tokenID int, requestIDs []string) (logs []*Log, err error) {
-+	if tokenID <= 0 || len(requestIDs) == 0 || len(requestIDs) > 50 { return []*Log{}, nil }
++	if tokenID <= 0 || len(requestIDs) == 0 || len(requestIDs) > 50 {
++		return []*Log{}, nil
++	}
 +	err = LOG_DB.Model(&Log{}).Where("token_id = ? AND request_id IN ?", tokenID, requestIDs).Order("id desc").Limit(100).Find(&logs).Error
  	formatUserLogs(logs, 0)
  	return logs, err
