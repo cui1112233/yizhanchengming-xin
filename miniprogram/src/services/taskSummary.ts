@@ -174,7 +174,7 @@ function entryFromRecord(definition: SourceDefinition, record: Record<string, un
     kind: firstText(record, ["kind", "type"]),
     stage: firstText(record, ["stage", "progressPhase"]),
     taskType: firstText(record, ["taskType", "task_type"]),
-    retryable: record.retryable === true || record.canRetry === true || record.can_retry === true,
+    retryable: record.retryable === true || record.canRetry === true || record.can_retry === true || (definition.source === "fetch" && status === "retry"),
     sourceOrder,
     entryOrder,
   };

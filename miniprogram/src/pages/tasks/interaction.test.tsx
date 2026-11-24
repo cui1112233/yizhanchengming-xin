@@ -20,10 +20,10 @@ const render=()=>{h.cursor=0;return nodes(TasksPage());};
 const ready=async()=>{render();h.show();for(let i=0;i<12;i++)await Promise.resolve();return render();};
 const content=(node:any):string=>typeof node==='string'||typeof node==='number'?String(node):!node||typeof node!=='object'?'':[node.props?.children].flat(Infinity).map(content).join('');
 beforeEach(()=>{h.slots=[];h.navigate.mockReset();h.load.mockReset().mockResolvedValue({sources:[{source:'fetch',state:'ready'}],entries:[
- {source:'fetch',sourceLabel:'小说获取',id:'run',title:'正在生成',status:'running',progress:{completed:2,total:5}},
- {source:'fetch',sourceLabel:'小说获取',id:'review',title:'等待确认',status:'attention'},
- {source:'fetch',sourceLabel:'小说获取',id:'done',title:'已完成项目',status:'completed'},
- {source:'fetch',sourceLabel:'小说获取',id:'a/b',title:'失败项目',status:'failed'},
+ {source:'fetch',sourceLabel:'小说获取',id:'run',title:'正在生成',status:'running',statusDetail:'进行中',progress:{completed:2,total:5}},
+ {source:'fetch',sourceLabel:'小说获取',id:'review',title:'等待提交',status:'attention',statusDetail:'待提交'},
+ {source:'fetch',sourceLabel:'小说获取',id:'done',title:'已完成项目',status:'completed',statusDetail:'已完成'},
+ {source:'fetch',sourceLabel:'小说获取',id:'a/b',title:'失败项目',status:'retry',statusDetail:'需重试',retryable:true},
 ]});});
 test('task center renders real counters, approved filters, and one shared list surface',async()=>{
  const tree=await ready();
@@ -32,8 +32,8 @@ test('task center renders real counters, approved filters, and one shared list s
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-item'))).toHaveLength(3);
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-art'))).toHaveLength(3);
  expect(tree.filter(n=>n.props?.className==='task-studio-count-value').map(content)).toEqual(['1','1','1']);
- expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-item')).map(content)).toEqual(['1进行中','1待确认','1已完成']);
- expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-filter')).map(content)).toEqual(['全部','进行中','待确认','已完成']);
+ expect(tree.filter(n=>n.props?.className?.includes('task-studio-count-item')).map(content)).toEqual(['1进行中','1需重试','1已完成']);
+ expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-filter')).map(content)).toEqual(['全部','进行中','需重试','已完成']);
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-list'))).toHaveLength(1);
  expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row'))).toHaveLength(4);
  expect(tree.filter(n=>n.props?.className==='task-studio-row-art').map(n=>n.props.src)).toEqual(['visual-run.webp','visual-review.webp','visual-done.webp','visual-a/b.webp']);
@@ -49,6 +49,10 @@ test('progress is rendered only when the server returns a valid total',async()=>
  const tree=await ready();
  expect(tree.filter(n=>n.props?.className==='task-studio-progress-track')).toHaveLength(1);
  expect(content(tree.find(n=>n.props?.className==='task-studio-progress-value'))).toBe('40%');
+});
+test('right side renders real progress, retry, completed and detailed states without syncing placeholders',async()=>{
+ const tree=await ready();const page=content(tree[0]);
+ expect(page).toContain('40%');expect(page).toContain('需重试');expect(page).toContain('已完成');expect(page).toContain('待提交');expect(page).not.toContain('状态同步中');
 });
 test('flat record opens the existing encoded module destination',async()=>{
  const tree=await ready();expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row'))).toHaveLength(4);

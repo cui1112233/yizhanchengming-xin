@@ -15,13 +15,12 @@ import { ThemedPage } from "../../theme";
 import { taskVisualAsset } from "./taskVisuals";
 import "./tasks-studio.scss";
 
-const FILTERS: TaskFilter[] = ["全部", "进行中", "待确认", "已完成"];
+const FILTERS: TaskFilter[] = ["全部", "进行中", "需重试", "已完成"];
 function statusLabel(entry: AggregatedTask) {
   if (entry.status === "running") return "进行中";
-  if (entry.status === "attention") return "待确认";
-  if (entry.status === "failed") return "失败";
+  if (entry.status === "retry") return "需重试";
   if (entry.status === "completed") return "已完成";
-  return entry.rawStatus ? `状态：${entry.rawStatus}` : "状态同步中";
+  return entry.statusDetail || (entry.rawStatus ? `状态：${entry.rawStatus}` : "状态未返回");
 }
 
 function formatTimestamp(value: string | undefined) {
@@ -42,6 +41,7 @@ export default function TasksPage() {
   const [summary, setSummary] = useState<TaskSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [retryingId, setRetryingId] = useState("");
   const [configurationError, setConfigurationError] = useState("");
   const [filter, setFilter] = useState<TaskFilter>("全部");
   const requestVersion = useRef(0);
@@ -64,6 +64,18 @@ export default function TasksPage() {
   const counts = taskCounts(entries);
   const failedSources = summary?.sources.filter((source) => source.state === "error") || [];
   const openTask = (entry: AggregatedTask) => { if (entry.id) void Taro.navigateTo({ url: taskDestination(entry) }); };
+  const retryTask = async (entry: AggregatedTask, event?: { stopPropagation?: () => void }) => {
+    event?.stopPropagation?.();
+    if (!entry.retryable || entry.source !== "fetch" || !entry.id || retryingId) { openTask(entry); return; }
+    setRetryingId(entry.id);
+    try {
+      await apiRequest("/api/batch-rewrite/tasks/batch-retry", { method: "POST", timeout: 180000, data: { mode: "selected", ids: [entry.id] } });
+      Taro.showToast({ title: "已提交重试", icon: "success" });
+      load();
+    } catch (cause) {
+      Taro.showToast({ title: cause instanceof Error ? cause.message : "重试失败", icon: "none" });
+    } finally { setRetryingId(""); }
+  };
 
   return <ThemedPage className="mp-page mp-primary-page mp-tasks-page task-studio-page" dynamicGlass={false}>
     <View className="task-studio-header-scene">
@@ -82,7 +94,7 @@ export default function TasksPage() {
     {summary && pageState.kind !== "configuration-error" && pageState.kind !== "all-error" ? <View className="task-studio-body">
       <View className="task-studio-counts liquid-glass--secondary" data-glass-role="secondary">
         <View className="task-studio-count-item is-running"><Image className="task-studio-count-art" src={taskRunningArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.running}</Text><Text>进行中</Text></View></View><View className="task-studio-count-divider" />
-        <View className="task-studio-count-item is-attention"><Image className="task-studio-count-art" src={taskAttentionArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.attention}</Text><Text>待确认</Text></View></View><View className="task-studio-count-divider" />
+        <View className="task-studio-count-item is-retry"><Image className="task-studio-count-art" src={taskAttentionArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.retry}</Text><Text>需重试</Text></View></View><View className="task-studio-count-divider" />
         <View className="task-studio-count-item is-completed"><Image className="task-studio-count-art" src={taskCompletedArt} mode="aspectFit" /><View><Text className="task-studio-count-value">{counts.completed}</Text><Text>已完成</Text></View></View>
       </View>
       <View className="task-studio-segments liquid-glass--list" data-glass-role="list">{FILTERS.map((item) => <Text key={item} className={filter === item ? "task-studio-filter is-active" : "task-studio-filter"} onClick={() => setFilter(item)}>{item}</Text>)}</View>
@@ -90,10 +102,10 @@ export default function TasksPage() {
       <View className="task-studio-list liquid-glass--list" data-glass-role="list">
         {filtered.map((entry, index) => {
           const progress = validProgress(entry); const visual = taskVisualAsset(entry); const disabled = !entry.id;
-          return <View className={`task-studio-row studio-task-record is-${entry.status}${disabled ? " is-disabled" : ""}${index === filtered.length - 1 ? " is-last" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
+          return <View className={`task-studio-row is-${entry.status}${disabled ? " is-disabled" : ""}${index === filtered.length - 1 ? " is-last" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
             <Image className="task-studio-row-art" src={visual} mode="aspectFit" />
             <View className="task-studio-row-copy"><Text className="task-studio-row-title">{entry.title || "服务端未返回标题"}</Text><Text className="task-studio-row-source">{entry.sourceLabel} · {formatTimestamp(entry.createdAt)}</Text></View>
-            <View className="task-studio-row-state studio-task-action">{progress ? <><Text className="task-studio-progress-value">{progress.percent}%</Text><View className="task-studio-progress-track"><View style={{ width: `${progress.percent}%` }} /></View></> : null}<Text className={`task-studio-status mp-status-pill is-${entry.status}`}>{disabled ? "记录 ID 未返回" : statusLabel(entry)}</Text></View>
+            <View className="task-studio-row-state">{progress ? <><Text className="task-studio-progress-value">{progress.percent}%</Text><View className="task-studio-progress-track"><View style={{ width: `${progress.percent}%` }} /></View></> : null}<Text className={`task-studio-status mp-status-pill is-${entry.status}`}>{disabled ? "记录 ID 未返回" : statusLabel(entry)}</Text>{entry.status === "retry" && !disabled ? <Button className="task-studio-row-retry" loading={retryingId === entry.id} onClick={(event) => void retryTask(entry, event)}> {entry.retryable ? "重试" : "查看处理"}</Button> : null}</View>
             {!disabled ? <AppIcon className="task-studio-row-arrow" name="chevron-right" size={17} /> : null}
           </View>;
         })}
