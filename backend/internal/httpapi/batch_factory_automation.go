@@ -5673,6 +5673,19 @@ func (c *BatchAutomationCoordinator) Pause(owner, batchID string) (map[string]an
 	})
 }
 
+// Job恢复运行时同步恢复书的标签，保留断点阶段和页账本。
+func preparePausedAutomationBooksForResume(job map[string]any) {
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if automationStringValue(entry["status"], "") == "paused" {
+			entry["status"] = "running"
+			delete(entry, "error")
+			delete(entry, "retryAt")
+		}
+	}
+}
+
 func (c *BatchAutomationCoordinator) Resume(ctx context.Context, owner, batchID string) (map[string]any, error) {
 	return c.control(owner, batchID, "running", func(job map[string]any) error {
 		batch, err := c.store.GetBatch(ctx, owner, batchID)
@@ -5689,6 +5702,7 @@ func (c *BatchAutomationCoordinator) Resume(ctx context.Context, owner, batchID 
 				return err
 			}
 		}
+		preparePausedAutomationBooksForResume(job)
 		c.launchRun(owner, batchID, automationStringValue(job["id"], ""), job, batch)
 		return nil
 	})

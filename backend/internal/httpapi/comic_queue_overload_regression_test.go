@@ -139,3 +139,20 @@ func TestComicRetryAttemptDoesNotDisplayPreviousStallFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPausedBooksResumeWithoutLosingStageOrTouchingFailures(t *testing.T) {
+	paused := map[string]any{"status": "paused", "stage": "comic_images", "error": "old error", "retryAt": "old time", "nodes": map[string]any{"successfulPage": "kept"}}
+	failed := map[string]any{"status": "failed", "error": "needs review"}
+	done := map[string]any{"status": "completed"}
+	job := map[string]any{"books": map[string]any{"paused": paused, "failed": failed, "done": done}}
+	preparePausedAutomationBooksForResume(job)
+	if paused["status"] != "running" || paused["stage"] != "comic_images" {
+		t.Fatalf("resume lost live state/stage: %#v", paused)
+	}
+	if paused["error"] != nil || paused["retryAt"] != nil || paused["nodes"] == nil {
+		t.Fatalf("resume must clear stale notice but keep ledger: %#v", paused)
+	}
+	if failed["status"] != "failed" || done["status"] != "completed" {
+		t.Fatal("resume changed unrelated terminal books")
+	}
+}
