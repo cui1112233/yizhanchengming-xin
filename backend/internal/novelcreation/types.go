@@ -226,10 +226,22 @@ type Dashboard struct {
 	ProjectID    string         `json:"projectId"`
 	ChapterCount int            `json:"chapterCount"`
 	TotalWords   int            `json:"totalWords"`
+	AvgWords     float64        `json:"avgWords"`
 	RunCounts    map[string]int `json:"runCounts"`
 	RunTotal     int            `json:"runTotal"`
 	SuccessRate  float64        `json:"successRate"`
 	LastRunAt    *time.Time     `json:"lastRunAt,omitempty"`
+	// StatusCounts 按章节审核状态统计，对应原版看板的状态分布。
+	StatusCounts map[string]int `json:"statusCounts"`
+	// WordTrend 按章号升序记录每章字数，对应原版看板的字数趋势。
+	WordTrend []ChapterWordPoint `json:"wordTrend"`
+}
+
+type ChapterWordPoint struct {
+	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	WordCount int    `json:"wordCount"`
+	Status    string `json:"status"`
 }
 
 // Batch is a continuous chapter-generation task. Each chapter is a normal run,

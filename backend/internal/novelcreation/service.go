@@ -893,10 +893,26 @@ func (s *Service) GetDashboard(ctx context.Context, owner, projectID string) (Da
 	if err != nil {
 		return Dashboard{}, err
 	}
-	dashboard := Dashboard{ProjectID: projectID, ChapterCount: len(chapters), RunCounts: make(map[string]int)}
+	dashboard := Dashboard{
+		ProjectID: projectID, ChapterCount: len(chapters),
+		RunCounts: make(map[string]int), StatusCounts: make(map[string]int),
+		WordTrend: []ChapterWordPoint{},
+	}
 	for _, chapter := range chapters {
 		dashboard.TotalWords += chapter.WordCount
+		status := strings.TrimSpace(chapter.AuditStatus)
+		if status == "" {
+			status = "unknown"
+		}
+		dashboard.StatusCounts[status]++
+		dashboard.WordTrend = append(dashboard.WordTrend, ChapterWordPoint{
+			Number: chapter.Number, Title: chapter.Title, WordCount: chapter.WordCount, Status: status,
+		})
 	}
+	if len(chapters) > 0 {
+		dashboard.AvgWords = float64(dashboard.TotalWords) / float64(len(chapters))
+	}
+	sort.Slice(dashboard.WordTrend, func(i, j int) bool { return dashboard.WordTrend[i].Number < dashboard.WordTrend[j].Number })
 	terminal, successful := 0, 0
 	for _, run := range runs {
 		dashboard.RunTotal++
