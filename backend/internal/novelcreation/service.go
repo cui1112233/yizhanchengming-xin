@@ -182,6 +182,7 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 		"hook_health_version":      1,
 		"state_validation_version": 1,
 		"writer_rule_version":      1,
+		"review_loop_version":      1,
 		"source_type":              input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
@@ -262,6 +263,7 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		HookHealthVersion      int                    `json:"hook_health_version"`
 		StateValidationVersion int                    `json:"state_validation_version"`
 		WriterRuleVersion      int                    `json:"writer_rule_version"`
+		ReviewLoopVersion      int                    `json:"review_loop_version"`
 		Settings               *ProjectSettings       `json:"project_settings"`
 		StyleProfile           *string                `json:"style_profile"`
 		Notes                  []ProjectNote          `json:"notes"`
@@ -359,7 +361,8 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		PostWrite: postWriteContextOf(prompt.PostWriteContext), HookHealthVersion: prompt.HookHealthVersion,
 		RetrievedChapters: prompt.RetrievedChapters, RetrievalVersion: prompt.RetrievalVersion,
 		StateValidationVersion: prompt.StateValidationVersion, WriterRuleVersion: prompt.WriterRuleVersion,
-		ModeInputs: prompt.ModeInputs, StyleProfile: styleProfile, Rules: settings.Rules, Notes: prompt.Notes,
+		ReviewLoopVersion: prompt.ReviewLoopVersion,
+		ModeInputs:        prompt.ModeInputs, StyleProfile: styleProfile, Rules: settings.Rules, Notes: prompt.Notes,
 		Checkpoint:          prompt.Checkpoint && len(prompt.ConfirmedFoundation) == 0,
 		ConfirmedFoundation: prompt.ConfirmedFoundation,
 		KnowledgeMaterials:  prompt.KnowledgeMaterials,

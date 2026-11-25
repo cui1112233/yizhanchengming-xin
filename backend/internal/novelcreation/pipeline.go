@@ -65,6 +65,9 @@ type RunContext struct {
 	// WriterRuleVersion >= 1 appends the ported writer craft rules to the
 	// chapter-draft system prompt. Old runs never see these blocks.
 	WriterRuleVersion int
+	// ReviewLoopVersion >= 1 switches to the structured review cycle with
+	// length-aware best selection, net-improvement exit and rollback report.
+	ReviewLoopVersion int
 	Runtime           Runtime
 	// ModeInputs is the validated mode-specific contract payload.
 	ModeInputs map[string]string
@@ -432,64 +435,105 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	if err := p.emitStage(ctx, input, sink, RunAuditing, "正在审核章节", 55); err != nil {
 		return ChapterBundle{}, err
 	}
-	audits := make([]Audit, 0, p.maxRevisions+1)
-	revisions := make([]Revision, 0, p.maxRevisions)
-	currentAudit, currentAuditRaw, err := p.auditChapter(ctx, input, sink, provider, foundation, plan, bestContent, 0)
-	if err != nil {
-		return ChapterBundle{}, err
-	}
-	audits = append(audits, newAudit(input, len(audits)+1, currentAudit, currentAuditRaw))
-	bestAudit := currentAudit
-	bestAuditRaw := currentAuditRaw
-
 	threshold := p.threshold(input)
-	revisingStageEmitted := false
 	maxRevisions := p.maxRevisions
 	if input.Agent != nil {
 		maxRevisions = input.Agent.MaxRevisionRounds
 	} else if input.MaxRevisionRounds > 0 {
 		maxRevisions = input.MaxRevisionRounds
 	}
-	for round := 1; !auditPasses(bestAudit, threshold) && round <= maxRevisions; round++ {
-		if len(bestAudit.Issues) == 0 {
-			break
+	var audits []Audit
+	var revisions []Revision
+	var bestAudit chapterAuditOutput
+	var bestAuditRaw json.RawMessage
+	var reviewReport *reviewCycleReport
+
+	if input.ReviewLoopVersion >= 1 {
+		loop, loopErr := p.runStructuredReviewLoop(ctx, reviewLoopRequest{
+			Input: input, Sink: sink, Foundation: foundation, Plan: plan,
+			Initial: bestContent, InitialRaw: bestContentRaw,
+			Threshold: threshold, MaxRounds: maxRevisions,
+			Assess: func(callCtx context.Context, content string, round int) (chapterAuditOutput, json.RawMessage, error) {
+				return p.auditChapter(callCtx, input, sink, provider, foundation, plan, content, round)
+			},
+			Revise: func(callCtx context.Context, content string, audit chapterAuditOutput, round int) (chapterRevisionOutput, json.RawMessage, error) {
+				var revision chapterRevisionOutput
+				raw, callErr := p.callJSON(callCtx, input, sink, provider, modelCallSpec{
+					definition: novelprompt.ChapterRevision, step: RunRevising, key: fmt.Sprintf(":%d", round),
+					userPayload: withReviewDimensionContext(input, map[string]any{
+						"chapter_content":   content,
+						"chapter_plan":      plan,
+						"audit_issues":      audit.Issues,
+						"previous_truth":    rawJSONValue(input.PreviousTruth),
+						"previous_chapters": input.PreviousChapters,
+						"memory_context":    rawJSONValue(input.PreviousMemory),
+					}, foundation),
+					temperature: 0.55, maxTokens: 12000,
+					validate: func() error { return validateRevision(revision, audit.Issues) },
+				}, &revision)
+				return revision, raw, callErr
+			},
+		})
+		if loopErr != nil {
+			return ChapterBundle{}, loopErr
 		}
-		if !revisingStageEmitted {
-			if err := p.emitStage(ctx, input, sink, RunRevising, "正在根据审核修订章节", 65); err != nil {
-				return ChapterBundle{}, err
+		audits, revisions = loop.Audits, loop.Revisions
+		bestContent, bestContentRaw = loop.Content, loop.ContentRaw
+		bestAudit, bestAuditRaw = loop.Audit, loop.AuditRaw
+		reviewReport = loop.Report
+	} else {
+		audits = make([]Audit, 0, p.maxRevisions+1)
+		revisions = make([]Revision, 0, p.maxRevisions)
+		currentAudit, currentAuditRaw, err := p.auditChapter(ctx, input, sink, provider, foundation, plan, bestContent, 0)
+		if err != nil {
+			return ChapterBundle{}, err
+		}
+		audits = append(audits, newAudit(input, len(audits)+1, currentAudit, currentAuditRaw))
+		bestAudit = currentAudit
+		bestAuditRaw = currentAuditRaw
+
+		revisingStageEmitted := false
+		for round := 1; !auditPasses(bestAudit, threshold) && round <= maxRevisions; round++ {
+			if len(bestAudit.Issues) == 0 {
+				break
 			}
-			revisingStageEmitted = true
-		}
+			if !revisingStageEmitted {
+				if err := p.emitStage(ctx, input, sink, RunRevising, "正在根据审核修订章节", 65); err != nil {
+					return ChapterBundle{}, err
+				}
+				revisingStageEmitted = true
+			}
 
-		var revision chapterRevisionOutput
-		revisionRaw, callErr := p.callJSON(ctx, input, sink, provider, modelCallSpec{
-			definition: novelprompt.ChapterRevision, step: RunRevising, key: fmt.Sprintf(":%d", round),
-			userPayload: withReviewDimensionContext(input, map[string]any{
-				"chapter_content":   bestContent,
-				"chapter_plan":      plan,
-				"audit_issues":      bestAudit.Issues,
-				"previous_truth":    rawJSONValue(input.PreviousTruth),
-				"previous_chapters": input.PreviousChapters,
-				"memory_context":    rawJSONValue(input.PreviousMemory),
-			}, foundation),
-			temperature: 0.55, maxTokens: 12000,
-			validate: func() error { return validateRevision(revision, bestAudit.Issues) },
-		}, &revision)
-		if callErr != nil {
-			return ChapterBundle{}, callErr
-		}
-		revisions = append(revisions, newRevision(input, round, revision, revisionRaw))
+			var revision chapterRevisionOutput
+			revisionRaw, callErr := p.callJSON(ctx, input, sink, provider, modelCallSpec{
+				definition: novelprompt.ChapterRevision, step: RunRevising, key: fmt.Sprintf(":%d", round),
+				userPayload: withReviewDimensionContext(input, map[string]any{
+					"chapter_content":   bestContent,
+					"chapter_plan":      plan,
+					"audit_issues":      bestAudit.Issues,
+					"previous_truth":    rawJSONValue(input.PreviousTruth),
+					"previous_chapters": input.PreviousChapters,
+					"memory_context":    rawJSONValue(input.PreviousMemory),
+				}, foundation),
+				temperature: 0.55, maxTokens: 12000,
+				validate: func() error { return validateRevision(revision, bestAudit.Issues) },
+			}, &revision)
+			if callErr != nil {
+				return ChapterBundle{}, callErr
+			}
+			revisions = append(revisions, newRevision(input, round, revision, revisionRaw))
 
-		candidateAudit, candidateAuditRaw, auditErr := p.auditChapter(ctx, input, sink, provider, foundation, plan, revision.Content, round)
-		if auditErr != nil {
-			return ChapterBundle{}, auditErr
-		}
-		audits = append(audits, newAudit(input, len(audits)+1, candidateAudit, candidateAuditRaw))
-		if betterAudit(candidateAudit, bestAudit, threshold) {
-			bestContent = strings.TrimSpace(revision.Content)
-			bestContentRaw = revisionRaw
-			bestAudit = candidateAudit
-			bestAuditRaw = candidateAuditRaw
+			candidateAudit, candidateAuditRaw, auditErr := p.auditChapter(ctx, input, sink, provider, foundation, plan, revision.Content, round)
+			if auditErr != nil {
+				return ChapterBundle{}, auditErr
+			}
+			audits = append(audits, newAudit(input, len(audits)+1, candidateAudit, candidateAuditRaw))
+			if betterAudit(candidateAudit, bestAudit, threshold) {
+				bestContent = strings.TrimSpace(revision.Content)
+				bestContentRaw = revisionRaw
+				bestAudit = candidateAudit
+				bestAuditRaw = candidateAuditRaw
+			}
 		}
 	}
 
@@ -593,7 +637,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	if err != nil {
 		return ChapterBundle{}, &DomainError{Code: ErrPersistenceFailed, Message: "failed to assemble chapter bundle", Cause: err}
 	}
-	if len(localChecks) > 0 || len(stateValidationRaw) > 0 || len(draft.PreWriteCheck) > 0 {
+	if len(localChecks) > 0 || len(stateValidationRaw) > 0 || len(draft.PreWriteCheck) > 0 || reviewReport != nil {
 		var snapshot map[string]json.RawMessage
 		if err = json.Unmarshal(bundle.RuntimeSnapshot, &snapshot); err != nil {
 			return ChapterBundle{}, err
@@ -606,6 +650,11 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		}
 		if len(draft.PreWriteCheck) > 0 {
 			if snapshot["preWriteCheck"], err = json.Marshal(draft.PreWriteCheck); err != nil {
+				return ChapterBundle{}, err
+			}
+		}
+		if reviewReport != nil {
+			if snapshot["reviewCycle"], err = json.Marshal(reviewReport); err != nil {
 				return ChapterBundle{}, err
 			}
 		}
