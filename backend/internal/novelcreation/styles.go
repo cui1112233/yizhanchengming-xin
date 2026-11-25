@@ -15,6 +15,9 @@ type StyleStatistics struct {
 	Sentences          int     `json:"sentences"`
 	MeanSentenceLength float64 `json:"meanSentenceLength"`
 	DialogueMarks      int     `json:"dialogueMarks"`
+	// 原版前端 Tln 指纹字段；analysisVersion 用于区分是否有指纹数据。
+	StyleFingerprint
+	AnalysisVersion int `json:"analysisVersion"`
 }
 type StyleSource struct {
 	Profile         StyleProfile      `json:"profile"`
@@ -44,6 +47,8 @@ func styleStats(text string) StyleStatistics {
 	if v.Sentences > 0 {
 		v.MeanSentenceLength = float64(v.Characters) / float64(v.Sentences)
 	}
+	v.StyleFingerprint = buildStyleFingerprint(text, "")
+	v.AnalysisVersion = 2
 	return v
 }
 func (s *Service) CreateStyleFromDocument(ctx context.Context, owner, project, document, title, description string) (out StyleSource, err error) {

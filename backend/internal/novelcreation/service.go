@@ -175,18 +175,19 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 		return Run{}, err
 	}
 	snapshotFields := map[string]any{
-		"system_prompts":         systemPrompts,
-		"project_settings":       settings,
-		"agent_contract_version": 1,
-		"review_cycle_version":   4,
-		"hook_health_version":    1,
-		"source_type":            input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
+		"system_prompts":           systemPrompts,
+		"project_settings":         settings,
+		"agent_contract_version":   1,
+		"review_cycle_version":     4,
+		"hook_health_version":      1,
+		"state_validation_version": 1,
+		"source_type":              input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
 		"knowledge_ids": selected.KnowledgeIDs, "knowledge_materials": selected.Knowledge,
 		"note_ids": selected.NoteIDs, "notes": selected.Notes, "style_profile_id": selected.StyleProfileID, "style_profile": selected.StyleProfile,
 		"previous_truth": continuity.Truth, "previous_memory": continuity.Memory,
-		"previous_chapters": continuity.Chapters,
+		"previous_chapters":  continuity.Chapters,
 		"post_write_context": buildPostWriteContext(chapters, chapterNumber, settings, project),
 		"retrieval_version":  1,
 		"retrieved_chapters": retrieveRelevantChapters(chapters, retrievalQuery(input.Content, chapters), chapterNumber, retrievalLimit),
@@ -253,30 +254,31 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		return s.finishWithError(ctx, owner, run, ErrSessionNotFound, "创作会话不存在", err)
 	}
 	var prompt struct {
-		SystemPrompts        *SystemPromptSnapshot  `json:"system_prompts"`
-		LongImitation        *LongImitationCreation `json:"long_imitation"`
-		AgentContractVersion int                    `json:"agent_contract_version"`
-		ReviewCycleVersion   int                    `json:"review_cycle_version"`
-		HookHealthVersion    int                    `json:"hook_health_version"`
-		Settings             *ProjectSettings       `json:"project_settings"`
-		StyleProfile         *string                `json:"style_profile"`
-		Notes                []ProjectNote          `json:"notes"`
-		UserMessage          string                 `json:"user_message"`
-		Mode                 string                 `json:"mode"`
-		ModeInputs           map[string]string      `json:"mode_inputs"`
-		ChapterNumber        int                    `json:"chapter_number"`
-		Checkpoint           bool                   `json:"checkpoint"`
-		ConfirmedFoundation  json.RawMessage        `json:"confirmed_foundation"`
-		KnowledgeIDs         []string               `json:"knowledge_ids"`
-		KnowledgeMaterials   []KnowledgeMaterial    `json:"knowledge_materials"`
-		ExpectedTarget       *PreviousChapter       `json:"expected_target"`
-		RetryOfRunID         string                 `json:"retry_of_run_id"`
-		PreviousChapters     []PreviousChapter      `json:"previous_chapters"`
-		PreviousTruth        json.RawMessage        `json:"previous_truth"`
-		PreviousMemory       json.RawMessage        `json:"previous_memory"`
-		PostWriteContext     *PostWriteContext      `json:"post_write_context"`
-		RetrievalVersion     int                    `json:"retrieval_version"`
-		RetrievedChapters    []RetrievedChapter     `json:"retrieved_chapters"`
+		SystemPrompts          *SystemPromptSnapshot  `json:"system_prompts"`
+		LongImitation          *LongImitationCreation `json:"long_imitation"`
+		AgentContractVersion   int                    `json:"agent_contract_version"`
+		ReviewCycleVersion     int                    `json:"review_cycle_version"`
+		HookHealthVersion      int                    `json:"hook_health_version"`
+		StateValidationVersion int                    `json:"state_validation_version"`
+		Settings               *ProjectSettings       `json:"project_settings"`
+		StyleProfile           *string                `json:"style_profile"`
+		Notes                  []ProjectNote          `json:"notes"`
+		UserMessage            string                 `json:"user_message"`
+		Mode                   string                 `json:"mode"`
+		ModeInputs             map[string]string      `json:"mode_inputs"`
+		ChapterNumber          int                    `json:"chapter_number"`
+		Checkpoint             bool                   `json:"checkpoint"`
+		ConfirmedFoundation    json.RawMessage        `json:"confirmed_foundation"`
+		KnowledgeIDs           []string               `json:"knowledge_ids"`
+		KnowledgeMaterials     []KnowledgeMaterial    `json:"knowledge_materials"`
+		ExpectedTarget         *PreviousChapter       `json:"expected_target"`
+		RetryOfRunID           string                 `json:"retry_of_run_id"`
+		PreviousChapters       []PreviousChapter      `json:"previous_chapters"`
+		PreviousTruth          json.RawMessage        `json:"previous_truth"`
+		PreviousMemory         json.RawMessage        `json:"previous_memory"`
+		PostWriteContext       *PostWriteContext      `json:"post_write_context"`
+		RetrievalVersion       int                    `json:"retrieval_version"`
+		RetrievedChapters      []RetrievedChapter     `json:"retrieved_chapters"`
 	}
 	if err := json.Unmarshal(run.PromptSnapshot, &prompt); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "创作输入快照损坏", err)
@@ -354,7 +356,8 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		PreviousTruth: prompt.PreviousTruth, PreviousMemory: prompt.PreviousMemory, PreviousChapters: prompt.PreviousChapters, Runtime: s.runtime,
 		PostWrite: postWriteContextOf(prompt.PostWriteContext), HookHealthVersion: prompt.HookHealthVersion,
 		RetrievedChapters: prompt.RetrievedChapters, RetrievalVersion: prompt.RetrievalVersion,
-		ModeInputs: prompt.ModeInputs, StyleProfile: styleProfile, Rules: settings.Rules, Notes: prompt.Notes,
+		StateValidationVersion: prompt.StateValidationVersion,
+		ModeInputs:             prompt.ModeInputs, StyleProfile: styleProfile, Rules: settings.Rules, Notes: prompt.Notes,
 		Checkpoint:          prompt.Checkpoint && len(prompt.ConfirmedFoundation) == 0,
 		ConfirmedFoundation: prompt.ConfirmedFoundation,
 		KnowledgeMaterials:  prompt.KnowledgeMaterials,

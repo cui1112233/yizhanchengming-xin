@@ -59,7 +59,10 @@ type RunContext struct {
 	// RetrievalVersion gates injection so old runs keep their request shape.
 	RetrievedChapters []RetrievedChapter
 	RetrievalVersion  int
-	Runtime               Runtime
+	// StateValidationVersion >= 1 adds the settlement validator call that the
+	// reference pipeline runs between settlement and memory indexing.
+	StateValidationVersion int
+	Runtime                Runtime
 	// ModeInputs is the validated mode-specific contract payload.
 	ModeInputs map[string]string
 	// StyleProfile and Rules are project-level writing constraints injected into
@@ -521,6 +524,22 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		}
 	}
 
+	var stateValidationRaw json.RawMessage
+	if input.StateValidationVersion >= 1 {
+		validation := validateStateConsistency(input.PreviousTruth, settlement, foundation)
+		stateValidationRaw, err = json.Marshal(validation)
+		if err != nil {
+			return ChapterBundle{}, err
+		}
+		// 校验不通过不阻断落盘：章节标记为需要人工复核。
+		if !validation.Passed {
+			finalStatus = RunSucceededWithWarnings
+		}
+		if err := p.emit(ctx, input, sink, RunEvent{Type: "run.state_validation", Step: string(RunSettling), Status: RunSettling, Message: "状态一致性检查完成，未调用模型", Progress: 88, Payload: stateValidationRaw}); err != nil {
+			return ChapterBundle{}, err
+		}
+	}
+
 	if err := p.emitStage(ctx, input, sink, RunIndexing, "正在生成下一章可用的记忆索引", 92); err != nil {
 		return ChapterBundle{}, err
 	}
@@ -548,12 +567,17 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	if err != nil {
 		return ChapterBundle{}, &DomainError{Code: ErrPersistenceFailed, Message: "failed to assemble chapter bundle", Cause: err}
 	}
-	if len(localChecks) > 0 {
+	if len(localChecks) > 0 || len(stateValidationRaw) > 0 {
 		var snapshot map[string]json.RawMessage
 		if err = json.Unmarshal(bundle.RuntimeSnapshot, &snapshot); err != nil {
 			return ChapterBundle{}, err
 		}
-		snapshot["localChecks"] = localChecks
+		if len(localChecks) > 0 {
+			snapshot["localChecks"] = localChecks
+		}
+		if len(stateValidationRaw) > 0 {
+			snapshot["stateValidation"] = stateValidationRaw
+		}
 		bundle.RuntimeSnapshot, err = json.Marshal(snapshot)
 		if err != nil {
 			return ChapterBundle{}, err
