@@ -462,3 +462,25 @@ func TestComicAudioCategoryRejectsMissingClassification(t *testing.T) {
 		t.Fatal("comicAudioCategoryName() error = nil, want missing classification error")
 	}
 }
+
+// 书单导入的书常常没有 classifyStatus；上传阶段必须按同一套默认规则补全，
+// 不能用“配置缺失”阻断整本发布。
+func TestComicAudioCategoryFinalizesMissingClassification(t *testing.T) {
+	cases := []struct {
+		name     string
+		metadata map[string]any
+		want     string
+	}{
+		{name: "书单风格", metadata: map[string]any{"style": "家庭奇葩"}, want: "现代通用"},
+		{name: "空元信息", metadata: map[string]any{}, want: "现代通用"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			book := batchfactoryv11.Book{Title: "婚礼当天，白富美闺蜜帮我收的份子钱少了十万八", SourceMetadata: tt.metadata}
+			got, err := comicAudioCategoryName(book)
+			if err != nil || got != tt.want {
+				t.Fatalf("comicAudioCategoryName() = %q, %v; want %q", got, err, tt.want)
+			}
+		})
+	}
+}

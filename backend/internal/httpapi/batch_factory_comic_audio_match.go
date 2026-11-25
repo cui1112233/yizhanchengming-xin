@@ -45,9 +45,20 @@ func comicAudioMetadataText(metadata map[string]any, keys ...string) string {
 
 func comicAudioCategoryName(book batchfactoryv11.Book) (string, error) {
 	metadata := book.SourceMetadata
-	status := strings.ToLower(comicAudioMetadataText(metadata, "classifyStatus", "classify_status"))
-	if status != "classified" {
-		return "", fmt.Errorf("%s 的男女频和风格尚未完成识别", strings.TrimSpace(book.Title))
+	// 男女频和风格识别只是元信息补全，不是上传前置条件。书单导入的书可能
+	// 从未走过识别，这里按抓取链路同一套规则补出可用的默认值，避免整本在
+	// “正在上传”阶段以“配置缺失（需先补齐设置）”失败。
+	if !strings.EqualFold(comicAudioMetadataText(metadata, "classifyStatus", "classify_status"), "classified") {
+		// 音频映射一直兼容“男/女”简写；补默认值前先统一格式，不能将
+		// 已明确的男频误当成缺失，再回落到默认女频。只处理副本。
+		metadata = copyAnyMap(metadata)
+		switch comicAudioMetadataText(metadata, "gender", "gender_name") {
+		case "男":
+			metadata["gender"] = "男频"
+		case "女":
+			metadata["gender"] = "女频"
+		}
+		metadata = finalizeFetchedBatchClassification(metadata)
 	}
 	style := comicAudioMetadataText(metadata, "style", "styleName", "style_name")
 	gender := comicAudioMetadataText(metadata, "gender", "gender_name")
