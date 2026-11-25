@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getMemberCenter, getTeamMembers, markAllNotificationsRead } from '../../shared/api/member';
 import { Link } from '../../shared/components/Link';
 import { FeatureBars, MemberIdentity, PageHeader, Panel, RoleBadge, avatarFallback, formatDate, formatTokens } from './accountCenterShared';
+import './member-identity-card.css';
 
 export default function MemberCenterPage() {
   const [loading, setLoading] = useState(true);
@@ -52,10 +53,22 @@ export default function MemberCenterPage() {
 
     <div className="ac-member-layout">
       <div className="ac-member-main">
-        <section className={`ac-identity-hero role-${self.role}`}>
-          <div className="ac-identity-glow" />
-          <div className="ac-hero-profile"><div className="ac-hero-avatar"><Avatar size={104} src={self.avatarUrl}>{avatarFallback(self)}</Avatar></div><div className="ac-hero-copy"><div className="ac-hero-name-line"><h2>{self.displayName}</h2><RoleBadge role={self.role} /></div><p>@{self.username}</p><div className="ac-hero-meta"><span><UsersRound size={15} />{center?.team ? teamName : self.role === 'member' ? (center.manager ? `所属管理 · ${center.manager.displayName}` : '暂未绑定管理') : 'qiantie 核心团队'}</span><span><KeyRound size={15} />{apiEnabled ? 'AI 服务已启用' : 'AI 服务未授权'}</span></div></div></div>
-          <div className="ac-hero-facts"><div><small>所属团队</small><strong>{teamName}</strong></div><div><small>当前身份</small><strong>{self.role === 'dev' ? '开发（最高权限）' : self.role === 'manager' ? '团队管理' : '团队成员'}</strong></div><div><small>加入时间</small><strong>{formatDate(self.createdAt).slice(0, 10)}</strong></div><div><small>API 服务</small><strong className={apiEnabled ? 'success' : 'danger'}>{apiEnabled ? '● 已启用' : '● 未授权'}</strong></div></div>
+        <section className="member-glass-card" aria-label="个人身份卡">
+          <img className="member-glass-card-art" src="/assets/member-center/glass-ribbon-card.png" alt="" aria-hidden="true" />
+          <span className="member-glass-brand">一战晟铭</span>
+          <div className="member-glass-profile">
+            <Avatar className="member-glass-avatar" src={self.avatarUrl}>{avatarFallback(self)}</Avatar>
+            <div className="member-glass-copy">
+              <div className="member-glass-name"><h2 title={self.displayName}>{self.displayName}</h2><RoleBadge role={self.role} /></div>
+              <p title={`@${self.username}`}>@{self.username}</p>
+              <span className={`member-glass-access ${apiEnabled ? 'is-enabled' : ''}`}><ShieldCheck size={18} />{apiEnabled ? 'AI 服务已启用' : 'AI 服务未授权'}</span>
+            </div>
+          </div>
+          <dl className="member-glass-facts">
+            <div><dt>所属团队</dt><dd title={teamName}>{teamName}</dd></div>
+            <div><dt>当前身份</dt><dd title={self.role === 'dev' ? '开发（最高权限）' : undefined}>{self.role === 'dev' ? '开发' : self.role === 'manager' ? '团队管理' : '团队成员'}</dd></div>
+            <div><dt>加入时间</dt><dd>{formatDate(self.createdAt).slice(0, 10)}</dd></div>
+          </dl>
         </section>
 
         <div className="ac-dashboard-grid ac-dashboard-grid-3">

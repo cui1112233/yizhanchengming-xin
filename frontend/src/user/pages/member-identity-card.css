@@ -1,0 +1,44 @@
+/* Selected glass-and-ribbon artwork; account content remains live HTML. */
+.member-glass-card {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  aspect-ratio: 1672 / 941;
+  color: #f5f5ff;
+  container-type: inline-size;
+  border-radius: 18px;
+  overflow: hidden;
+}
+.member-glass-card-art { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.member-glass-brand { position: absolute; left: 14%; top: 24%; font-size: clamp(13px, 2.5cqw, 26px); font-weight: 650; letter-spacing: .04em; }
+.member-glass-profile { position: absolute; left: 14%; right: 22%; top: 34%; display: flex; align-items: center; gap: 3cqw; min-width: 0; }
+.member-glass-card .member-glass-avatar { flex: 0 0 auto; width: 13cqw; height: 13cqw; max-width: 150px; max-height: 150px; border: 1px solid #c7cce5; font-size: 4cqw; background: #242e4c; }
+.member-glass-copy { min-width: 0; flex: 1; }
+.member-glass-name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.member-glass-name h2 { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fafaff; font-size: clamp(18px, 3.7cqw, 38px); font-weight: 650; line-height: 1.25; }
+.member-glass-copy > p { margin: 5px 0 10px; color: #b9bfd9; font-size: clamp(11px, 2cqw, 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-glass-access { display: inline-flex; align-items: center; gap: 8px; color: #b9bfd9; font-size: clamp(10px, 1.8cqw, 17px); }
+.member-glass-access svg { flex-shrink: 0; }
+.member-glass-access.is-enabled svg { color: #73d6ce; }
+.member-glass-facts { position: absolute; left: 14%; right: 27%; bottom: 20%; display: grid; grid-template-columns: 1.2fr 1fr 1fr; margin: 0; padding-top: 2cqw; border-top: 1px solid #bfc6dd70; }
+.member-glass-facts > div { min-width: 0; padding: 0 2cqw; border-left: 1px solid #bfc6dd70; }
+.member-glass-facts > div:first-child { padding-left: 0; border: 0; }
+.member-glass-facts dt { margin-bottom: 6px; color: #b9bfd9; font-size: clamp(10px, 1.7cqw, 17px); }
+.member-glass-facts dd { margin: 0; overflow-wrap: anywhere; color: #f5f5ff; font-size: clamp(11px, 2cqw, 20px); font-weight: 600; line-height: 1.4; }
+@container (max-width: 600px) {
+  .member-glass-name h2 { font-size: 20px; }
+  .member-glass-copy > p { margin: 3px 0 6px; }
+  .member-glass-facts { right: 23%; bottom: 19%; padding-top: 12px; }
+  .member-glass-facts dd { font-size: 11px; }
+  .member-glass-name { gap: 4px 8px; }
+}
+@media (max-width: 540px) {
+  .member-glass-card { min-height: 345px; aspect-ratio: auto; }
+  .member-glass-brand { top: 24%; }
+  .member-glass-profile { top: 35%; left: 13%; right: 16%; gap: 12px; }
+  .member-glass-card .member-glass-avatar { width: 60px; height: 60px; }
+  .member-glass-name h2 { font-size: 17px; }
+  .member-glass-name .ant-tag { font-size: 9px; padding-inline: 5px; }
+  .member-glass-facts { left: 13%; right: 20%; bottom: 20%; }
+  .member-glass-access { gap: 4px; font-size: 10px; }
+}
