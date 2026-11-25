@@ -52,6 +52,13 @@ type RunContext struct {
 	PreviousChapters      []PreviousChapter
 	PreviousTruth         json.RawMessage
 	PreviousMemory        json.RawMessage
+	// HookHealthVersion >= 1 freezes the planner hook-health injection for new
+	// runs; older snapshots keep their original request shape.
+	HookHealthVersion int
+	// RetrievedChapters is the frozen cross-chapter recall for planner/writer.
+	// RetrievalVersion gates injection so old runs keep their request shape.
+	RetrievedChapters []RetrievedChapter
+	RetrievalVersion  int
 	Runtime               Runtime
 	// ModeInputs is the validated mode-specific contract payload.
 	ModeInputs map[string]string
@@ -68,6 +75,9 @@ type RunContext struct {
 	// KnowledgeMaterials is the bounded snapshot of user-selected materials.
 	Notes              []ProjectNote
 	KnowledgeMaterials []KnowledgeMaterial
+	// PostWrite carries the frozen cross-chapter data for deterministic checks.
+	// Old runs have no such snapshot and therefore report those checks as absent.
+	PostWrite PostWriteContext
 	// MaxRevisionRounds overrides the default audit-revision loop bound.
 	MaxRevisionRounds              int
 	Agent                          *AgentSettings
@@ -181,6 +191,16 @@ type settledTimelineEvent struct {
 type settledForeshadowing struct {
 	Thread string `json:"thread"`
 	Status string `json:"status"`
+	// 以下字段由服务端自动维护，模型输出不要求填写。
+	// 旧结算快照没有这些字段时，伏笔健康按章号与 open/resolved 保守推断。
+	StartChapter        int    `json:"startChapter,omitempty"`
+	LastAdvancedChapter int    `json:"lastAdvancedChapter,omitempty"`
+	AdvancingCount      int    `json:"advancingCount,omitempty"`
+	Type                string `json:"type,omitempty"`
+	PayoffTiming        string `json:"payoffTiming,omitempty"`
+	ExpectedPayoff      string `json:"expectedPayoff,omitempty"`
+	CoreHook            bool   `json:"coreHook,omitempty"`
+	Promoted            bool   `json:"promoted,omitempty"`
 }
 
 type memoryIndexOutput struct {
@@ -293,23 +313,33 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		chapterNumber = 1
 	}
 	var plan chapterPlanOutput
+	chapterPlanPayload := map[string]any{
+		"creation_mode":        modeContract(input.Session.Mode),
+		"mode_inputs":          input.ModeInputs,
+		"style_profile":        input.StyleProfile,
+		"rules":                input.Rules,
+		"notes":                input.Notes,
+		"knowledge_materials":  input.KnowledgeMaterials,
+		"foundation_plan":      foundation,
+		"chapter_number":       chapterNumber,
+		"target_chapter_words": input.Project.TargetChapterWords,
+		"previous_truth":       rawJSONValue(input.PreviousTruth),
+		"previous_chapters":    input.PreviousChapters,
+		"memory_context":       rawJSONValue(input.PreviousMemory),
+		"user_message":         input.UserMessage,
+	}
+	if input.HookHealthVersion >= 1 {
+		if hooks := hooksFromTruth(input.PreviousTruth); len(hooks) > 0 {
+			chapterPlanPayload["hook_health"] = formatHookHealthForPlanner(analyzeHookHealth(hooks, chapterNumber))
+		}
+	}
+	if input.RetrievalVersion >= 1 && len(input.RetrievedChapters) > 0 {
+		chapterPlanPayload["retrieved_chapters"] = input.RetrievedChapters
+	}
 	planRaw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
-		definition: novelprompt.ChapterPlan, step: RunPlanning,
-		userPayload: map[string]any{
-			"creation_mode":        modeContract(input.Session.Mode),
-			"mode_inputs":          input.ModeInputs,
-			"style_profile":        input.StyleProfile,
-			"rules":                input.Rules,
-			"notes":                input.Notes,
-			"knowledge_materials":  input.KnowledgeMaterials,
-			"foundation_plan":      foundation,
-			"chapter_number":       chapterNumber,
-			"target_chapter_words": input.Project.TargetChapterWords,
-			"previous_truth":       rawJSONValue(input.PreviousTruth),
-			"previous_chapters":    input.PreviousChapters,
-			"memory_context":       rawJSONValue(input.PreviousMemory),
-			"user_message":         input.UserMessage,
-		},
+		definition:  novelprompt.ChapterPlan,
+		step:        RunPlanning,
+		userPayload: chapterPlanPayload,
 		temperature: 0.35, maxTokens: 3500,
 		validate: func() error {
 			return validateImitationPlan(plan, chapterNumber, foundation.Volumes, input.LongImitation)
@@ -327,21 +357,26 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		return ChapterBundle{}, err
 	}
 	var draft chapterDraftOutput
+	draftPayload := map[string]any{
+		"creation_mode":       modeContract(input.Session.Mode),
+		"mode_inputs":         input.ModeInputs,
+		"style_profile":       input.StyleProfile,
+		"rules":               input.Rules,
+		"notes":               input.Notes,
+		"knowledge_materials": input.KnowledgeMaterials,
+		"foundation_plan":     foundation,
+		"chapter_plan":        plan,
+		"previous_truth":      rawJSONValue(input.PreviousTruth),
+		"previous_chapters":   input.PreviousChapters,
+		"memory_context":      rawJSONValue(input.PreviousMemory),
+	}
+	if input.RetrievalVersion >= 1 && len(input.RetrievedChapters) > 0 {
+		draftPayload["retrieved_chapters"] = input.RetrievedChapters
+	}
 	draftRaw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
-		definition: novelprompt.ChapterDraft, step: RunWriting,
-		userPayload: map[string]any{
-			"creation_mode":       modeContract(input.Session.Mode),
-			"mode_inputs":         input.ModeInputs,
-			"style_profile":       input.StyleProfile,
-			"rules":               input.Rules,
-			"notes":               input.Notes,
-			"knowledge_materials": input.KnowledgeMaterials,
-			"foundation_plan":     foundation,
-			"chapter_plan":        plan,
-			"previous_truth":      rawJSONValue(input.PreviousTruth),
-			"previous_chapters":   input.PreviousChapters,
-			"memory_context":      rawJSONValue(input.PreviousMemory),
-		},
+		definition:  novelprompt.ChapterDraft,
+		step:        RunWriting,
+		userPayload: draftPayload,
 		temperature: 0.75, maxTokens: 12000,
 		validate: func() error { return requireText("content", draft.Content) },
 	}, &draft)
@@ -438,12 +473,9 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	if input.Agent != nil && (input.Agent.EnablePostWrite || input.Agent.EnableAiTells) {
 		checks := map[string]any{"model_calls": 0, "content_rewritten": false}
 		if input.Agent.EnablePostWrite {
-			titles := []string{}
-			// Full previous chapter texts are not currently present in RunContext.
-			// Do not feed bounded endings to the full cross-chapter check.
-			result := ValidatePostWrite(bestContent, PostWriteInput{Title: plan.Title, ExistingTitles: titles})
+			result := ValidatePostWrite(bestContent, input.PostWrite.postWriteInput(plan.Title))
 			checks["post_write"] = result
-			checks["cross_chapter_status"] = "not_checked_missing_full_text"
+			checks["post_write_status"] = input.PostWrite.postWriteStatus()
 			if !result.Passed {
 				finalStatus = RunSucceededWithWarnings
 			}

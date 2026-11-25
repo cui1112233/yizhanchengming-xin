@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	promptcatalog "qiantie/backend/internal/prompt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -178,6 +179,7 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 		"project_settings":       settings,
 		"agent_contract_version": 1,
 		"review_cycle_version":   4,
+		"hook_health_version":    1,
 		"source_type":            input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
@@ -185,7 +187,10 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 		"note_ids": selected.NoteIDs, "notes": selected.Notes, "style_profile_id": selected.StyleProfileID, "style_profile": selected.StyleProfile,
 		"previous_truth": continuity.Truth, "previous_memory": continuity.Memory,
 		"previous_chapters": continuity.Chapters,
-		"message_id":        message.ID,
+		"post_write_context": buildPostWriteContext(chapters, chapterNumber, settings, project),
+		"retrieval_version":  1,
+		"retrieved_chapters": retrieveRelevantChapters(chapters, retrievalQuery(input.Content, chapters), chapterNumber, retrievalLimit),
+		"message_id":         message.ID,
 	}
 	if imitation != nil {
 		snapshotFields["long_imitation"] = imitation
@@ -252,6 +257,7 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		LongImitation        *LongImitationCreation `json:"long_imitation"`
 		AgentContractVersion int                    `json:"agent_contract_version"`
 		ReviewCycleVersion   int                    `json:"review_cycle_version"`
+		HookHealthVersion    int                    `json:"hook_health_version"`
 		Settings             *ProjectSettings       `json:"project_settings"`
 		StyleProfile         *string                `json:"style_profile"`
 		Notes                []ProjectNote          `json:"notes"`
@@ -268,6 +274,9 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		PreviousChapters     []PreviousChapter      `json:"previous_chapters"`
 		PreviousTruth        json.RawMessage        `json:"previous_truth"`
 		PreviousMemory       json.RawMessage        `json:"previous_memory"`
+		PostWriteContext     *PostWriteContext      `json:"post_write_context"`
+		RetrievalVersion     int                    `json:"retrieval_version"`
+		RetrievedChapters    []RetrievedChapter     `json:"retrieved_chapters"`
 	}
 	if err := json.Unmarshal(run.PromptSnapshot, &prompt); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "创作输入快照损坏", err)
@@ -343,6 +352,8 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		OwnerUsername: owner, Run: run, Project: project, Session: session,
 		UserMessage: prompt.UserMessage, ChapterNumber: prompt.ChapterNumber,
 		PreviousTruth: prompt.PreviousTruth, PreviousMemory: prompt.PreviousMemory, PreviousChapters: prompt.PreviousChapters, Runtime: s.runtime,
+		PostWrite: postWriteContextOf(prompt.PostWriteContext), HookHealthVersion: prompt.HookHealthVersion,
+		RetrievedChapters: prompt.RetrievedChapters, RetrievalVersion: prompt.RetrievalVersion,
 		ModeInputs: prompt.ModeInputs, StyleProfile: styleProfile, Rules: settings.Rules, Notes: prompt.Notes,
 		Checkpoint:          prompt.Checkpoint && len(prompt.ConfirmedFoundation) == 0,
 		ConfirmedFoundation: prompt.ConfirmedFoundation,
@@ -899,6 +910,32 @@ func (s *Service) GetDashboard(ctx context.Context, owner, projectID string) (Da
 	return dashboard, nil
 }
 
+// GetHookHealth 基于最新章节结算快照计算伏笔健康，不调用模型、不写库。
+func (s *Service) GetHookHealth(ctx context.Context, owner, projectID string) (HookHealthReport, error) {
+	if s == nil || s.store == nil {
+		return HookHealthReport{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
+	if _, err := s.store.GetProject(ctx, owner, projectID); err != nil {
+		return HookHealthReport{}, err
+	}
+	chapters, err := s.store.ListChapters(ctx, owner, projectID)
+	if err != nil {
+		return HookHealthReport{}, err
+	}
+	latest := 0
+	for _, chapter := range chapters {
+		if chapter.Number > latest {
+			latest = chapter.Number
+		}
+	}
+	continuity, err := s.loadContinuity(ctx, owner, projectID, chapters)
+	if err != nil {
+		return HookHealthReport{}, err
+	}
+	return analyzeHookHealth(hooksFromTruth(continuity.Truth), latest), nil
+}
+
 func normalizeRules(rules []string) []string {
 	normalized := make([]string, 0, len(rules))
 	for _, rule := range rules {
@@ -914,6 +951,8 @@ type ExportDocument struct {
 	Filename    string
 	ContentType string
 	Content     string
+	// Binary 用于 epub 等二进制格式；非空时优先于 Content。
+	Binary []byte
 }
 
 // ExportProject renders every stored chapter in reading order.
@@ -945,8 +984,19 @@ func (s *Service) ExportProject(ctx context.Context, owner, projectID, format st
 		normalized = "markdown"
 	case "txt", "text":
 		normalized = "txt"
+	case "epub":
+		normalized = "epub"
 	default:
-		return ExportDocument{}, &DomainError{Code: ErrInputRequired, Message: "导出格式仅支持 markdown 或 txt"}
+		return ExportDocument{}, &DomainError{Code: ErrInputRequired, Message: "导出格式仅支持 markdown、txt 或 epub"}
+	}
+	if normalized == "epub" {
+		ordered := append([]Chapter(nil), chapters...)
+		sort.Slice(ordered, func(i, j int) bool { return ordered[i].Number < ordered[j].Number })
+		binary, e := buildEPUB(project.Title, ordered)
+		if e != nil {
+			return ExportDocument{}, &DomainError{Code: ErrPersistenceFailed, Message: "生成 epub 失败", Cause: e}
+		}
+		return ExportDocument{Filename: sanitizeExportFilename(project.Title) + ".epub", ContentType: "application/epub+zip", Binary: binary}, nil
 	}
 	var builder strings.Builder
 	if normalized == "markdown" {

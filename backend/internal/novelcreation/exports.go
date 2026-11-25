@@ -45,10 +45,10 @@ func (s *Service) PersistExport(ctx context.Context, owner, project, format stri
 		if e != nil {
 			return e
 		}
-		sum := sha256.Sum256([]byte(doc.Content))
+		sum := sha256.Sum256(exportPayload(doc))
 		id := novelID("export")
 		ownerHash := sha256.Sum256([]byte(owner))
-		record = exportRecord{ID: id, Filename: doc.Filename, ContentType: doc.ContentType, Status: "uploading", CreatedAt: time.Now().UTC(), Sources: chapterSources(ch), Object: storedDocumentObject{Key: "novel-exports/" + hex.EncodeToString(ownerHash[:12]) + "/" + project + "/" + id, ContentType: doc.ContentType, Size: int64(len(doc.Content)), SHA256: hex.EncodeToString(sum[:])}}
+		record = exportRecord{ID: id, Filename: doc.Filename, ContentType: doc.ContentType, Status: "uploading", CreatedAt: time.Now().UTC(), Sources: chapterSources(ch), Object: storedDocumentObject{Key: "novel-exports/" + hex.EncodeToString(ownerHash[:12]) + "/" + project + "/" + id, ContentType: doc.ContentType, Size: int64(len(exportPayload(doc))), SHA256: hex.EncodeToString(sum[:])}}
 		return putContent(ctx, tx, owner, project, "export", id, record.Status, time.Now().UTC().Add(3*time.Minute), record)
 	})
 	if err != nil {
@@ -56,7 +56,7 @@ func (s *Service) PersistExport(ctx context.Context, owner, project, format stri
 	}
 	uploadCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	err = s.documents.Put(uploadCtx, DocumentObject(record.Object), strings.NewReader(doc.Content))
+	err = s.documents.Put(uploadCtx, DocumentObject(record.Object), strings.NewReader(string(exportPayload(doc))))
 	if err != nil {
 		record.Status = "failed"
 		record.Error = "导出文件上传失败"
@@ -96,7 +96,21 @@ func (s *Service) DownloadExport(ctx context.Context, owner, project, id string)
 	if int64(len(b)) != v.Object.Size || hex.EncodeToString(sum[:]) != v.Object.SHA256 {
 		return ExportDocument{}, inputError("导出文件校验失败")
 	}
-	return ExportDocument{Filename: v.Filename, ContentType: v.ContentType, Content: string(b)}, nil
+	document := ExportDocument{Filename: v.Filename, ContentType: v.ContentType}
+	if v.ContentType == "application/epub+zip" {
+		document.Binary = b
+	} else {
+		document.Content = string(b)
+	}
+	return document, nil
+}
+
+// exportPayload 统一文本与二进制导出的落盘字节。
+func exportPayload(doc ExportDocument) []byte {
+	if doc.Binary != nil {
+		return doc.Binary
+	}
+	return []byte(doc.Content)
 }
 func (s *Service) GetShortResult(ctx context.Context, owner, runID string) (ChapterVersion, error) {
 	run, e := s.store.GetRun(ctx, owner, runID)

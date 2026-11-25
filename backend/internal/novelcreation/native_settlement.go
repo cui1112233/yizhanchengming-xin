@@ -46,12 +46,7 @@ func mergeNativeSettlement(previous json.RawMessage, delta truthSettlementOutput
 		Facts:            mergeSettlementRows(old.Facts, delta.Facts, func(v settledFact) string { return v.ID }, func(_, new settledFact) settledFact { return new }),
 		CharacterChanges: mergeSettlementRows(old.CharacterChanges, delta.CharacterChanges, func(v settledCharacterChange) settledCharacterChange { return v }, func(_, new settledCharacterChange) settledCharacterChange { return new }),
 		Timeline:         mergeSettlementRows(old.Timeline, delta.Timeline, func(v settledTimelineEvent) settledTimelineEvent { return v }, func(_, new settledTimelineEvent) settledTimelineEvent { return new }),
-		Foreshadowing: mergeSettlementRows(old.Foreshadowing, delta.Foreshadowing, func(v settledForeshadowing) string { return v.Thread }, func(old, new settledForeshadowing) settledForeshadowing {
-			if old.Status == "resolved" {
-				new.Status = "resolved"
-			}
-			return new
-		}),
+		Foreshadowing:    mergeForeshadowingBookkeeping(old.Foreshadowing, delta.Foreshadowing, chapter),
 	}
 	if e := validateSettlement(merged); e != nil {
 		return delta, nil, &DomainError{Code: ErrInvalidOutput, Message: "结算合并校验失败，已停止保存", Cause: e}
@@ -65,8 +60,39 @@ func mergeNativeSettlement(previous json.RawMessage, delta truthSettlementOutput
 	return merged, snapshot, e
 }
 
-func uniqueSettlementIdentifiers(value truthSettlementOutput) error {
-	seen := map[string]bool{}
+// mergeForeshadowingBookkeeping 在合并结算伏笔时维护健康分析所需的章号账本。
+// 模型只输出 thread/status；startChapter、lastAdvancedChapter 与推进次数由服务端
+// 按真实章节号记录。历史快照缺章号时保持 0，健康分析会把它标为来源未知而不是
+// 当作刚埋下的伏笔。
+func mergeForeshadowingBookkeeping(old, delta []settledForeshadowing, chapter int) []settledForeshadowing {
+	known := map[string]bool{}
+	for _, hook := range old {
+		known[strings.TrimSpace(hook.Thread)] = true
+	}
+	fresh := make([]settledForeshadowing, len(delta))
+	copy(fresh, delta)
+	for i := range fresh {
+		if !known[strings.TrimSpace(fresh[i].Thread)] && fresh[i].StartChapter == 0 {
+			fresh[i].StartChapter = chapter
+		}
+	}
+	return mergeSettlementRows(old, fresh, func(v settledForeshadowing) string { return v.Thread }, func(prev, next settledForeshadowing) settledForeshadowing {
+		if prev.Status == "resolved" {
+			next.Status = "resolved"
+			next.LastAdvancedChapter = prev.LastAdvancedChapter
+		}
+		if prev.StartChapter > 0 {
+			next.StartChapter = prev.StartChapter
+		}
+		if next.Status == "open" && prev.Status != "resolved" {
+			next.LastAdvancedChapter = chapter
+			next.AdvancingCount = prev.AdvancingCount + 1
+		}
+		return next
+	})
+}
+
+func uniqueSettlementIdentifiers(value truthSettlementOutput) error {	seen := map[string]bool{}
 	for _, fact := range value.Facts {
 		if seen[fact.ID] {
 			return fmt.Errorf("结算事实编号重复：%s，已停止保存", fact.ID)

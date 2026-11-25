@@ -113,6 +113,10 @@ export function getNovelCreationDashboard(projectId) {
   return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/dashboard`);
 }
 
+export function getNovelCreationHooks(projectId, signal) {
+  return novelProjectRequest(projectId, '/hooks', undefined, { signal });
+}
+
 export function listNovelCreationSchedules(projectId) {
   return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules`);
 }

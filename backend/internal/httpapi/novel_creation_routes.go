@@ -351,6 +351,14 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"dashboard": dashboard})
 	})
+	handle("GET /api/novel-creation/projects/{projectID}/hooks", func(w http.ResponseWriter, req *http.Request, owner string) {
+		health, err := service.GetHookHealth(req.Context(), owner, req.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"hooks": health})
+	})
 	handle("GET /api/novel-creation/projects/{projectID}/schedules", func(w http.ResponseWriter, req *http.Request, owner string) {
 		schedules, err := service.ListSchedules(req.Context(), owner, req.PathValue("projectID"))
 		if err != nil {

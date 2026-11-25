@@ -214,6 +214,10 @@ func registerNovelContentRoutes(handle func(string, func(http.ResponseWriter, *h
 		}
 		w.Header().Set("Content-Type", v.ContentType)
 		w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(v.Filename))
+		if v.Binary != nil {
+			w.Write(v.Binary)
+			return
+		}
 		w.Write([]byte(v.Content))
 	}
 	handle("GET /api/novel-creation/projects/{projectID}/exports/{exportID}", func(w http.ResponseWriter, r *http.Request, o string) {

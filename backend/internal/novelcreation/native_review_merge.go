@@ -13,9 +13,8 @@ func mergePostWriteIntoAudit(input RunContext, plan chapterPlanOutput, content s
 	if input.ReviewCycleVersion < 1 || input.Agent == nil || !input.Agent.EnablePostWrite {
 		return audit, raw, nil
 	}
-	// PreviousChapters contains bounded endings, not full source text: never pass
-	// those into whole-chapter duplicate checks or pretend that check was done.
-	checks := ValidatePostWrite(content, PostWriteInput{Title: plan.Title})
+	// 使用冻结的跨章资料执行全部确定性检查；缺资料的项必须在结果里标为未检查。
+	checks := ValidatePostWrite(content, input.PostWrite.postWriteInput(plan.Title))
 	seen := map[string]bool{}
 	for _, i := range audit.Issues {
 		seen[i.ID] = true
@@ -49,6 +48,7 @@ func mergePostWriteIntoAudit(input RunContext, plan chapterPlanOutput, content s
 	payload["issues"], _ = json.Marshal(audit.Issues)
 	payload["passed"], _ = json.Marshal(audit.Passed)
 	payload["post_write"], _ = json.Marshal(checks)
+	payload["post_write_status"], _ = json.Marshal(input.PostWrite.postWriteStatus())
 	merged, e := json.Marshal(payload)
 	return audit, merged, e
 }
