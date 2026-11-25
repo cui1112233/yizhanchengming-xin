@@ -54,7 +54,7 @@ export default function MemberCenterPage() {
     <div className="ac-member-layout">
       <div className="ac-member-main">
         <section className="member-glass-card" aria-label="个人身份卡">
-          <img className="member-glass-card-art" src="/assets/member-center/glass-ribbon-card.png" alt="" aria-hidden="true" />
+          <img className="member-glass-card-art" src="/assets/member-center/glass-ribbon-card-transparent.png" alt="" aria-hidden="true" />
           <span className="member-glass-brand">一战晟铭</span>
           <div className="member-glass-profile">
             <Avatar className="member-glass-avatar" src={self.avatarUrl}>{avatarFallback(self)}</Avatar>
