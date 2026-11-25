@@ -39,6 +39,45 @@ func TestSplitIntoBatchesByEpisodesFallback(t *testing.T) {
 	}
 }
 
+func TestSplitIntoBatchesRecognizesLuoshuiChapterUnits(t *testing.T) {
+	content := strings.Join([]string{
+		"前言文字",
+		"第一章 开场", "甲",
+		"第十二回 回目", "乙",
+		"第三节 一节", "丙",
+		"第四篇 一篇", "丁",
+		"第五卷 一卷", "戊",
+		"第六部 一部", "己",
+		"## Chapter 7 英文", "庚",
+	}, "\n")
+	chunks := SplitIntoBatches(content, 1)
+	if len(chunks) != 7 {
+		t.Fatalf("chunks = %d, want 7: %+v", len(chunks), chunks)
+	}
+	if !strings.HasPrefix(chunks[0], "前言文字") || !strings.Contains(chunks[0], "第一章 开场") {
+		t.Fatalf("前言丢失: %q", chunks[0])
+	}
+	for index, want := range []string{"第十二回", "第三节", "第四篇", "第五卷", "第六部", "Chapter 7"} {
+		if !strings.Contains(chunks[index+1], want) {
+			t.Errorf("chunk %d missing %q: %q", index+1, want, chunks[index+1])
+		}
+	}
+}
+
+func TestSplitIntoBatchesRecognizesEpisodeUnits(t *testing.T) {
+	content := "前言。\n第三集 A\n正文一\nEpisode 2 B\n正文二"
+	chunks := SplitIntoBatches(content, 1)
+	if len(chunks) != 2 {
+		t.Fatalf("chunks = %d, want 2: %+v", len(chunks), chunks)
+	}
+	if !strings.HasPrefix(chunks[0], "前言。") || !strings.Contains(chunks[0], "第三集 A") {
+		t.Fatalf("chunk0 = %q", chunks[0])
+	}
+	if !strings.Contains(chunks[1], "Episode 2 B") || !strings.Contains(chunks[1], "正文二") {
+		t.Fatalf("chunk1 = %q", chunks[1])
+	}
+}
+
 const charactersJSON = `{
   "characters": [
     {"name": "顾苒苒", "颜值定位": "甜美毒舌女主", "出现集数": "第01-03集", "identity": "主角，倔强", "prompt": "甜美毒舌女主的完整提示词", "voice": "清亮少女音【标签：甜妹音】", "tag": "主角"},

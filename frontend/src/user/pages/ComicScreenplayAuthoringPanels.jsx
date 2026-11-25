@@ -3,6 +3,8 @@ import { BookOpen, Check, Download, Plus, Save, Send, Sparkles, Trash2, Users } 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { comicStageLocation } from './comic-screenplay-stages.js';
 import { exportChapterText } from './comic-screenplay-chapter-export.js';
+import { chapterHeadingMatches, splitSourceChapters } from './comic-screenplay-episode-headings.js';
+import { loadComicScreenplayWorkspace } from '../../shared/api/comicScreenplay.js';
 import { applyComicProposal, generateComicChapter, getComicAssistant, getComicChapters, getComicDisplay, getComicTeam, planComicChapters, saveComicChapters, saveComicDisplay, saveComicTeam, sendComicAssistant } from '../../shared/api/comicScreenplayWorkflow.js';
 
 function errorMessage(error){message.error(error.message||'操作失败，请稍后重试');}
@@ -24,8 +26,20 @@ export function ComicChaptersPanel({projectId,onSaved,readOnly=false,canGenerate
   async function act(kind,action){if(busy)return;setBusy(kind);try{const next=await action();setData(next);setDirty(false);await onSaved?.();message.success(kind==='save'?'章节已保存':'处理完成，结果已保存');}catch(err){errorMessage(err);}finally{setBusy('');}}
   const save=()=>!readOnly&&act('save',()=>saveComicChapters(projectId,{expected_revision:data?.state?.revision||0,chapters}));
   function exportCurrent(){if(!active)return;try{const fileName=exportChapterText(active,chapters.findIndex(item=>item.id===selected));message.success(`已导出：${fileName}`);}catch(err){errorMessage(err);}}
+  async function splitByHeading(){
+    if(readOnly||busy||dirty||loading||error)return;
+    setBusy('split');
+    try{
+      const workspace=await loadComicScreenplayWorkspace(projectId);
+      const source=String(workspace?.project?.source_text||'');
+      if(!source.trim()){message.warning('项目还没有保存原文，请先在剧本页保存原文');return;}
+      if(!chapterHeadingMatches(source).length){message.warning('没有识别到章节标题（第N章/回/节/篇/卷/部/集、Chapter/Episode）');return;}
+      const rows=splitSourceChapters(source).map((row,index)=>({id:`chapter_${Date.now()}_${index}_${Math.random().toString(36).slice(2,6)}`,title:row.title||`第${index+1}章`,source_text:row.sourceText,script_text:''}));
+      Modal.confirm({title:`按标题拆分 ${rows.length} 章`,content:'将用项目原文替换当前章节列表，未保存的章节修改会丢失。拆分后仍需点击「保存章节」。',okText:'替换并拆分',cancelText:'取消',onOk:()=>{setChapters(rows);setSelected(rows[0]?.id||'');setDirty(true);message.success(`已识别 ${rows.length} 章，请检查后保存`);}});
+    }catch(err){errorMessage(err);}finally{setBusy('');}
+  }
   return <div className="comic-chapters-panel"><ResourceError error={error} retry={refresh}/><Spin spinning={loading}>
-    <div className="comic-panel-heading"><div><h3>章节与分集</h3><p>分别管理原文和剧本，生成结果会保存为工作台的新剧本版本。</p></div><Space><Button icon={<Download size={14}/>} disabled={!active||!String(active.source_text||'').trim()||!!busy} title={active?.source_text?.trim()?'导出本章原文为 TXT（剧本不走本章导出，剧本用复制或剧本合集导出）':'本章还没有原文，没有可导出的内容'} onClick={exportCurrent}>导出本章</Button><Button icon={<Plus size={14}/>} disabled={readOnly||!!busy} onClick={()=>{const id=`chapter_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;setChapters(rows=>[...rows,{id,title:`第${rows.length+1}章`,source_text:'',script_text:''}]);setSelected(id);setDirty(true);}}>新增章节</Button><Button onClick={refresh} disabled={!!busy||dirty}>刷新章节</Button><Button type="primary" icon={<Save size={14}/>} disabled={readOnly||!dirty||!!busy||loading||!!error} loading={busy==='save'} onClick={save}>保存章节</Button></Space></div>
+    <div className="comic-panel-heading"><div><h3>章节与分集</h3><p>分别管理原文和剧本，生成结果会保存为工作台的新剧本版本。</p></div><Space><Button icon={<Download size={14}/>} disabled={!active||!String(active.source_text||'').trim()||!!busy} title={active?.source_text?.trim()?'导出本章原文为 TXT（剧本不走本章导出，剧本用复制或剧本合集导出）':'本章还没有原文，没有可导出的内容'} onClick={exportCurrent}>导出本章</Button><Button icon={<Plus size={14}/>} disabled={readOnly||!!busy} onClick={()=>{const id=`chapter_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;setChapters(rows=>[...rows,{id,title:`第${rows.length+1}章`,source_text:'',script_text:''}]);setSelected(id);setDirty(true);}}>新增章节</Button><Button icon={<BookOpen size={14}/>} disabled={readOnly||!!busy||dirty||loading||!!error} loading={busy==='split'} onClick={splitByHeading} title="用项目已保存原文按章节标题拆分">按标题拆分</Button><Button onClick={refresh} disabled={!!busy||dirty}>刷新章节</Button><Button type="primary" icon={<Save size={14}/>} disabled={readOnly||!dirty||!!busy||loading||!!error} loading={busy==='save'} onClick={save}>保存章节</Button></Space></div>
     <div className="comic-chapter-layout"><aside>{chapters.map((item,index)=><button type="button" key={item.id} className={selected===item.id?'is-active':''} onClick={()=>setSelected(item.id)}><BookOpen size={15}/><span>{item.title||`第${index+1}章`}</span><small>{[...String(item.source_text||'')].length} 字</small></button>)}{!chapters.length?<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有章节"/>:null}</aside><section>{active?<>
       <div className="comic-chapter-title"><Input value={active.title} disabled={readOnly} placeholder="章节标题" onChange={event=>patch({title:event.target.value})}/><Popconfirm title="移除此章节？保存后生效" onConfirm={()=>{setChapters(rows=>rows.filter(item=>item.id!==selected));setSelected(chapters.find(item=>item.id!==selected)?.id||'');setDirty(true);}}><Button aria-label="移除当前章节" danger disabled={readOnly} icon={<Trash2 size={15}/>}/></Popconfirm></div>
       <div className="comic-chapter-editors"><label>章节原文<Input.TextArea rows={15} disabled={readOnly} value={active.source_text||''} onChange={event=>patch({source_text:event.target.value})} placeholder="输入或粘贴这一章的原文"/></label><label>本章剧本<Input.TextArea rows={15} disabled={readOnly} value={active.script_text||''} onChange={event=>patch({script_text:event.target.value})} placeholder="可以手工编辑，也可以生成后继续修改"/></label></div>

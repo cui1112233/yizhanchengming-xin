@@ -310,8 +310,9 @@ func (s *AssetService) resolveChunks(ctx context.Context, req AssetRequest) ([]s
 }
 
 var (
-	chapterHeadingRe      = regexp.MustCompile(`(?m)^[ \t]*第[0-9一二三四五六七八九十百千万两]+[章回][ \t]*[^\n]*$`)
-	batchEpisodeHeadingRe = regexp.MustCompile(`(?m)^[ \t]*#[ \t]*第[0-9]+[ \t]*集[ \t]*[:：]?[^\n]*$`)
+	// 洛水章节识别：章/回/节/篇/卷/部 + Chapter；集与 Episode 作为分集单位单独优先于正文切分。
+	chapterHeadingRe      = regexp.MustCompile(`(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:第[ \t]*[0-9〇零一二三四五六七八九十百千万两]+[ \t]*(?:章|回|节|篇|卷|部)|Chapter[ \t]+[0-9]+)[ \t]*[^\n]*$`)
+	batchEpisodeHeadingRe = regexp.MustCompile(`(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:第[ \t]*[0-9〇零一二三四五六七八九十百千万两]+[ \t]*集|Episode[ \t]+[0-9]+)[ \t]*[^\n]*$`)
 )
 
 // SplitIntoBatches 优先按「第N章」切分，其次按「# 第N集」，都没有则整段一批。
@@ -327,11 +328,15 @@ func SplitIntoBatches(content string, size int) []string {
 		}
 		units := make([]string, 0, len(positions))
 		for i, position := range positions {
-			end := len(content)
+			start, end := position[0], len(content)
+			// 第一个标题前的文字是作品前言，必须并入第一块，不能静默丢弃。
+			if i == 0 {
+				start = 0
+			}
 			if i+1 < len(positions) {
 				end = positions[i+1][0]
 			}
-			units = append(units, strings.TrimSpace(content[position[0]:end]))
+			units = append(units, strings.TrimSpace(content[start:end]))
 		}
 		chunks := make([]string, 0, (len(units)+size-1)/size)
 		for start := 0; start < len(units); start += size {

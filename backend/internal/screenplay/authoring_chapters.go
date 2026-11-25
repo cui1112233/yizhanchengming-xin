@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var chapterEpisodeHeading = regexp.MustCompile(`(?m)^#\s*第\s*\d+\s*集[^\n]*\n?`)
+var chapterEpisodeHeading = regexp.MustCompile(`(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:第[ \t]*[0-9〇零一二三四五六七八九十百千万两]+[ \t]*集|Episode[ \t]+[0-9]+)[^\n]*\n?`)
 var chapterSceneHeading = regexp.MustCompile(`(?m)^##\s*\d+\s*-\s*(\d+)\s*[:：]`)
 
 func chapterCollectionText(chapters []Chapter) (string, error) {

@@ -28,6 +28,23 @@ func TestEpisodeHeadingParityPreservesPreambleAndEmptyEpisodes(t *testing.T) {
 		t.Fatalf("tail=%q", rows[2].Content)
 	}
 }
+func TestEpisodeHeadingParityEnglishEpisode(t *testing.T) {
+	rows := splitEpisodes("前言\nEpisode 1: Start\nA\nEpisode 2\nB\nChapter 3\nC")
+	if len(rows) != 2 {
+		t.Fatalf("episodes=%+v, want 2", rows)
+	}
+	for i, no := range []int{1, 2} {
+		if rows[i].No != no {
+			t.Errorf("episode %d=%d, want %d", i, rows[i].No, no)
+		}
+	}
+	if !strings.HasPrefix(rows[0].Content, "前言\nEpisode 1: Start") || !strings.Contains(rows[0].Content, "A") {
+		t.Fatalf("preamble/body lost: %q", rows[0].Content)
+	}
+	if !strings.HasPrefix(rows[1].Content, "Episode 2") || !strings.Contains(rows[1].Content, "Chapter 3") {
+		t.Fatalf("chapter heading must stay in episode body: %q", rows[1].Content)
+	}
+}
 func TestEpisodeHeadingParityChineseNumbers(t *testing.T) {
 	rows := splitEpisodes("第十一集\na\n第两百零三集：标题\nb\n第 二〇四 集\nc")
 	if len(rows) != 3 {
@@ -73,6 +90,7 @@ func TestEpisodeHeadingParityEmptyBodyRejectedBeforeAnyGeneration(t *testing.T) 
 		{"batch-preflight", "第1集\n完整剧本正文。\n第二集", 0, "第2集"},
 		{"markdown-batch-preflight", "# 第1集\n完整剧本正文。\n## 第2集：仅标题", 0, "第2集"},
 		{"preamble-empty-first", "前言。\n第一集\n第二集\n完整剧本正文。", 0, "第1集"},
+		{"english-empty", "前言。\nEpisode 2", 2, "第2集"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

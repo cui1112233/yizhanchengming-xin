@@ -178,7 +178,7 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	for _, episode := range episodes {
 		body := episode.Content
 		for _, position := range storyboardEpisodeHeadingRe.FindAllStringSubmatchIndex(body, -1) {
-			if _, ok := storyboardEpisodeNumber(body[position[2]:position[3]]); ok {
+			if _, ok := storyboardEpisodeHeadingNumber(body, position); ok {
 				body = body[position[1]:]
 				break
 			}
@@ -426,9 +426,21 @@ func (s *StoryboardService) resolveEpisodes(ctx context.Context, req StoryboardR
 	return episodes, nil
 }
 
-// A title needs a line of its own and a separator after 集; chapter headings
-// and narrative mentions such as 第2集会再见 remain body text.
-var storyboardEpisodeHeadingRe = regexp.MustCompile(`(?m)^[ \t]*(?:#{1,6}[ \t]*)?第[ \t]*([0-9〇零一二三四五六七八九十百千万两]+)[ \t]*集([ \t：:·—\-][^\r\n]*)?\r?$`)
+// A title needs a line of its own and a separator after 集；English Episode N 等价。
+// Chapter headings and narrative mentions such as 第2集会再见 remain body text.
+var storyboardEpisodeHeadingRe = regexp.MustCompile(`(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:第[ \t]*([0-9〇零一二三四五六七八九十百千万两]+)[ \t]*集|Episode[ \t]+([0-9]+))([ \t：:·—\-][^\r\n]*)?\r?$`)
+
+// storyboardEpisodeHeadingNumber 从匹配位置取集号：中文集号在第 1 组，Episode 在第 2 组。
+func storyboardEpisodeHeadingNumber(content string, position []int) (int, bool) {
+	if position[2] >= 0 {
+		return storyboardEpisodeNumber(content[position[2]:position[3]])
+	}
+	if position[4] >= 0 {
+		value, err := strconv.Atoi(content[position[4]:position[5]])
+		return value, err == nil && value > 0
+	}
+	return 0, false
+}
 
 func storyboardEpisodeNumber(text string) (int, bool) {
 	if number, err := strconv.ParseInt(text, 10, 64); err == nil {
@@ -487,13 +499,13 @@ func splitEpisodes(content string) []episodeInput {
 	positions := storyboardEpisodeHeadingRe.FindAllStringSubmatchIndex(content, -1)
 	valid := make([][]int, 0, len(positions))
 	for _, position := range positions {
-		if _, ok := storyboardEpisodeNumber(content[position[2]:position[3]]); ok {
+		if _, ok := storyboardEpisodeHeadingNumber(content, position); ok {
 			valid = append(valid, position)
 		}
 	}
 	episodes := make([]episodeInput, 0, len(valid))
 	for i, position := range valid {
-		number, _ := storyboardEpisodeNumber(content[position[2]:position[3]])
+		number, _ := storyboardEpisodeHeadingNumber(content, position)
 		start, end := position[0], len(content)
 		if i == 0 {
 			start = 0
