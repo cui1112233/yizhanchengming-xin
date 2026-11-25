@@ -382,7 +382,7 @@ func TestWorkerPipelineRecoveryReplaysRepairAndAuditRounds(t *testing.T) {
 	provider := &queuedPipelineProvider{responses: []string{`{"title":`, foundationJSON, chapterPlanJSON, draftJSON, failedAuditJSON, revisedJSON, passedAuditJSON, settlementJSON, memoryJSON}}
 	pipeline := pipelineWithProvider(provider)
 	ctx := context.WithValue(context.Background(), journalKey{}, &callJournal{f.store, l})
-	input := RunContext{OwnerUsername: "alice", Run: r, Project: f.project, Session: f.session, UserMessage: f.sendInput("worker").Content, ChapterNumber: 1, PreviousTruth: json.RawMessage(`{}`), PreviousMemory: json.RawMessage(`{}`), PreviousChapters: []PreviousChapter{}, Rules: []string{}, Runtime: f.runtime, MaxRevisionRounds: 2}
+	input := RunContext{OwnerUsername: "alice", Run: r, Project: f.project, Session: f.session, UserMessage: f.sendInput("worker").Content, ChapterNumber: 1, PreviousTruth: json.RawMessage(`{}`), PreviousMemory: json.RawMessage(`{}`), PreviousChapters: []PreviousChapter{}, Rules: []string{}, Runtime: f.runtime, MaxRevisionRounds: 2, WriterRuleVersion: 1}
 	if _, err = pipeline.Run(ctx, input, &recordingEventSink{}); err != nil {
 		t.Fatal(err)
 	}

@@ -181,6 +181,7 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 		"review_cycle_version":     4,
 		"hook_health_version":      1,
 		"state_validation_version": 1,
+		"writer_rule_version":      1,
 		"source_type":              input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
@@ -260,6 +261,7 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		ReviewCycleVersion     int                    `json:"review_cycle_version"`
 		HookHealthVersion      int                    `json:"hook_health_version"`
 		StateValidationVersion int                    `json:"state_validation_version"`
+		WriterRuleVersion      int                    `json:"writer_rule_version"`
 		Settings               *ProjectSettings       `json:"project_settings"`
 		StyleProfile           *string                `json:"style_profile"`
 		Notes                  []ProjectNote          `json:"notes"`
@@ -356,8 +358,8 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		PreviousTruth: prompt.PreviousTruth, PreviousMemory: prompt.PreviousMemory, PreviousChapters: prompt.PreviousChapters, Runtime: s.runtime,
 		PostWrite: postWriteContextOf(prompt.PostWriteContext), HookHealthVersion: prompt.HookHealthVersion,
 		RetrievedChapters: prompt.RetrievedChapters, RetrievalVersion: prompt.RetrievalVersion,
-		StateValidationVersion: prompt.StateValidationVersion,
-		ModeInputs:             prompt.ModeInputs, StyleProfile: styleProfile, Rules: settings.Rules, Notes: prompt.Notes,
+		StateValidationVersion: prompt.StateValidationVersion, WriterRuleVersion: prompt.WriterRuleVersion,
+		ModeInputs: prompt.ModeInputs, StyleProfile: styleProfile, Rules: settings.Rules, Notes: prompt.Notes,
 		Checkpoint:          prompt.Checkpoint && len(prompt.ConfirmedFoundation) == 0,
 		ConfirmedFoundation: prompt.ConfirmedFoundation,
 		KnowledgeMaterials:  prompt.KnowledgeMaterials,

@@ -62,7 +62,10 @@ type RunContext struct {
 	// StateValidationVersion >= 1 adds the settlement validator call that the
 	// reference pipeline runs between settlement and memory indexing.
 	StateValidationVersion int
-	Runtime                Runtime
+	// WriterRuleVersion >= 1 appends the ported writer craft rules to the
+	// chapter-draft system prompt. Old runs never see these blocks.
+	WriterRuleVersion int
+	Runtime           Runtime
 	// ModeInputs is the validated mode-specific contract payload.
 	ModeInputs map[string]string
 	// StyleProfile and Rules are project-level writing constraints injected into
@@ -142,8 +145,16 @@ type chapterPlanOutput struct {
 	TargetWords   int    `json:"targetWords"`
 }
 
+type preWriteCheckRow struct {
+	Item   string `json:"item"`
+	Record string `json:"record"`
+	Note   string `json:"note,omitempty"`
+}
+
 type chapterDraftOutput struct {
-	Content string `json:"content"`
+	PreWriteCheck []preWriteCheckRow `json:"preWriteCheck"`
+	Title         string             `json:"title"`
+	Content       string             `json:"content"`
 }
 
 type chapterAuditOutput struct {
@@ -381,10 +392,25 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		step:        RunWriting,
 		userPayload: draftPayload,
 		temperature: 0.75, maxTokens: 12000,
-		validate: func() error { return requireText("content", draft.Content) },
+		validate: func() error {
+			if e := requireText("content", draft.Content); e != nil {
+				return e
+			}
+			if e := validatePreWriteCheck(draft.PreWriteCheck); e != nil {
+				return e
+			}
+			draft.Title = normalizeDraftTitle(draft.Title)
+			return nil
+		},
 	}, &draft)
 	if err != nil {
 		return ChapterBundle{}, err
+	}
+	// 只有新任务采用写手标题；旧任务没有 PostWrite 快照，保持章节计划标题。
+	if input.WriterRuleVersion >= 1 {
+		if adopted := adoptDraftTitle(draft.Title, plan.Title, input.PostWrite.ExistingTitles); adopted != "" {
+			plan.Title = adopted
+		}
 	}
 
 	if err := p.emitStage(ctx, input, sink, RunNormalizing, "正在规范化章节正文", 45); err != nil {
@@ -567,7 +593,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	if err != nil {
 		return ChapterBundle{}, &DomainError{Code: ErrPersistenceFailed, Message: "failed to assemble chapter bundle", Cause: err}
 	}
-	if len(localChecks) > 0 || len(stateValidationRaw) > 0 {
+	if len(localChecks) > 0 || len(stateValidationRaw) > 0 || len(draft.PreWriteCheck) > 0 {
 		var snapshot map[string]json.RawMessage
 		if err = json.Unmarshal(bundle.RuntimeSnapshot, &snapshot); err != nil {
 			return ChapterBundle{}, err
@@ -577,6 +603,11 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		}
 		if len(stateValidationRaw) > 0 {
 			snapshot["stateValidation"] = stateValidationRaw
+		}
+		if len(draft.PreWriteCheck) > 0 {
+			if snapshot["preWriteCheck"], err = json.Marshal(draft.PreWriteCheck); err != nil {
+				return ChapterBundle{}, err
+			}
 		}
 		bundle.RuntimeSnapshot, err = json.Marshal(snapshot)
 		if err != nil {
@@ -671,6 +702,18 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 		}
 		if input.Project.TargetChapterWords > 8000 && spec.maxTokens >= 12000 {
 			spec.maxTokens = input.Project.TargetChapterWords*2 + 4000
+		}
+	}
+	if input.WriterRuleVersion >= 1 && spec.definition.ID == novelprompt.ChapterDraft.ID {
+		blocks := BuildWriterRuleBlocks(WriterRuleInput{
+			Genre:         input.Project.Genre,
+			ChapterNumber: input.ChapterNumber,
+			TargetWords:   input.Project.TargetChapterWords,
+			HasHookDebt:   input.HookHealthVersion >= 1 && len(hooksFromTruth(input.PreviousTruth)) > 0,
+			HasRetrieval:  input.RetrievalVersion >= 1 && len(input.RetrievedChapters) > 0,
+		})
+		if len(blocks) > 0 {
+			spec.definition.SystemPrompt += "\n\n" + strings.Join(blocks, "\n\n")
 		}
 	}
 	if input.Agent != nil {
