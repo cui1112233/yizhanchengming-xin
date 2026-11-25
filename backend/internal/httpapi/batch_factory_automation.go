@@ -55,6 +55,7 @@ type BatchAutomationCoordinator struct {
 	textEnsure            func(context.Context, txt.EnsureRequest) (txt.EnsureResult, error)
 	textPublish           func(context.Context, txt.EnsureRequest, txt.Collection) (bool, error)
 	comicGenerate         func(context.Context, string, string, string) (batchfactoryv11.ComicCollection, error)
+	comicGenerationGroup  func(context.Context, string, batchfactoryv11.SettingsPatch) (string, error)
 	comicPublish          func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)
 	comicPublishRecord    func(context.Context, string, string, string) (N8ComicPublishRecord, bool)
 	comicPublishPreflight func(context.Context, string, string, string, batchfactoryv11.SettingsPatch) error
@@ -72,10 +73,8 @@ type BatchAutomationCoordinator struct {
 	dispatcherOnce       sync.Once
 	reaperOnce           sync.Once
 	sweepOnce            sync.Once
-	// comicRunSlots 限制同时进入“资产+页图”出图的书籍数量。出图是最贵的上游
-	// 环节，多本同时各开多页并发会把请求全堵在队列里，每本都缺几页、谁也无法
-	// 提交。改成按本串行后，一本出完并发布，下一本才开始出图。
-	// 队列按申请顺序（FIFO）发放槽位，避免不同批次的书互相插队导致饥饿。
+	// 同一共享出图池限制整本并发并保持 FIFO；不同上游的整本任务互不阻塞。
+	// 每个实际图片请求仍需经过 Redis 共享准入，不按用户扩大供应商额度。
 	comicRunSlots *automationComicSlotQueue
 }
 
@@ -87,6 +86,12 @@ type automationComicSlotQueue struct {
 	capacity int
 	active   int
 	waiters  []chan struct{}
+	groups   map[string]*automationComicSlotGroup
+}
+
+type automationComicSlotGroup struct {
+	queue *automationComicSlotQueue
+	refs  int
 }
 
 func newAutomationComicSlotQueue(capacity int) *automationComicSlotQueue {
@@ -94,6 +99,42 @@ func newAutomationComicSlotQueue(capacity int) *automationComicSlotQueue {
 		capacity = 1
 	}
 	return &automationComicSlotQueue{capacity: capacity}
+}
+
+func (q *automationComicSlotQueue) acquireGroup(ctx context.Context, group string, onWait func(int)) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if group == "" {
+		if err := q.acquire(ctx, onWait); err != nil {
+			return nil, err
+		}
+		return sync.OnceFunc(q.release), nil
+	}
+	q.mu.Lock()
+	if q.groups == nil {
+		q.groups = make(map[string]*automationComicSlotGroup)
+	}
+	g := q.groups[group]
+	if g == nil {
+		g = &automationComicSlotGroup{queue: newAutomationComicSlotQueue(q.capacity)}
+		q.groups[group] = g
+	}
+	g.refs++
+	q.mu.Unlock()
+	unref := func() {
+		q.mu.Lock()
+		defer q.mu.Unlock()
+		g.refs--
+		if g.refs == 0 {
+			delete(q.groups, group)
+		}
+	}
+	if err := g.queue.acquire(ctx, onWait); err != nil {
+		unref()
+		return nil, err
+	}
+	return sync.OnceFunc(func() { g.queue.release(); unref() }), nil
 }
 
 // acquire 阻塞直到拿到槽位。排队期间每分钟调用一次 onWait（用于写排队心跳，
@@ -4448,10 +4489,18 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 								persist()
 								entryLogMu.Unlock()
 							}
-							if err := c.comicRunSlots.acquire(generateCtx, writeQueueWait); err != nil {
+							group := ""
+							if c.comicGenerationGroup != nil {
+								// 无法解析通道时退回保守公共队列，具体配置错误由生成阶段报告。
+								if resolved, err := c.comicGenerationGroup(generateCtx, owner, effective); err == nil {
+									group = resolved
+								}
+							}
+							release, err := c.comicRunSlots.acquireGroup(generateCtx, group, writeQueueWait)
+							if err != nil {
 								return batchfactoryv11.ComicCollection{}, err
 							}
-							defer c.comicRunSlots.release()
+							defer release()
 							// 拿到槽位后记录一次并发预算，解释当前为什么是这个路数。
 							// 只在本书首次出图时记一条，重试不重复刷。
 							entryLogMu.Lock()

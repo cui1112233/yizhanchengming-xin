@@ -14,6 +14,7 @@ import (
 	"time"
 
 	_ "golang.org/x/image/webp"
+	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/imagecapacity"
 	"qiantie/backend/internal/yzcmusage"
 )
@@ -125,6 +126,23 @@ func resolveImageCapacityRequest(ctx context.Context, options RouterOptions, ide
 	}
 	params, _ := model["params"].(map[string]any)
 	return imagecapacity.Request{Endpoint: endpoint, Credential: credential, Model: target.ModelID, Size: size, Quality: modelString(params, "quality"), Resolution: modelString(params, "resolution"), References: references, Owner: identity.Username}, nil
+}
+
+// 与实际图片请求使用同一容量策略，不能按成员或 Key 拆分共享上游的整本队列。
+func resolveComicBookQueueGroup(ctx context.Context, options RouterOptions, owner string, settings batchfactoryv11.SettingsPatch) (string, error) {
+	request, err := resolveImageCapacityRequest(ctx, options, BridgeIdentity{Username: owner},
+		comicSettingString(settings, "imageModelId", ""), batchfactoryv11.EffectiveImageAspectRatio(settings), "", false)
+	if err != nil {
+		return "", err
+	}
+	policy, err := options.ImageCapacity.Resolve(ctx, request)
+	if err != nil {
+		return "", err
+	}
+	if policy.GroupKey != "" {
+		return "pool:" + policy.GroupKey, nil
+	}
+	return "account:" + policy.AccountKey, nil
 }
 
 func registerImageCapacityRoutes(root *http.ServeMux, auth BridgeAuth, options RouterOptions) {

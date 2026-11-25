@@ -224,6 +224,11 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator.SetComicBookGenerator(comicGenerator.generateBook)
 	}
 	if options.AutomationCoordinator != nil {
+		if options.ImageCapacity != nil {
+			options.AutomationCoordinator.comicGenerationGroup = func(ctx context.Context, owner string, settings batchfactoryv11.SettingsPatch) (string, error) {
+				return resolveComicBookQueueGroup(ctx, options, owner, settings)
+			}
+		}
 		if options.AutomationCoordinator.stages != nil {
 			options.AutomationCoordinator.stages.Production = batchProduction
 		}
