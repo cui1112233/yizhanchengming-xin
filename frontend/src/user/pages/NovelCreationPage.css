@@ -564,3 +564,23 @@ body:has(.novel-creation-page) .legacy-sidebar.collapsed :is(.legacy-nav-icon,.l
 .novel-word-trend > div { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 10px; flex: 1 0 auto; }
 .novel-word-trend span { display: block; width: 100%; min-width: 6px; border-radius: 2px 2px 0 0; background: var(--ant-color-primary, #1677ff); opacity: .75; }
 .novel-word-trend small { font-size: 9px; color: var(--text-secondary, #999); margin-top: 2px; }
+
+.novel-play-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+.novel-play-worlds { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.novel-play-worlds button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 12px; border: 1px solid var(--ant-color-border, #d9d9d9); border-radius: 8px; background: transparent; cursor: pointer; text-align: left; }
+.novel-play-worlds button.active { border-color: var(--ant-color-primary, #1677ff); background: color-mix(in srgb, var(--ant-color-primary, #1677ff) 8%, transparent); }
+.novel-play-worlds small { font-size: 11px; color: var(--text-secondary, #888); }
+.novel-play-stage { display: flex; flex-direction: column; gap: 10px; }
+.novel-play-stage > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.novel-play-stage h4 { margin: 0; font-size: 15px; }
+.novel-play-stage header p { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary, #888); }
+.novel-play-premise { margin: 0; font-size: 13px; line-height: 1.6; }
+.novel-play-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.novel-play-turns { display: flex; flex-direction: column; gap: 10px; max-height: 52vh; overflow-y: auto; padding-right: 4px; }
+.novel-play-turn { border: 1px solid var(--ant-color-border, #ececec); border-radius: 8px; padding: 10px 12px; }
+.novel-play-turn > header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; }
+.novel-play-input { margin: 0 0 6px; font-size: 12px; color: var(--text-secondary, #888); }
+.novel-play-scene { margin: 0 0 8px; font-size: 13px; line-height: 1.75; white-space: pre-wrap; }
+.novel-play-input-row { display: flex; align-items: flex-end; gap: 8px; }
+.novel-play-input-row textarea { resize: vertical; }
+

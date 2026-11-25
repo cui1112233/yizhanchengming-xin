@@ -4,7 +4,7 @@ import ComposerToolbar from './novel-creation/ComposerToolbar.jsx';
 import ShortStoryDialog from './novel-creation/ShortStoryDialog.jsx';
 import ShortStoryPanel from './novel-creation/ShortStoryPanel.jsx';
 import { Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Spin, Tabs, message } from 'antd';
-import { Archive, BookOpen, Bot, CalendarClock, ChartColumn, FileText, FilePlus2, CornerDownRight, Pencil, NotebookPen, Plus } from 'lucide-react';
+import { Archive, BookOpen, Bot, CalendarClock, ChartColumn, FileText, FilePlus2, CornerDownRight, Gamepad2, Pencil, NotebookPen, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getCurrentAccount, getCurrentUsername } from '../../shared/api/auth.js';
@@ -18,6 +18,7 @@ import SchedulerPanel from './novel-creation/SchedulerPanel.jsx';
 import MaterialsPanel from './novel-creation/MaterialsPanel.jsx';
 import NotesPanel from './novel-creation/NotesPanel.jsx';
 import HooksPanel from './novel-creation/HooksPanel.jsx';
+import PlayPanel from './novel-creation/PlayPanel.jsx';
 import ChaptersPanel from './novel-creation/ChaptersPanel.jsx';
 import RunCard from './novel-creation/RunCard.jsx';
 import BlueprintEditor from './novel-creation/BlueprintEditor.jsx';
@@ -30,7 +31,7 @@ import useWorkspaceScope from './novel-creation/useWorkspaceScope.js';
 import { MODE_FIELDS, MODES, STATUS, TERMINAL, availableModel, draftKey, mergeSnapshot, modelOptions, readSaved, validRun } from './novel-creation/contracts.js';
 import './NovelCreationPage.css';
 
-const TOOLS = [['写作风格', FileText], ['导入素材', BookOpen], ['Agent设置', Bot], ['定时写作', CalendarClock], ['数据看板', ChartColumn], ['备忘录', NotebookPen]];
+const TOOLS = [['写作风格', FileText], ['导入素材', BookOpen], ['Agent设置', Bot], ['定时写作', CalendarClock], ['互动世界', Gamepad2], ['数据看板', ChartColumn], ['备忘录', NotebookPen]];
 const creationIcons = { long_original: FileText, short_original: FileText, long_imitation: Pencil, short_imitation: Pencil, fanfiction: CornerDownRight, continuation: FilePlus2 };
 const width = value => Math.max(360, Math.min(800, Number(value) || Math.round(window.innerWidth * .38)));
 
@@ -359,7 +360,7 @@ export default function NovelCreationPage() {
       </aside>
       {tool ? <section className="novel-creation-tool-workspace" aria-label={tool}>
         <header className="novel-chat-heading"><Button onClick={() => setTool('')}>返回对话</Button><b>{tool}</b></header>
-        <div className="novel-tool-content" key={scopeKey + ':' + tool}>{tool === '定时写作' ? <SchedulerPanel key={projectReadKey} owner={owner} projectId={projectId} sessionId={sessionId} mode={activeMode} modelId={draft.modelId} models={models} ensureSession={() => createSession(false)} onOpenSession={openScheduledSession}/> : tool === 'Agent设置' ? <AgentPanel projectId={projectId} models={models} mode={activeMode} /> : !projectId ? <Empty description="请先选择作品后使用此工具" /> : tool === '写作风格' ? <MaterialsPanel {...materialsProps} styleMode /> : <div className="novel-panel"><p>统计已保存正文，失败次数不计为章节。</p>{dashboard ? <>{(() => {
+        <div className="novel-tool-content" key={scopeKey + ':' + tool}>{tool === '定时写作' ? <SchedulerPanel key={projectReadKey} owner={owner} projectId={projectId} sessionId={sessionId} mode={activeMode} modelId={draft.modelId} models={models} ensureSession={() => createSession(false)} onOpenSession={openScheduledSession}/> : tool === 'Agent设置' ? <AgentPanel projectId={projectId} models={models} mode={activeMode} /> : !projectId ? <Empty description="请先选择作品后使用此工具" /> : tool === '写作风格' ? <MaterialsPanel {...materialsProps} styleMode /> : tool === '互动世界' ? <PlayPanel key={projectReadKey} projectId={projectId} /> : <div className="novel-panel"><p>统计已保存正文，失败次数不计为章节。</p>{dashboard ? <>{(() => {
   const trend = Array.isArray(dashboard.wordTrend) ? dashboard.wordTrend : [];
   const statusEntries = Object.entries(dashboard.statusCounts || {});
   const maxWords = Math.max(1, ...trend.map(p => Number(p.wordCount) || 0));

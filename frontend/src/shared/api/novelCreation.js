@@ -125,6 +125,26 @@ export function generateNovelCreationCover(projectId, input) {
   return novelProjectRequest(projectId, '/cover', input);
 }
 
+export function listNovelCreationPlays(projectId, signal) {
+  return novelProjectRequest(projectId, '/plays', undefined, { signal });
+}
+
+export function createNovelCreationPlay(projectId, input) {
+  return novelProjectRequest(projectId, '/plays', input);
+}
+
+export function getNovelCreationPlay(projectId, worldId, signal) {
+  return novelProjectRequest(projectId, `/plays/${encodeURIComponent(worldId)}`, undefined, { signal });
+}
+
+export function stepNovelCreationPlay(projectId, worldId, input) {
+  return novelProjectRequest(projectId, `/plays/${encodeURIComponent(worldId)}/step`, { input });
+}
+
+export function patchNovelCreationPlay(projectId, worldId, input) {
+  return novelProjectRequest(projectId, `/plays/${encodeURIComponent(worldId)}`, input, { method: 'PATCH' });
+}
+
 export function listNovelCreationSchedules(projectId) {
   return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules`);
 }

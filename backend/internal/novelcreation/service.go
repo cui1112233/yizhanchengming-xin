@@ -33,6 +33,7 @@ type Service struct {
 	documents       DocumentObjectStore
 	documentParser  DocumentParser
 	covers          CoverImageGenerator
+	playText        PlayTextCompleter
 	automationClock func() time.Time
 	store           Store
 	runtime         Runtime

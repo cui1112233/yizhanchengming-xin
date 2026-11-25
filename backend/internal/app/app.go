@@ -387,6 +387,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	novelCreationService := novelcreation.NewService(novelCreationStore, novelCreationRuntime, novelcreation.NewPipeline(novelcreation.ProviderResolver(httpapi.NovelCreationTextResolver(authStore, memberProfiles, textProviderForModel))))
 	novelCreationService.ConfigureSystemPrompts(prompt.NewCatalog(cfg.PresetPath))
 	novelCreationService.ConfigureCoverGenerator(httpapi.NewNovelCoverGenerator(store, novelFetchStore))
+	novelCreationService.ConfigurePlayText(httpapi.NewNovelPlayText(novelcreation.ProviderResolver(httpapi.NovelCreationTextResolver(authStore, memberProfiles, textProviderForModel))))
 	if cfg.AgentAssetTOSBucket != "" {
 		documentObjects, documentErr := novelcreation.NewTOSDocumentStore(novelcreation.DocumentTOSConfig{Endpoint: cfg.AgentAssetTOSEndpoint, Region: cfg.AgentAssetTOSRegion, Bucket: cfg.AgentAssetTOSBucket, AccessKey: cfg.AgentAssetTOSAccessKey, SecretKey: cfg.AgentAssetTOSSecretKey})
 		if documentErr != nil {
