@@ -1,4 +1,4 @@
-﻿package httpapi
+package httpapi
 
 import (
 	"archive/zip"
@@ -3658,6 +3658,15 @@ func retryableShuihuoAssetImageTransportError(err error) bool {
 // retryableShuihuoAssetImageError 在传输抖动之外，把“生图请求被当成聊天请求”
 // 的上游 400 也视为可重试的通道错误。
 func retryableShuihuoAssetImageError(err error) bool {
+	var upstream shuihuoImageUpstreamError
+	if errors.As(err, &upstream) {
+		switch upstream.StatusCode {
+		case http.StatusRequestTimeout, http.StatusTooManyRequests,
+			http.StatusInternalServerError, http.StatusBadGateway,
+			http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+			return true
+		}
+	}
 	return retryableShuihuoAssetImageTransportError(err) || errors.Is(err, errShuihuoImageChatChannel)
 }
 
@@ -4786,6 +4795,17 @@ func shuihuoImageStatusRejectionMessage(status int, raw string) string {
 	}
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		return fmt.Sprintf("图片通道鉴权失败（HTTP %d），请检查渠道 Key 是否有效、是否具备出图权限", status)
+	}
+	switch {
+	case status == http.StatusTooManyRequests:
+		return "图片服务请求过于频繁（HTTP 429），请稍后重试"
+	case status == http.StatusRequestTimeout || status == http.StatusGatewayTimeout:
+		return fmt.Sprintf("图片服务响应超时（HTTP %d），请稍后重试", status)
+	case status >= 500:
+		if strings.Contains(strings.ToLower(raw), "overload") {
+			return fmt.Sprintf("图片服务当前负载过高（HTTP %d），请稍后重试", status)
+		}
+		return fmt.Sprintf("图片服务暂时不可用（HTTP %d），请稍后重试", status)
 	}
 	return fmt.Sprintf("图片通道拒绝了本次请求（HTTP %d），当前配置的模型可能不支持出图", status)
 }

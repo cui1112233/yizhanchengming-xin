@@ -104,6 +104,7 @@ func (q *automationComicSlotQueue) acquire(ctx context.Context, onWait func(posi
 	if q.active < q.capacity && len(q.waiters) == 0 {
 		q.active++
 		q.mu.Unlock()
+		reportComicGenerationHeartbeat(ctx)
 		return nil
 	}
 	ready := make(chan struct{})
@@ -111,19 +112,23 @@ func (q *automationComicSlotQueue) acquire(ctx context.Context, onWait func(posi
 	ahead := len(q.waiters) - 1
 	q.mu.Unlock()
 
-	if onWait != nil {
-		onWait(ahead)
+	notifyWait := func(position int) {
+		// 排队是活跃等待，不能沿用进入队列前的停滞计时。
+		reportComicGenerationHeartbeat(ctx)
+		if onWait != nil {
+			onWait(position)
+		}
 	}
+	notifyWait(ahead)
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ready:
+			reportComicGenerationHeartbeat(ctx)
 			return nil
 		case <-ticker.C:
-			if onWait != nil {
-				onWait(q.positionOf(ready))
-			}
+			notifyWait(q.positionOf(ready))
 		case <-ctx.Done():
 			if !q.removeWaiter(ready) {
 				// 槽位已经发放给自己，归还后再退出，避免容量泄漏。
@@ -2955,6 +2960,8 @@ func (c *BatchAutomationCoordinator) generateComicWithRetry(
 		if err := ctx.Err(); err != nil {
 			return batchfactoryv11.ComicCollection{}, err
 		}
+		// 新尝试的实时状态不展示上一轮错误；页账本和执行日志仍保留。
+		delete(entry, "error")
 		collection, err := operation(ctx)
 		if err == nil {
 			delete(entry, "retryAt")
