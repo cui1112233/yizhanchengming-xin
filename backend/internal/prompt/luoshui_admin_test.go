@@ -54,7 +54,7 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 		"plugin.viral-opening":     2,
 		"plugin.character-edit":    1,
 		"plugin.cover-generation":  1,
-		"plugin.comic-screenplay":  19,
+		"plugin.comic-screenplay":  len(comicAdminPromptIDs()),
 		"plugin.unassigned":        23,
 	}
 	for slot, want := range wantCounts {
@@ -69,8 +69,8 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 	if strings.Join(orders["plugin.novel-to-drama"], ",") != strings.Join(wantOrder, ",") {
 		t.Fatalf("小说转剧顺序错误: got=%v want=%v", orders["plugin.novel-to-drama"], wantOrder)
 	}
-	if strings.Join(orders["plugin.comic-screenplay"], ",") != strings.Join(comicScreenplayPromptIDs, ",") {
-		t.Fatalf("漫剧创作顺序错误: got=%v want=%v", orders["plugin.comic-screenplay"], comicScreenplayPromptIDs)
+	if strings.Join(orders["plugin.comic-screenplay"], ",") != strings.Join(comicAdminPromptIDs(), ",") {
+		t.Fatalf("漫剧创作顺序错误: got=%v want=%v", orders["plugin.comic-screenplay"], comicAdminPromptIDs())
 	}
 	// 模块归属：漫剧创作条目在独立模块，CM 插件条目留在 CM 插件模块。
 	for _, item := range LuoshuiAdminPresets() {
@@ -92,6 +92,34 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 	}
 }
 
+func TestComicScreenplayAdminIncludesAllRecoveredPrompts(t *testing.T) {
+	catalog, err := RecoveredCreativePromptCatalog()
+	if err != nil || len(catalog) != 63 {
+		t.Fatalf("catalog=%d err=%v", len(catalog), err)
+	}
+	byCorpus := map[string]map[string]any{}
+	for _, item := range LuoshuiAdminPresets() {
+		lock, _ := item["protocolLock"].(map[string]any)
+		if lock["slot"] != "plugin.comic-screenplay" {
+			continue
+		}
+		byCorpus[item["corpusId"].(string)] = item
+	}
+	for _, record := range catalog {
+		item, ok := byCorpus[record.ID]
+		if !ok {
+			t.Fatalf("漫剧创作后台缺少恢复提示词 %s（%s）", record.ID, record.Name)
+		}
+		body, _ := item["body"].(string)
+		if strings.TrimSpace(body) == "" {
+			t.Fatalf("恢复提示词 %s 正文为空", record.ID)
+		}
+	}
+	if len(byCorpus) != len(comicAdminPromptIDs()) {
+		t.Fatalf("comic items=%d want=%d", len(byCorpus), len(comicAdminPromptIDs()))
+	}
+}
+
 // 模块拆分后的视图合并：漫剧创作视图吃独立模块基线 + 历史 CM 插件模块下的覆盖；
 // CM 插件视图不再混入漫剧创作条目。
 func TestMergePresetsSplitByModule(t *testing.T) {
@@ -102,8 +130,8 @@ func TestMergePresetsSplitByModule(t *testing.T) {
 			comicCount++
 		}
 	}
-	if comicCount != 19 {
-		t.Fatalf("comic builtin=%d want=19", comicCount)
+	if comicCount != len(comicAdminPromptIDs()) {
+		t.Fatalf("comic builtin=%d want=%d", comicCount, len(comicAdminPromptIDs()))
 	}
 	legacy := map[string]any{
 		"id":      LuoshuiOverridePresetID("storyboard_xiaoluo_v7_15s"),

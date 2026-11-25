@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"sort"
 	"strings"
 
 	"qiantie/backend/internal/prompt/luoshui"
@@ -38,6 +39,81 @@ var comicScreenplayPromptIDs = []string{
 	"v88_doctor_screenplay",
 	"v88_doctor_storyboard",
 	"v88_synopsis",
+}
+
+type luoshuiAdminEntry struct {
+	ID      string
+	Name    string
+	Body    string
+	Section string
+	Hidden  bool
+	Note    string
+}
+
+func registryAdminEntry(entry luoshui.Entry) luoshuiAdminEntry {
+	return luoshuiAdminEntry{ID: entry.ID, Name: entry.Name, Body: entry.Body(), Section: entry.Section, Hidden: entry.HiddenFromUser()}
+}
+
+var comicPromptTypeOrder = map[string]int{"script": 0, "storyboard": 1, "character-design": 2, "scene-design": 3, "voice-design": 4}
+
+func comicPromptTypeLabel(value string) string {
+	switch value {
+	case "script":
+		return "剧本"
+	case "storyboard":
+		return "分镜"
+	case "character-design":
+		return "人设设计"
+	case "scene-design":
+		return "场景设计"
+	case "voice-design":
+		return "音色设计"
+	}
+	return value
+}
+
+// recoveredComicAdminEntries 返回洛水原版恢复的 63 项提示词，按
+// 剧本 → 分镜 → 人设设计 → 场景设计 → 音色设计、同类型按原编号排序。
+func recoveredComicAdminEntries() []luoshuiAdminEntry {
+	records, err := RecoveredCreativePromptCatalog()
+	if err != nil {
+		return nil
+	}
+	sort.SliceStable(records, func(i, j int) bool {
+		left, right := comicPromptTypeOrder[records[i].Type], comicPromptTypeOrder[records[j].Type]
+		if left != right {
+			return left < right
+		}
+		return records[i].SourceID < records[j].SourceID
+	})
+	out := make([]luoshuiAdminEntry, 0, len(records))
+	for _, record := range records {
+		snapshot, found, resolveErr := resolveRecoveredCreativePrompt(record.ID, record.Purpose)
+		if resolveErr != nil || !found {
+			continue
+		}
+		out = append(out, luoshuiAdminEntry{ID: record.ID, Name: record.Name, Body: snapshot.Body, Note: "原版恢复原文 · " + comicPromptTypeLabel(record.Type) + " · 后台发布后运行时生效"})
+	}
+	return out
+}
+
+// comicAdminPromptIDs 是「漫剧创作」后台模块的完整目录：63 项恢复原文
+// 在前，兼容运行词按原固定顺序补在其后。
+func comicAdminPromptIDs() []string {
+	recovered := recoveredComicAdminEntries()
+	seen := make(map[string]bool, len(recovered)+len(comicScreenplayPromptIDs))
+	out := make([]string, 0, len(recovered)+len(comicScreenplayPromptIDs))
+	for _, entry := range recovered {
+		seen[entry.ID] = true
+		out = append(out, entry.ID)
+	}
+	for _, id := range comicScreenplayPromptIDs {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // 分组顺序固定：先按 5 个插件功能，再是未归属。漫剧创作链路已拆为独立
@@ -124,7 +200,7 @@ func LuoshuiAdminPresets() []map[string]any {
 					continue
 				}
 				assigned[option.corpusID] = true
-				items = append(items, luoshuiAdminItem(entry, group, index, false))
+				items = append(items, luoshuiAdminItem(registryAdminEntry(entry), group, index, false))
 				index++
 			}
 			continue
@@ -136,7 +212,7 @@ func LuoshuiAdminPresets() []map[string]any {
 					continue
 				}
 				assigned[id] = true
-				items = append(items, luoshuiAdminItem(entry, group, index, false))
+				items = append(items, luoshuiAdminItem(registryAdminEntry(entry), group, index, false))
 				index++
 			}
 			continue
@@ -146,18 +222,29 @@ func LuoshuiAdminPresets() []map[string]any {
 			if assigned[id] || comicChain[id] {
 				continue
 			}
-			items = append(items, luoshuiAdminItem(entries[id], group, index, true))
+			items = append(items, luoshuiAdminItem(registryAdminEntry(entries[id]), group, index, true))
 			index++
 		}
 	}
-	// 漫剧创作独立模块：按「剧本 → 资产 → 分镜 → 审核/概要」固定顺序。
-	for _, id := range comicScreenplayPromptIDs {
+	// 漫剧创作独立模块：63 项恢复原文在前，兼容运行词补在其后。
+	recovered := recoveredComicAdminEntries()
+	recoveredByID := make(map[string]luoshuiAdminEntry, len(recovered))
+	for _, entry := range recovered {
+		recoveredByID[entry.ID] = entry
+	}
+	for _, id := range comicAdminPromptIDs() {
+		if entry, ok := recoveredByID[id]; ok {
+			assigned[id] = true
+			items = append(items, luoshuiAdminItem(entry, comicGroup, index, false))
+			index++
+			continue
+		}
 		entry, ok := entries[id]
 		if !ok || assigned[id] {
 			continue
 		}
 		assigned[id] = true
-		items = append(items, luoshuiAdminItem(entry, comicGroup, index, false))
+		items = append(items, luoshuiAdminItem(registryAdminEntry(entry), comicGroup, index, false))
 		index++
 	}
 	return items
@@ -168,7 +255,7 @@ func ComicScreenplaySlots() []map[string]string {
 	return []map[string]string{{"id": "plugin.comic-screenplay", "label": "漫剧创作", "mode": "primary"}}
 }
 
-func luoshuiAdminItem(entry luoshui.Entry, group LuoshuiAdminGroup, index int, unassigned bool) map[string]any {
+func luoshuiAdminItem(entry luoshuiAdminEntry, group LuoshuiAdminGroup, index int, unassigned bool) map[string]any {
 	// 漫剧创作链路条目归属独立后台模块；其余条目留在 CM 插件模块。
 	module := LuoshuiAdminModule
 	if group.Slot == "plugin.comic-screenplay" {
@@ -184,7 +271,7 @@ func luoshuiAdminItem(entry luoshui.Entry, group LuoshuiAdminGroup, index int, u
 		"version":           1,
 		"revision":          1,
 		"status":            "published",
-		"body":              entry.Body(),
+		"body":              entry.Body,
 		"protocolLock":      map[string]any{"slot": group.Slot},
 		"createdAt":         "",
 		"createdBy":         "cm-embed",
@@ -196,7 +283,10 @@ func luoshuiAdminItem(entry luoshui.Entry, group LuoshuiAdminGroup, index int, u
 	}
 }
 
-func luoshuiAdminDescription(entry luoshui.Entry, group LuoshuiAdminGroup, unassigned bool) string {
+func luoshuiAdminDescription(entry luoshuiAdminEntry, group LuoshuiAdminGroup, unassigned bool) string {
+	if entry.Note != "" {
+		return entry.Note
+	}
 	// V88 内置运行词：正文是 V88 自研功能的内置词（非 CM v2.9.0 取证原文），
 	// 运行时读取已发布覆盖版本，后台编辑发布后真实生效。
 	if entry.Section == "v88" {
@@ -224,7 +314,7 @@ func luoshuiAdminDescription(entry luoshui.Entry, group LuoshuiAdminGroup, unass
 	} else if group.Label != "" {
 		parts = append(parts, group.Label+"下拉选项")
 	}
-	if entry.HiddenFromUser() {
+	if entry.Hidden {
 		parts = append(parts, "规格要求不向普通用户展示正文")
 	}
 	return strings.Join(parts, " · ")
