@@ -1,6 +1,7 @@
 import { Avatar } from 'antd';
 import { ChartNoAxesCombined, ChevronLeft, Crown, ExternalLink, KeyRound, LogOut, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
 import { Link } from '../components/Link';
+import '../styles/profile-grey-glass.css';
 
 function roleLabel(role) {
   if (role === 'dev') return 'DEV';
@@ -11,6 +12,33 @@ function roleLabel(role) {
 export function AccountCenterLayout({ account, username, avatar, pathname, onReturn, onLogout, children }) {
   const canManage = ['dev', 'manager'].includes(account?.role);
   const canAccessAdmin = account?.role === 'dev';
+
+  // Roll out the new shell only to Profile; other account pages keep their layout.
+  if (pathname === '/profile') {
+    const entries = [
+      { href: '/profile', label: '个人资料' },
+      { href: '/member', label: '会员中心' },
+      { href: '/security', label: '账号安全' },
+      ...(canManage ? [{ href: '/advanced-team-admin', label: '联合治理' }, { href: '/api-config', label: 'API 配置' }] : []),
+      { href: 'http://newapi.yzcm.site/', label: 'YZCM API', external: true },
+      { href: '/usage', label: '用量与制作' },
+      ...(canManage ? [{ href: '/team', label: '组员管理' }] : []),
+      ...(canAccessAdmin ? [{ href: '/accounts', label: '账号与角色', developer: true }, { href: '/admin/presets', label: '管理后台', reload: true, developer: true }] : [])
+    ];
+    return <div className="account-center-workspace profile-glass-workspace">
+      <header className="pg-shell-header">
+        <button type="button" className="pg-brand" onClick={onReturn} aria-label="一战晟铭，返回工作台"><b aria-hidden="true">Y</b><span>一战晟铭</span></button>
+        <div className="pg-shell-account"><Avatar size={32} src={account?.avatarUrl} style={{ backgroundColor: avatar?.background }}>{avatar?.emoji}</Avatar><span>{account?.displayName || username}</span><em>{roleLabel(account?.role)}</em></div>
+      </header>
+      <nav className="pg-navigation" aria-label="个人中心导航">
+        {entries.map(entry => entry.external
+          ? <a key={entry.href} href={entry.href} target="_blank" rel="noreferrer" title="一战晟铭专属 API 控制台">{entry.label}<ExternalLink size={12} aria-hidden="true" /></a>
+          : <Link key={entry.href} href={entry.href} reload={entry.reload} aria-current={pathname === entry.href ? 'page' : undefined} className={pathname === entry.href ? 'active' : ''}>{entry.label}{entry.developer ? <small>DEV</small> : null}</Link>)}
+      </nav>
+      <main className="account-center-main pg-main">{children}</main>
+      <footer className="pg-shell-footer"><button type="button" onClick={onReturn} aria-label="返回工作台"><ChevronLeft size={16} />返回工作台</button><button type="button" onClick={onLogout}><LogOut size={16} />退出登录</button></footer>
+    </div>;
+  }
 
   return <div className="account-center-workspace">
     <aside className="account-center-sidebar" aria-label="个人中心导航">
