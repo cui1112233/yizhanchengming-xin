@@ -4425,7 +4425,10 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						// 才释放给下一本。这样一本书几十页可以连续占满上游通道快速收口，
 						// 不会再出现“每本都缺几页、一本也提交不了”。
 						// 等待期间持续刷新整本心跳，避免排队被误判成停滞而取消。
-						if c.comicRunSlots != nil {
+						// 例外：出图工作已经全部完成的书（续跑/重试场景）不会发起任何
+						// 上游请求，直接跳过排队，立即进入完成与发布流程，同时把槽位
+						// 让给真正需要出图的书。
+						if c.comicRunSlots != nil && !comicBookGenerationIdle(generateCtx, c.store, owner, batchID, effective, book) {
 							waitStarted := c.now()
 							// 排队等待期间必须把状态写回前端，否则界面一直显示
 							// “正在逐页生成”却没有任何页产出；耐久层也会因为长时间
