@@ -20,6 +20,7 @@ type Service struct {
 	Submit    func(context.Context, n8comic.PublishRequest) (n8comic.PublishResult, error)
 	Now       func() time.Time
 	Lock      sync.Locker
+	LockFor   func(PublishRequest) sync.Locker
 	localLock sync.Mutex
 	Acquire   func(context.Context, PublishRequest) (func(), error)
 }
@@ -77,6 +78,9 @@ func (s *Service) Publish(ctx context.Context, r PublishRequest, prepare func(co
 		return Record{}, ErrInvalid
 	}
 	lock := s.Lock
+	if s.LockFor != nil {
+		lock = s.LockFor(r)
+	}
 	if lock == nil {
 		lock = &s.localLock
 	}
@@ -269,6 +273,9 @@ func (s *Service) Status(ctx context.Context, r PublishRequest) (Record, bool, e
 		return Record{}, false, ErrInvalid
 	}
 	lock := s.Lock
+	if s.LockFor != nil {
+		lock = s.LockFor(r)
+	}
 	if lock == nil {
 		lock = &s.localLock
 	}

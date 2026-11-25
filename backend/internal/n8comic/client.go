@@ -30,6 +30,10 @@ const (
 	uploadPath = "/material/open/carousel/image_upload_param"
 	readPath   = "/material/open/carousel/image/read"
 	createPath = "/material/open/carousel/create"
+	// Transfer limits are separate from asynchronous image readback workers.
+	// One client is shared by the publisher across collections and books.
+	imageTransferWorkers = 3
+	imageTransferSlots   = 6
 )
 
 type Config struct {
@@ -48,6 +52,7 @@ type Client struct {
 	now          func() time.Time
 	pollInterval time.Duration
 	pollAttempts int
+	uploadSlots  chan struct{}
 }
 
 type ImageInput struct {
@@ -149,6 +154,7 @@ func NewClient(config Config) *Client {
 		now:          now,
 		pollInterval: pollInterval,
 		pollAttempts: pollAttempts,
+		uploadSlots:  make(chan struct{}, imageTransferSlots),
 	}
 }
 
@@ -311,39 +317,9 @@ type pendingImage struct {
 }
 
 func (c *Client) uploadImages(ctx context.Context, producer string, inputs []ImageInput, uploaded []int64, signatures []string, onImage func(int, int64) error) ([]int64, error) {
-	imageIDs := make([]int64, len(inputs))
-	pending := make([]pendingImage, 0, len(inputs))
-	for index, input := range inputs {
-		if index < len(uploaded) && uploaded[index] > 0 {
-			imageIDs[index] = uploaded[index]
-			if signatures != nil {
-				content, _, err := compressImageForUpload(input.Content, strings.ToLower(strings.TrimSpace(input.MediaType)))
-				if err != nil {
-					return imageIDs, err
-				}
-				sig := md5.Sum(content)
-				signatures[index] = hex.EncodeToString(sig[:])
-			}
-			continue
-		}
-		item, err := c.prepareImageUpload(ctx, producer, input)
-		if err != nil {
-			// 已上传的页仍然保留在 imageIDs 里，便于调用方持久化后只补缺图。
-			return imageIDs, err
-		}
-		if signatures != nil {
-			signatures[index] = item.signature
-		}
-		if item.imageID > 0 {
-			imageIDs[index] = item.imageID
-			if onImage != nil {
-				if err = onImage(index, item.imageID); err != nil {
-					return imageIDs, err
-				}
-			}
-		}
-		item.target = index
-		pending = append(pending, item)
+	imageIDs, pending, err := c.prepareImageUploads(ctx, producer, inputs, uploaded, signatures, onImage)
+	if err != nil {
+		return imageIDs, err
 	}
 
 	for index := range pending {
@@ -412,6 +388,106 @@ func (c *Client) uploadImages(ctx context.Context, producer string, inputs []Ima
 		return imageIDs, firstErr
 	}
 	return imageIDs, nil
+}
+
+// prepareImageUploads transfers independent pages in bounded parallelism. Results
+// and persistence callbacks stay indexed by the original page, never completion
+// order. Existing image IDs are reused without another upload request.
+func (c *Client) prepareImageUploads(ctx context.Context, producer string, inputs []ImageInput, uploaded []int64, signatures []string, onImage func(int, int64) error) ([]int64, []pendingImage, error) {
+	imageIDs := make([]int64, len(inputs))
+	pending := make([]pendingImage, len(inputs))
+	indexes := make([]int, 0, len(inputs))
+	for index, input := range inputs {
+		pending[index].target = index
+		if index >= len(uploaded) || uploaded[index] <= 0 {
+			indexes = append(indexes, index)
+			continue
+		}
+		imageIDs[index], pending[index].imageID = uploaded[index], uploaded[index]
+		if signatures != nil {
+			content, _, err := compressImageForUpload(input.Content, strings.ToLower(strings.TrimSpace(input.MediaType)))
+			if err != nil {
+				return imageIDs, pending, err
+			}
+			digest := md5.Sum(content)
+			signatures[index] = hex.EncodeToString(digest[:])
+		}
+	}
+	workers := min(imageTransferWorkers, len(indexes))
+	if workers <= 2 {
+		workers = min(1, workers)
+	}
+	if workers == 0 {
+		return imageIDs, pending, nil
+	}
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+	worker := func() {
+		defer wg.Done()
+		for index := range jobs {
+			mu.Lock()
+			failed := firstErr != nil
+			mu.Unlock()
+			if failed {
+				continue
+			}
+			item, err := c.prepareImageUploadLimited(ctx, producer, inputs[index])
+			mu.Lock()
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				mu.Unlock()
+				continue
+			}
+			item.target = index
+			pending[index] = item
+			if signatures != nil {
+				signatures[index] = item.signature
+			}
+			if item.imageID > 0 {
+				imageIDs[index] = item.imageID
+				if onImage != nil {
+					if err = onImage(index, item.imageID); err != nil && firstErr == nil {
+						firstErr = err
+					}
+				}
+			}
+			mu.Unlock()
+		}
+	}
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go worker()
+	}
+dispatch:
+	for _, index := range indexes {
+		select {
+		case jobs <- index:
+		case <-ctx.Done():
+			mu.Lock()
+			if firstErr == nil {
+				firstErr = ctx.Err()
+			}
+			mu.Unlock()
+			break dispatch
+		}
+	}
+	close(jobs)
+	wg.Wait()
+	return imageIDs, pending, firstErr
+}
+
+func (c *Client) prepareImageUploadLimited(ctx context.Context, producer string, input ImageInput) (pendingImage, error) {
+	select {
+	case c.uploadSlots <- struct{}{}:
+		defer func() { <-c.uploadSlots }()
+	case <-ctx.Done():
+		return pendingImage{}, ctx.Err()
+	}
+	return c.prepareImageUpload(ctx, producer, input)
 }
 
 func (c *Client) prepareImageUpload(ctx context.Context, producer string, input ImageInput) (pendingImage, error) {

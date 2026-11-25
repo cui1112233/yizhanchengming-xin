@@ -469,6 +469,7 @@ type BatchFactoryN8ComicPublisher struct {
 	// WorkTitleMapPath 是本地“书名 -> N8 作品 ID”缓存路径，为空时使用默认路径。
 	WorkTitleMapPath string
 	mu               sync.Mutex
+	collectionLocks  map[string]*collectionPublishLockEntry
 	titleMapOnce     sync.Once
 	titleMap         *n8WorkTitleMap
 

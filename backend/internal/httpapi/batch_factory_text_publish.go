@@ -197,7 +197,7 @@ func (p *BatchFactoryN8ComicPublisher) configureCollectionClaim(redisURL string)
 	}
 }
 func (p *BatchFactoryN8ComicPublisher) collectionService() *cp.Service {
-	svc := &cp.Service{Acquire: p.claimCollection, Records: collectionDraftRecords{p.Store}, Now: p.Now, Lock: &p.mu}
+	svc := &cp.Service{Acquire: p.claimCollection, Records: collectionDraftRecords{p.Store}, Now: p.Now, LockFor: p.collectionPublishLock}
 	if p.Client != nil {
 		svc.Submit = p.Client.Publish
 		if reader, ok := p.Client.(interface {
