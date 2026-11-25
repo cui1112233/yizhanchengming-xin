@@ -107,7 +107,11 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 	var splitLayout bool
 	var err error
 	if r.stateStore != nil {
-		state, _, err = r.stateStore.Load(context.Background())
+		if reader, ok := r.stateStore.(AutomationBatchStateReader); ok {
+			state, _, err = reader.LoadBatch(context.Background(), strings.TrimSpace(owner), strings.TrimSpace(batchID))
+		} else {
+			state, _, err = r.stateStore.Load(context.Background())
+		}
 	} else if r.path != "" {
 		state, splitLayout, err = readAutomationState(r.path)
 	} else {

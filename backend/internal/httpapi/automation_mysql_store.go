@@ -33,6 +33,14 @@ type AutomationJobSaver interface {
 	SaveJobs(context.Context, map[string]map[string]any) error
 }
 
+// AutomationBatchStateReader keeps status polling scoped to one account and
+// batch. Partial saves are required so repairing this view cannot replace the
+// full persisted state in stores whose Save method replaces a snapshot.
+type AutomationBatchStateReader interface {
+	AutomationJobSaver
+	LoadBatch(context.Context, string, string) (automationStateFile, bool, error)
+}
+
 // AutomationJobReader is the narrow read side used by the unified execution
 // kernel. It avoids loading every historical job for one execution request.
 type AutomationJobReader interface {
@@ -65,6 +73,40 @@ func (s *mysqlAutomationStateStore) Load(ctx context.Context) (automationStateFi
 		}
 		if len(ids) == 0 {
 			break
+		}
+		if err := s.loadJobsByID(ctx, state.Jobs, ids); err != nil {
+			return state, false, err
+		}
+		if len(ids) < automationJobPageSize {
+			break
+		}
+	}
+	return state, len(state.Jobs) > 0, nil
+}
+
+func (s *mysqlAutomationStateStore) LoadBatch(ctx context.Context, owner, batchID string) (automationStateFile, bool, error) {
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{}}
+	if s == nil || s.db == nil {
+		return state, false, nil
+	}
+	for offset := 0; ; offset += automationJobPageSize {
+		rows, err := s.db.QueryContext(ctx, `SELECT id FROM batch_automation_jobs WHERE owner_username = ? AND batch_id = ? ORDER BY id LIMIT ? OFFSET ?`, owner, batchID, automationJobPageSize, offset)
+		if err != nil {
+			return state, false, fmt.Errorf("load batch automation ids: %w", err)
+		}
+		ids := make([]string, 0, automationJobPageSize)
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return state, false, fmt.Errorf("scan batch automation id: %w", err)
+			}
+			ids = append(ids, id)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return state, false, fmt.Errorf("iterate batch automation ids: %w", err)
 		}
 		if err := s.loadJobsByID(ctx, state.Jobs, ids); err != nil {
 			return state, false, err
