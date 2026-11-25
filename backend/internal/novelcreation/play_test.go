@@ -109,6 +109,19 @@ func TestCreatePlayWorldSavesOpeningAndLists(t *testing.T) {
 	}
 }
 
+func TestCreatePlayWorldWithSameTitleKeepsBothWorlds(t *testing.T) {
+	service, project, text := playFixture(t)
+	first := createPlayWorld(t, service, project, text)
+	second := createPlayWorld(t, service, project, text)
+	if first.ID == second.ID {
+		t.Fatalf("同名世界不能互相覆盖: %q", first.ID)
+	}
+	list, err := service.ListPlayWorlds(context.Background(), "alice", project.ID)
+	if err != nil || len(list) != 2 {
+		t.Fatalf("list=%d err=%v", len(list), err)
+	}
+}
+
 func TestStepPlayWorldMergesSimulationAndState(t *testing.T) {
 	service, project, text := playFixture(t)
 	world := createPlayWorld(t, service, project, text)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,6 +20,8 @@ const (
 	playDefaultMode        = "open"
 	playDefaultActionsJSON = `["观察周围","开口说话","回忆来意"]`
 )
+
+var playIDSequence atomic.Uint64
 
 type PlayEntity struct {
 	Name     string `json:"name"`
@@ -124,11 +127,9 @@ type playStateOutput struct {
 	Goals     []string       `json:"goals"`
 }
 
+// playID 保留可读的 ASCII 前缀，并追加短后缀，避免同名世界互相覆盖。
 func playID(title string) string {
 	slug := strings.TrimSpace(title)
-	if slug == "" {
-		return "world-" + fingerprint([]string{time.Now().UTC().String()})[:12]
-	}
 	out := []rune{}
 	for _, r := range slug {
 		switch {
@@ -137,14 +138,16 @@ func playID(title string) string {
 		case r == '-' || r == '_':
 			out = append(out, r)
 		}
-		if len(out) >= 40 {
+		if len(out) >= 32 {
 			break
 		}
 	}
-	if len(out) == 0 {
-		return "world-" + fingerprint([]string{slug})[:12]
+	base := strings.Trim(string(out), "-_")
+	if base == "" {
+		base = "world"
 	}
-	return string(out)
+	unique := fmt.Sprintf("%d-%d", time.Now().UTC().UnixNano(), playIDSequence.Add(1))
+	return base + "-" + fingerprint([]string{slug, unique})[:8]
 }
 
 // decodePlayJSON 容忍代码围栏与前后杂讯，只取对象本体。
