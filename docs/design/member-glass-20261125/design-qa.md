@@ -2,7 +2,7 @@
 
 选定参考：用户附件 codex-clipboard-9f7d485d-fd16-4f8d-94cd-b9210e4cb8ff.png。
 
-实现：MemberCenterPage.jsx、member-identity-card.css 与独立无字背景素材 glass-ribbon-card.png。
+实现：MemberCenterPage.jsx、member-identity-card.css。最终使用中部和外围均透明的 glass-ribbon-overlay.png，只保留边框和彩带；卡片底板由实时背景模糊玻璃层提供。
 
 本地运行地址：http://localhost:4001/member。源码提交：12da9b6a。
 
@@ -22,3 +22,7 @@
 final result: passed
 
 此结果为上述视觉和运行检查通过，不声明逐像素一致。本次未推送或部署生产。
+
+## 通透效果修订
+
+用户确认需要真正透出页面背景，已在03297ad5中替换不透明图形底板。素材中心和外角的alpha均实测为0；浏览器实际计算得到底板颜色rgba(22,30,52,0.32)，背景效果blur(18px) saturate(1.35)。本地4001重新构建、启动后截图确认底板跟随原页面背景颜色，头像和文字保持清晰。无背景模糊支持的浏览器使用更深半透明底色作为可读性回退。没有修改账号权限或资金数据。
