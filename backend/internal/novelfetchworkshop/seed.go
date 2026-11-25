@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"sync"
 )
 
 // The imported workbench catalog is bundled with the Go service so a fresh
@@ -88,10 +89,8 @@ func importedKnowledge() (map[string]any, map[string]any) {
 	return knowledge, sensitive
 }
 
-// DefaultWorkshopSettings returns a fresh copy of the imported V78 catalog.
-// It is merged into each user's configuration only when that user has not
-// supplied a value, so existing user data remains authoritative.
-func DefaultWorkshopSettings() map[string]any {
+// The bundled catalog is immutable. Parse it once, never cache user settings.
+var workshopDefaults = sync.OnceValue(func() map[string]any {
 	app := readImportedSeed("app.json")
 	knowledge, sensitive := importedKnowledge()
 	app["knowledge"] = knowledge
@@ -100,10 +99,58 @@ func DefaultWorkshopSettings() map[string]any {
 		"appConfig":          app,
 		"knowledgeLibraries": knowledge,
 	}
+})
+
+// DefaultWorkshopSettings returns a private copy of the imported V78 catalog.
+// Saved user values still take precedence when defaults are merged.
+func DefaultWorkshopSettings() map[string]any {
+	return cloneWorkshopValue(workshopDefaults()).(map[string]any)
+}
+
+// Clone JSON-shaped trees directly. Fixed catalogs contain thousands of small
+// objects; encoding and decoding every subtree wastes CPU on each scheduler read.
+// The fallback retains the JSON normalization used for less common input types.
+func cloneWorkshopValue(value any) any {
+	switch value := value.(type) {
+	case map[string]any:
+		if value == nil {
+			return nil
+		}
+		result := make(map[string]any, len(value))
+		for key, item := range value {
+			result[key] = cloneWorkshopValue(item)
+		}
+		return result
+	case []any:
+		if value == nil {
+			return nil
+		}
+		result := make([]any, len(value))
+		for index, item := range value {
+			result[index] = cloneWorkshopValue(item)
+		}
+		return result
+	case nil, bool, string, float64:
+		return value
+	default:
+		raw, _ := json.Marshal(value)
+		var result any
+		_ = json.Unmarshal(raw, &result)
+		return result
+	}
 }
 
 func mergeWorkshopMaps(base, override map[string]any) map[string]any {
-	result := cloneMap(base)
+	result, _ := cloneWorkshopValue(base).(map[string]any)
+	if result == nil {
+		result = map[string]any{}
+	}
+	mergeWorkshopOverrides(result, override)
+	return result
+}
+
+// result is already a private copy; don't clone every parent again on descent.
+func mergeWorkshopOverrides(result, override map[string]any) {
 	for key, value := range override {
 		// Older accounts may already contain an empty placeholder for a
 		// library. Treat that placeholder as missing so the bundled catalog is
@@ -113,15 +160,14 @@ func mergeWorkshopMaps(base, override map[string]any) map[string]any {
 		}
 		if nested, ok := value.(map[string]any); ok {
 			if previous, ok := result[key].(map[string]any); ok {
-				result[key] = mergeWorkshopMaps(previous, nested)
+				mergeWorkshopOverrides(previous, nested)
 			} else {
-				result[key] = cloneMap(nested)
+				result[key] = cloneWorkshopValue(nested)
 			}
 			continue
 		}
 		result[key] = value
 	}
-	return result
 }
 
 func isEmptyWorkshopValue(value any) bool {
@@ -152,7 +198,7 @@ func EnsureWorkshopDefaults(settings map[string]any) map[string]any {
 	if libraries, _ := settings["knowledgeLibraries"].(map[string]any); len(libraries) == 0 {
 		if app, _ := settings["appConfig"].(map[string]any); app != nil {
 			if knowledge, _ := app["knowledge"].(map[string]any); len(knowledge) > 0 {
-				settings["knowledgeLibraries"] = cloneMap(knowledge)
+				settings["knowledgeLibraries"] = cloneWorkshopValue(knowledge)
 			}
 		}
 	}
@@ -171,7 +217,7 @@ func EnsureWorkshopDefaults(settings map[string]any) map[string]any {
 		}
 	}
 	promoteSavedSensitiveCatalog(settings)
-	merged := mergeWorkshopMaps(DefaultWorkshopSettings(), settings)
+	merged := mergeWorkshopMaps(workshopDefaults(), settings)
 	// Keep the legacy view synchronized for older embedded pages. The Go
 	// knowledgeLibraries map remains the canonical persisted source.
 	if libraries, _ := merged["knowledgeLibraries"].(map[string]any); len(libraries) > 0 {
@@ -179,7 +225,7 @@ func EnsureWorkshopDefaults(settings map[string]any) map[string]any {
 		if app == nil {
 			app = map[string]any{}
 		}
-		app["knowledge"] = cloneMap(libraries)
+		app["knowledge"] = cloneWorkshopValue(libraries)
 		merged["appConfig"] = app
 	}
 	EnsureSensitiveRuleReplacements(merged)
