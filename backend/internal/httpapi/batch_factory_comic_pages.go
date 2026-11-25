@@ -1038,13 +1038,35 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 					ExpectedRevision: page.Revision,
 				})
 				if recoverErr != nil {
-					if errors.Is(recoverErr, batchfactoryv11.ErrConflict) {
-						return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, comicPageClaimError(recoverErr)
+					// Lease recovery hit a revision race. The stale-reclaim sweep
+					// (ExpireStaleGeneratingComicPage) or another worker may have
+					// already moved the page out of generating since we read it.
+					// Re-read the page; if it's no longer generating the stale
+					// lease is gone and we can continue with normal generation.
+					refreshed, listErr := comicStore.ListComicPages(ctx, owner, batchID, bookID)
+					if listErr == nil {
+						found := false
+						for _, rp := range refreshed {
+							if rp.VideoID != videoID {
+								continue
+							}
+							storedPage, hasStoredPage = rp, true
+							found = true
+							break
+						}
+						if found && !comicPageGenerationTaskExists(storedPage) {
+							log.Printf("comic page stale lease resolved externally batch=%s book=%s video=%s status=%s rev=%d",
+								batchID, bookID, videoID, storedPage.Status, storedPage.Revision)
+						} else {
+							return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, comicPageClaimError(recoverErr)
+						}
+					} else {
+						return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("回收旧漫画页生成任务失败: %w", recoverErr)
 					}
-					return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("回收旧漫画页生成任务失败: %w", recoverErr)
+				} else {
+					storedPage = recovered
+					log.Printf("comic page recovered stale generation lease batch=%s book=%s video=%s", batchID, bookID, videoID)
 				}
-				storedPage = recovered
-				log.Printf("comic page recovered stale generation lease batch=%s book=%s video=%s", batchID, bookID, videoID)
 			}
 			if len(page.ReferenceImageURLs) > 0 {
 				input.ReferenceImageURLs = page.ReferenceImageURLs
