@@ -11,11 +11,11 @@ import (
 // 洛水 novels.services.hook_manager 的服务端等价实现（50 册 §3.20）。
 // 只使用已冻结的结算伏笔与真实章节号，不调用模型。
 const (
-	hookMaxActive       = 15
-	hookStaleThreshold  = 8
+	hookMaxActive        = 15
+	hookStaleThreshold   = 8
 	hookDroughtThreshold = 12
-	hookBurstThreshold  = 3
-	hookDecayThreshold  = 0.7
+	hookBurstThreshold   = 3
+	hookDecayThreshold   = 0.7
 )
 
 var hookHalfLifeMap = map[string]float64{"immediate": 10, "mid-arc": 30, "slow-burn": 80}
@@ -27,14 +27,14 @@ type HookAlert struct {
 }
 
 type HookHealthReport struct {
-	CurrentChapter int                     `json:"currentChapter"`
-	ActiveCount    int                     `json:"activeCount"`
-	StaleCount     int                     `json:"staleCount"`
-	ResolvedCount  int                     `json:"resolvedCount"`
-	UnknownStart   int                     `json:"unknownStartCount"`
-	ActiveHooks    []settledForeshadowing  `json:"activeHooks"`
-	StaleHooks     []settledForeshadowing  `json:"staleHooks"`
-	Alerts         []HookAlert             `json:"alerts"`
+	CurrentChapter int                    `json:"currentChapter"`
+	ActiveCount    int                    `json:"activeCount"`
+	StaleCount     int                    `json:"staleCount"`
+	ResolvedCount  int                    `json:"resolvedCount"`
+	UnknownStart   int                    `json:"unknownStartCount"`
+	ActiveHooks    []settledForeshadowing `json:"activeHooks"`
+	StaleHooks     []settledForeshadowing `json:"staleHooks"`
+	Alerts         []HookAlert            `json:"alerts"`
 }
 
 func hookHalfLife(hook settledForeshadowing) float64 {

@@ -52,10 +52,10 @@ func TestBuildPostWriteContextFreezesRealChapterData(t *testing.T) {
 	}
 	status := got.postWriteStatus()
 	for key, want := range map[string]string{
-		"cross_chapter": "checked_full_text",
+		"cross_chapter":   "checked_full_text",
 		"duplicate_title": "checked_history_titles",
-		"fatigue": "checked_genre_fatigue_words",
-		"person": "checked_rules_declaration",
+		"fatigue":         "checked_genre_fatigue_words",
+		"person":          "checked_rules_declaration",
 	} {
 		if status[key] != want {
 			t.Fatalf("%s=%s want=%s", key, status[key], want)
@@ -81,7 +81,7 @@ func TestHistoricalRunWithoutPostWriteContextReportsUnchecked(t *testing.T) {
 	p := postWriteContextOf(nil)
 	status := p.postWriteStatus()
 	for key, want := range map[string]string{
-		"cross_chapter": "not_checked_missing_full_text",
+		"cross_chapter":   "not_checked_missing_full_text",
 		"duplicate_title": "not_checked_missing_history_titles",
 	} {
 		if status[key] != want {

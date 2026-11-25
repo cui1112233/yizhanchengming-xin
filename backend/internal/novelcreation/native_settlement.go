@@ -92,7 +92,8 @@ func mergeForeshadowingBookkeeping(old, delta []settledForeshadowing, chapter in
 	})
 }
 
-func uniqueSettlementIdentifiers(value truthSettlementOutput) error {	seen := map[string]bool{}
+func uniqueSettlementIdentifiers(value truthSettlementOutput) error {
+	seen := map[string]bool{}
 	for _, fact := range value.Facts {
 		if seen[fact.ID] {
 			return fmt.Errorf("结算事实编号重复：%s，已停止保存", fact.ID)

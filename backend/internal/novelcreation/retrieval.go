@@ -10,10 +10,10 @@ import (
 // 原版使用 SQLite FTS5 + 关键词重叠 + 近因 + 邻近度打分；CM 的章节正文已经在
 // MySQL，因此直接在内存中做同样的排序，不引入第二套存储。
 const (
-	retrievalLimit      = 3
-	retrievalTokenLimit = 24
+	retrievalLimit        = 3
+	retrievalTokenLimit   = 24
 	retrievalExcerptRunes = 500
-	retrievalMaxTokens  = 10
+	retrievalMaxTokens    = 10
 )
 
 type RetrievedChapter struct {

@@ -38,12 +38,12 @@ func TestWriterRuleBlocksAddHookDebtOnlyWhenPresent(t *testing.T) {
 
 func TestNormalizeDraftTitle(t *testing.T) {
 	cases := map[string]string{
-		"第3章 雨夜来信":     "雨夜来信",
-		"第十二章：门缝":      "门缝",
+		"第3章 雨夜来信":             "雨夜来信",
+		"第十二章：门缝":              "门缝",
 		"Chapter 7 The Letter": "The Letter",
-		"《春雨》":           "春雨",
-		"  雨停  ":          "雨停",
-		"第三章":            "第三章",
+		"《春雨》":                 "春雨",
+		"  雨停  ":               "雨停",
+		"第三章":                  "第三章",
 	}
 	for input, want := range cases {
 		if got := normalizeDraftTitle(input); got != want {
