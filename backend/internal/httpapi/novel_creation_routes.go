@@ -351,6 +351,29 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"dashboard": dashboard})
 	})
+	handle("GET /api/novel-creation/projects/{projectID}/cover", func(w http.ResponseWriter, req *http.Request, owner string) {
+		cover, found, err := service.GetProjectCover(req.Context(), owner, req.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"cover": cover, "exists": found})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/cover", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			ImageModelID string `json:"imageModelId"`
+			StyleHint    string `json:"styleHint"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		cover, err := service.GenerateProjectCover(req.Context(), owner, req.PathValue("projectID"), input.ImageModelID, input.StyleHint)
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"cover": cover})
+	})
 	handle("GET /api/novel-creation/projects/{projectID}/hooks", func(w http.ResponseWriter, req *http.Request, owner string) {
 		health, err := service.GetHookHealth(req.Context(), owner, req.PathValue("projectID"))
 		if err != nil {

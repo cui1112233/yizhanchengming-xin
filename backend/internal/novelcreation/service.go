@@ -32,6 +32,7 @@ type Service struct {
 	restoreProject  func(context.Context, string, string) error
 	documents       DocumentObjectStore
 	documentParser  DocumentParser
+	covers          CoverImageGenerator
 	automationClock func() time.Time
 	store           Store
 	runtime         Runtime

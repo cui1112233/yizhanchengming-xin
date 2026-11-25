@@ -117,6 +117,14 @@ export function getNovelCreationHooks(projectId, signal) {
   return novelProjectRequest(projectId, '/hooks', undefined, { signal });
 }
 
+export function getNovelCreationCover(projectId, signal) {
+  return novelProjectRequest(projectId, '/cover', undefined, { signal });
+}
+
+export function generateNovelCreationCover(projectId, input) {
+  return novelProjectRequest(projectId, '/cover', input);
+}
+
 export function listNovelCreationSchedules(projectId) {
   return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules`);
 }
