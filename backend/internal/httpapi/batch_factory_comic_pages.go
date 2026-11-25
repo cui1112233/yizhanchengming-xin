@@ -1418,12 +1418,11 @@ func missingComicPageWorkItems(generationVideos []batchfactoryv11.Video, pages [
 	return work
 }
 
-// comicBookGenerationIdle 判断一本书的出图工作是否已经全部完成：所有页都有主图，
-// 且待生成的资产参考图为零（或资产图片开关关闭、生成器本来就会跳过）。
-// 这类书做幂等续跑时生成器不会发起任何上游出图请求，无需占用整机出图槽位
-// 排队；跳过排队既能让本书立即完成 comic_images 阶段进入发布，也把槽位
-// 让给真正需要出图的书。任何读取失败都保守地返回 false（照常排队）。
-func comicBookGenerationIdle(ctx context.Context, store batchfactoryv11.Store, owner, batchID string, effective batchfactoryv11.SettingsPatch, book batchfactoryv11.Book) bool {
+// Completed books and near-complete backfills don't need the whole-book queue.
+// Backfills are bounded to three pages and at least 80% already complete. They
+// still pass through the shared provider admission queue, with unchanged limits.
+// Missing asset images, live page tasks and read failures keep the normal queue.
+func comicBookCanBypassGenerationSlot(ctx context.Context, store batchfactoryv11.Store, owner, batchID string, effective batchfactoryv11.SettingsPatch, book batchfactoryv11.Book) bool {
 	if store == nil {
 		return false
 	}
@@ -1439,8 +1438,16 @@ func comicBookGenerationIdle(ctx context.Context, store batchfactoryv11.Store, o
 	if len(generationVideos) > comicPageGenerationLimit {
 		generationVideos = generationVideos[:comicPageGenerationLimit]
 	}
-	if len(missingComicPageWorkItems(generationVideos, pages)) > 0 {
-		return false
+	missing := len(missingComicPageWorkItems(generationVideos, pages))
+	if missing > 0 {
+		if missing > 3 || (len(generationVideos)-missing)*5 < len(generationVideos)*4 {
+			return false
+		}
+		for _, page := range pages {
+			if comicVideoInList(generationVideos, page.VideoID) && comicPageGenerationTaskExists(page) && !comicPageGenerationTaskIsStale(page, time.Now().UTC()) {
+				return false
+			}
+		}
 	}
 	if !batchfactoryv11.AssetImagesEnabled(effective) {
 		return true

@@ -80,7 +80,8 @@ elseif action=='finish' then
    p.failures=0
    if now>=p.cooling then
     if p.stable==0 then p.stable=now end;p.successes=p.successes+1
-    if p.successes>=20 and now-p.stable>=30000 and now-p.lastBad>=30000 then p.limit=math.min(p.hard,p.limit+1);p.successes=0;p.stable=now end
+    local recoverySuccesses=math.min(20,math.max(2,p.limit*2))
+    if p.successes>=recoverySuccesses and now-p.stable>=30000 and now-p.lastBad>=30000 then p.limit=math.min(p.hard,p.limit+1);p.successes=0;p.stable=now end
    end
   end
  end

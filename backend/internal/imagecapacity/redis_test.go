@@ -279,7 +279,7 @@ func TestOrdinaryFailuresDoNotAdaptAndRecoveryIsGradual(t *testing.T) {
 	l, _ := c.Acquire(context.Background(), q)
 	l.Finish(Outcome{Limited: true, RetryAfter: time.Millisecond})
 	p, _ := c.Resolve(context.Background(), q)
-	key := c.prefix + ":" + hash(p.AccountKey)
+	key := testCapacityStateKey(c, p)
 	v, e := c.do(context.Background(), "GET", key)
 	if e != nil {
 		t.Fatal(e)
