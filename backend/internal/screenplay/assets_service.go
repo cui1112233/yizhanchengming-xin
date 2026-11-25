@@ -3,6 +3,7 @@ package screenplay
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -58,6 +59,7 @@ type AssetService struct {
 	Store     Store
 	Generator TextGenerator
 	Prompts   *luoshui.Registry
+	Authoring *AuthoringService
 }
 
 func (s *AssetService) Extract(ctx context.Context, req AssetRequest) (AssetResult, error) {
@@ -297,11 +299,39 @@ func (s *AssetService) resolveChunks(ctx context.Context, req AssetRequest) ([]s
 	}
 	content := strings.TrimSpace(req.Content)
 	if content == "" {
+		// 洛水来源契约：已保存剧本优先；没有剧本时回退章节（剧本→原文），最后回退项目原文。
 		doc, err := s.Store.ActiveDocument(ctx, req.Owner, req.ProjectID)
-		if err != nil {
+		switch {
+		case err == nil:
+			content = strings.TrimSpace(doc.Content)
+		case errors.Is(err, ErrNotFound), errors.Is(err, ErrNoActiveScript):
+			// 没有剧本不是错误，继续按章节/项目原文回退。
+		default:
 			return nil, err
 		}
-		content = strings.TrimSpace(doc.Content)
+	}
+	if content == "" && s.Authoring != nil {
+		if state, err := s.Authoring.Load(ctx, req.Owner, req.ProjectID); err == nil {
+			chapters := make([]string, 0, len(state.Chapters))
+			for _, chapter := range state.Chapters {
+				text := strings.TrimSpace(chapter.ScriptText)
+				if text == "" {
+					text = strings.TrimSpace(chapter.SourceText)
+				}
+				if text == "" {
+					return nil, ErrEmptyContent
+				}
+				chapters = append(chapters, text)
+			}
+			if len(chapters) > 0 {
+				return chapters, nil
+			}
+		}
+	}
+	if content == "" {
+		if project, err := s.Store.GetProject(ctx, req.Owner, req.ProjectID); err == nil {
+			content = strings.TrimSpace(project.SourceText)
+		}
 	}
 	if content == "" {
 		return nil, ErrEmptyContent

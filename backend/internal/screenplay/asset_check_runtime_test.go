@@ -205,6 +205,70 @@ func TestAssetCheckRuntimeLateResultCannotOverwriteNewLease(t *testing.T) {
 	}
 }
 
+func TestAssetCheckSourceEpisodesPrefersScriptThenChapterSource(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	if _, err := store.CreateProject(ctx, Project{ID: "p", OwnerUsername: "alice", SourceText: "项目原文", ModelID: "m"}); err != nil {
+		t.Fatal(err)
+	}
+	authors := &AuthoringService{Store: store, Repository: NewMemoryAuthoringRepository()}
+	if _, err := authors.Save(ctx, "alice", "p", AuthoringState{Chapters: []Chapter{
+		{ID: "c1", Title: "第一章", SourceText: "第一原文", ScriptText: "第一剧本"},
+		{ID: "c2", Title: "第二章", SourceText: "第二原文"},
+		{ID: "c3", Title: "第三章", ScriptText: "第三剧本"},
+	}}, 0); err != nil {
+		t.Fatal(err)
+	}
+	r := &AssetCheckRuntime{Store: store, Repository: store, Authoring: authors}
+	project, err := store.GetProject(ctx, "alice", "p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	eps, err := r.sourceEpisodes(ctx, "alice", project, AssetCheckStartRequest{EpisodeNumbers: []int{1, 2, 3}})
+	if err != nil || len(eps) != 3 {
+		t.Fatalf("eps=%+v err=%v", eps, err)
+	}
+	for index, want := range []string{"第一剧本", "第二原文", "第三剧本"} {
+		if eps[index].Content != want {
+			t.Errorf("episode %d content=%q want %q", index+1, eps[index].Content, want)
+		}
+	}
+	original, err := r.sourceEpisodes(ctx, "alice", project, AssetCheckStartRequest{SourceMode: "original", EpisodeNumbers: []int{1, 2, 3}})
+	if err != nil || len(original) != 2 {
+		t.Fatalf("original=%+v err=%v", original, err)
+	}
+	if original[0].Content != "第一原文" || original[1].Content != "第二原文" {
+		t.Fatalf("original content=%+v", original)
+	}
+}
+
+func TestAssetCheckSourceEpisodesFallsBackToActiveDocument(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	if _, err := store.CreateProject(ctx, Project{ID: "p", OwnerUsername: "alice", ModelID: "m"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveScreenplay(ctx, Document{ID: "doc", ProjectID: "p", OwnerUsername: "alice", Source: "b", Content: "第1集：甲\nA\n第2集：乙\nB"}, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	authors := &AuthoringService{Store: store, Repository: NewMemoryAuthoringRepository()}
+	if _, err := authors.Save(ctx, "alice", "p", AuthoringState{Chapters: []Chapter{}}, 0); err != nil {
+		t.Fatal(err)
+	}
+	r := &AssetCheckRuntime{Store: store, Repository: store, Authoring: authors}
+	project, err := store.GetProject(ctx, "alice", "p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	eps, err := r.sourceEpisodes(ctx, "alice", project, AssetCheckStartRequest{EpisodeNumbers: []int{1, 2}})
+	if err != nil || len(eps) != 2 {
+		t.Fatalf("eps=%+v err=%v", eps, err)
+	}
+	if !strings.Contains(eps[0].Content, "A") || !strings.Contains(eps[1].Content, "B") {
+		t.Fatalf("document fallback content=%+v", eps)
+	}
+}
+
 func TestAssetCheckStartIdempotentSnapshotsAndValidation(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

@@ -95,6 +95,34 @@ func newAssetService(t *testing.T, mode PermissionMode) (*AssetService, *MemoryS
 	return &AssetService{Store: store, Generator: generator}, store, generator
 }
 
+func TestAssetServiceResolveChunksFallsBackToAuthoringAndProjectSource(t *testing.T) {
+	ctx := context.Background()
+	s, store, _ := newAssetService(t, PermissionBypass)
+	if _, err := store.CreateProject(ctx, Project{ID: "p2", OwnerUsername: "alice", SourceText: "项目原文", ModelID: "m"}); err != nil {
+		t.Fatal(err)
+	}
+	authors := &AuthoringService{Store: store, Repository: NewMemoryAuthoringRepository()}
+	if _, err := authors.Save(ctx, "alice", "p1", AuthoringState{Chapters: []Chapter{
+		{ID: "c1", Title: "第一章", ScriptText: "第一剧本"},
+		{ID: "c2", Title: "第二章", SourceText: "第二原文"},
+	}}, 0); err != nil {
+		t.Fatal(err)
+	}
+	s.Authoring = authors
+	chunks, err := s.resolveChunks(ctx, AssetRequest{Owner: "alice", ProjectID: "p1"})
+	if err != nil || len(chunks) != 2 || chunks[0] != "第一剧本" || chunks[1] != "第二原文" {
+		t.Fatalf("authoring fallback chunks=%q err=%v", chunks, err)
+	}
+	chunks, err = s.resolveChunks(ctx, AssetRequest{Owner: "alice", ProjectID: "p2"})
+	if err != nil || len(chunks) != 1 || chunks[0] != "项目原文" {
+		t.Fatalf("project source fallback chunks=%q err=%v", chunks, err)
+	}
+	chunks, err = s.resolveChunks(ctx, AssetRequest{Owner: "alice", ProjectID: "p1", Content: "显式正文"})
+	if err != nil || len(chunks) != 1 || chunks[0] != "显式正文" {
+		t.Fatalf("explicit content chunks=%q err=%v", chunks, err)
+	}
+}
+
 func TestExtractMissingOnlyPreservesExistingAsset(t *testing.T) {
 	s, store, _ := newAssetService(t, PermissionBypass)
 	old, err := store.CreateAsset(context.Background(), Asset{ProjectID: "p1", OwnerUsername: "alice", Type: AssetCharacter, Name: "顾苒苒", Prompt: "用户手写，不得覆盖"})
@@ -248,13 +276,13 @@ func TestExtractAllChunksFailedReturnsError(t *testing.T) {
 	}
 }
 
-func TestExtractNoSourceAndNoDocument(t *testing.T) {
+func TestExtractNoSourceReturnsEmptyContent(t *testing.T) {
 	service, _, _ := newAssetService(t, PermissionBypass)
 	_, err := service.Extract(context.Background(), AssetRequest{
 		Owner: "alice", ProjectID: "p1", Type: AssetCharacter, Degree: DegreeStandard,
 	})
-	if !errors.Is(err, ErrNoActiveScript) {
-		t.Fatalf("err = %v, want ErrNoActiveScript", err)
+	if !errors.Is(err, ErrEmptyContent) {
+		t.Fatalf("err = %v, want ErrEmptyContent", err)
 	}
 }
 
