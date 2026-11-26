@@ -78,18 +78,19 @@ func splitStoryboardScenes(content string) ([]storyboardSceneInput, error) {
 	return scenes, nil
 }
 
-func (s *StoryboardService) generateSceneShots(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, extra, planning, model string, useHistory bool, aspectRatio string) ([]StoryboardShot, error) {
+func (s *StoryboardService) generateSceneShots(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, extra, planning, model string, useHistory bool, aspectRatio string) ([]StoryboardShot, []int, error) {
 	if req.sceneOnlyIndex == nil && selected.SourceID > 0 && !useHistory && len(units) > 1 && s.SceneConcurrency != 1 {
 		return s.generateConcurrentScenes(ctx, req, episode, units, selected, roles, scenes, props, style, synopsis, prefix, extra, planning, model, aspectRatio)
 	}
 	all := []StoryboardShot{}
+	failed := []int{}
 	var firstErr error
 	for index, unit := range units {
 		if req.sceneOnlyIndex != nil && index != *req.sceneOnlyIndex {
 			continue
 		}
 		if err := ctx.Err(); err != nil {
-			return all, err
+			return all, failed, err
 		}
 		phase := "storyboard"
 		if len(units) > 1 {
@@ -111,7 +112,7 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 			var err error
 			user, err = prompt.StoryboardSceneUserMessage(episode.OriginalContent, unit.Content)
 			if err != nil {
-				return all, fmt.Errorf("第%d集第%d场消息构建失败：%w", episode.No, index+1, err)
+				return all, failed, fmt.Errorf("第%d集第%d场消息构建失败：%w", episode.No, index+1, err)
 			}
 		}
 		if planning != "" {
@@ -176,19 +177,20 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 					a.Episodes[episode.No].Calls[phase] = call
 					return nil
 				}); saveErr != nil {
-					return all, saveErr
+					return all, failed, saveErr
 				}
 			}
 			wrapped := fmt.Errorf("第%d集第%d场：%w", episode.No, index+1, err)
 			if saveErr := req.generationSession.episodeError(episode.No, wrapped); saveErr != nil {
-				return all, saveErr
+				return all, failed, saveErr
 			}
 			if firstErr == nil {
 				firstErr = wrapped
 			}
 			if ctx.Err() != nil || req.generationSession.callStatus(episode.No, phase) == "unknown" {
-				return all, wrapped
+				return all, failed, wrapped
 			}
+			failed = append(failed, index+1)
 			continue
 		}
 		for local := range shots {
@@ -206,7 +208,7 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 			all = append(all, shots[local])
 		}
 	}
-	return all, firstErr
+	return all, failed, firstErr
 }
 
 func validateSelectedStoryboardProtocol(p prompt.CreativePromptSnapshot, raw string, shots []StoryboardShot) error {

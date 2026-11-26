@@ -50,6 +50,11 @@ type StoryboardRequest struct {
 	ExtraContent string  `json:"extraContent,omitempty"`
 }
 
+type StoryboardSceneFailure struct {
+	Episode int `json:"episode"`
+	Scene   int `json:"scene"`
+}
+
 type StoryboardResult struct {
 	GenerationAttempt    *StoryboardGenerationSummary `json:"generation_attempt,omitempty"`
 	AddedAssetCount      int                          `json:"added_asset_count,omitempty"`
@@ -59,6 +64,7 @@ type StoryboardResult struct {
 	Warnings             []string                     `json:"warnings,omitempty"`
 	PartialFailure       bool                         `json:"partial_failure"`
 	FailedEpisodes       []int                        `json:"failed_episodes,omitempty"`
+	FailedScenes         []StoryboardSceneFailure     `json:"failed_scenes,omitempty"`
 	RequiresConfirmation bool                         `json:"requires_confirmation"`
 	PendingActions       []PendingAction              `json:"pending_actions,omitempty"`
 }
@@ -283,8 +289,11 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 			result.Warnings = append(result.Warnings, fmt.Sprintf("第 %d 集内容为空，已跳过", episode.No))
 			continue
 		}
-		shots, sceneErr := s.generateSceneShots(ctx, req, episode, sceneInputs[episode.No], selected, roles, scenes, props, style, synopsis, prefix, req.ExtraContent, planningByEpisode[episode.No], firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), EffectiveCreativeConfig(project).StoryboardUseContextHistory, EffectiveCreativeConfig(project).AspectRatio)
+		shots, failedScenes, sceneErr := s.generateSceneShots(ctx, req, episode, sceneInputs[episode.No], selected, roles, scenes, props, style, synopsis, prefix, req.ExtraContent, planningByEpisode[episode.No], firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), EffectiveCreativeConfig(project).StoryboardUseContextHistory, EffectiveCreativeConfig(project).AspectRatio)
 		if sceneErr != nil {
+			for _, scene := range failedScenes {
+				result.FailedScenes = append(result.FailedScenes, StoryboardSceneFailure{Episode: episode.No, Scene: scene})
+			}
 			if ctx.Err() != nil {
 				return result, wrapAIError(ctx.Err())
 			}

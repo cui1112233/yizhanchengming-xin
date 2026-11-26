@@ -109,6 +109,17 @@ func generationAttemptResult(a StoryboardGenerationAttempt) StoryboardResult {
 		} else if a.Status != "running" {
 			out.FailedEpisodes = append(out.FailedEpisodes, n)
 		}
+		for phase, call := range ep.Calls {
+			if call.Status != "invalid" && call.Status != "failed" {
+				continue
+			}
+			if len(phase) <= len("storyboard_scene_") || phase[:len("storyboard_scene_")] != "storyboard_scene_" {
+				continue
+			}
+			if scene, err := strconv.Atoi(phase[len("storyboard_scene_"):]); err == nil && scene > 0 {
+				out.FailedScenes = append(out.FailedScenes, StoryboardSceneFailure{Episode: n, Scene: scene})
+			}
+		}
 	}
 	out.PartialFailure = len(out.Storyboards) > 0 && len(out.FailedEpisodes) > 0
 	return out

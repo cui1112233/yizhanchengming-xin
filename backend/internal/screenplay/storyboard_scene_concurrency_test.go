@@ -168,8 +168,12 @@ func TestStoryboardSceneConcurrencyRetryKeepsOtherSceneCheckpoints(t *testing.T)
 	})
 	s := &StoryboardService{Store: store, Generator: g}
 	req := concurrentSceneInput("parallel-failed-parent")
-	if _, err := s.Generate(context.Background(), req); err == nil {
+	firstResult, err := s.Generate(context.Background(), req)
+	if err == nil {
 		t.Fatal("invalid scene accepted")
+	}
+	if len(firstResult.FailedScenes) != 1 || firstResult.FailedScenes[0].Episode != 1 || firstResult.FailedScenes[0].Scene != 2 {
+		t.Fatalf("failed scenes = %+v, want episode 1 scene 2", firstResult.FailedScenes)
 	}
 	state, _ := store.LoadStoryboardGenerations(context.Background(), "alice", "p1")
 	for _, phase := range []string{"storyboard_scene_1", "storyboard_scene_3", "storyboard_scene_4"} {

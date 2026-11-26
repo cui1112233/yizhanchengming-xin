@@ -37,12 +37,13 @@ func (s *StoryboardService) sceneConcurrency() int {
 	return n
 }
 
-func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, extra, planning, model, aspectRatio string) ([]StoryboardShot, error) {
+func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, extra, planning, model, aspectRatio string) ([]StoryboardShot, []int, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	type sceneResult struct {
-		shots []StoryboardShot
-		err   error
+		shots  []StoryboardShot
+		failed []int
+		err    error
 	}
 	results := make([]sceneResult, len(units))
 	jobs := make(chan int, len(units))
@@ -70,9 +71,9 @@ func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req St
 				}
 				local := req
 				local.sceneOnlyIndex = &index
-				shots, err := s.generateSceneShots(ctx, local, episode, units, selected, roles, scenes, props, style, synopsis, prefix, extra, planning, model, false, aspectRatio)
+				shots, failed, err := s.generateSceneShots(ctx, local, episode, units, selected, roles, scenes, props, style, synopsis, prefix, extra, planning, model, false, aspectRatio)
 				<-storyboardSceneSlots
-				results[index] = sceneResult{shots, err}
+				results[index] = sceneResult{shots, failed, err}
 				// An uncertain request must be reconciled before scheduling more paid work.
 				if err != nil {
 					status := req.generationSession.callStatus(episode.No, fmt.Sprintf("storyboard_scene_%d", index+1))
@@ -86,11 +87,13 @@ func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req St
 	}
 	wg.Wait()
 	var all []StoryboardShot
+	failedScenes := []int{}
 	var firstErr error
 	for _, result := range results {
 		if result.err != nil && (firstErr == nil || (errors.Is(firstErr, context.Canceled) && !errors.Is(result.err, context.Canceled))) {
 			firstErr = result.err
 		}
+		failedScenes = append(failedScenes, result.failed...)
 		for _, shot := range result.shots {
 			shot.Seq = len(all) + 1
 			all = append(all, shot)
@@ -99,5 +102,5 @@ func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req St
 	if firstErr == nil && ctx.Err() != nil {
 		firstErr = ctx.Err()
 	}
-	return all, firstErr
+	return all, failedScenes, firstErr
 }

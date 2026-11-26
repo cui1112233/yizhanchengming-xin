@@ -48,7 +48,9 @@ function collectWarnings(result) {
 function describePartialFailure(result) {
   if (!result?.partial_failure) return '';
   const episodes = Array.isArray(result.failed_episodes) ? result.failed_episodes.filter(no => Number(no) > 0) : [];
-  if (episodes.length) return `第 ${episodes.join('、')} 集生成失败`;
+  const scenes = Array.isArray(result.failed_scenes) ? result.failed_scenes.filter(item => Number(item?.episode) > 0 && Number(item?.scene) > 0).map(item => `第${item.episode}集第${item.scene}场`) : [];
+  if (episodes.length) return `第 ${episodes.join('、')} 集生成失败${scenes.length ? `；失败场景：${scenes.join('、')}` : ''}`;
+  if (scenes.length) return `失败场景：${scenes.join('、')}`;
   const batches = Array.isArray(result.failed_batches)
     ? result.failed_batches.map(item => Number(item?.batch_index)).filter(no => no > 0)
     : [];
