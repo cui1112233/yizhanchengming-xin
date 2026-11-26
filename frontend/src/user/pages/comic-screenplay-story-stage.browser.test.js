@@ -47,12 +47,14 @@ const synopsisResult={title:'少年爱辱',synopsis:'林川在一座南方小城
  assert(genBtn,'AI generate button missing with result');
  genBtn.click();await tick();
  assert(generated===1,'AI generate callback not fired with result');
- // 无结构化结果、无手动概要时：空态卡片 + 可见可用 AI 生成入口
+ // 无结构化结果、无手动概要时：不渲染空概要卡，标题行保留可见可用 AI 生成入口
  root.render(<ComicScreenplayStoryStage project={{id:'p2',title:'空态项目',synopsis:''}} synopsisResult={null} document={doc2} draft={doc2.content} onDraft={()=>{}} onSave={async()=>true} onTools={()=>{}} readOnly={false} working="" sourceReady={true} onGenerateSynopsis={()=>generated++}/>);
  for(let i=0;i<30;i++)await tick();
  assert(!document.querySelector('.comic-story-tags'),'tags should not render without result');
- assert(document.querySelector('.comic-story-summary'),'summary section must render in empty state');
- assert(document.body.textContent.includes('尚未生成故事概要'),'empty-state hint missing');
+ assert(!document.querySelector('.comic-story-summary'),'empty summary section should not render');
+ const trigger=document.querySelector('.comic-story-summary-trigger');
+ assert(trigger,'empty-state trigger missing');
+ assert(trigger.textContent.includes('AI 生成故事概要'),'empty-state trigger text mismatch');
  const emptyGenBtn=[...document.querySelectorAll('button')].find(b=>b.textContent.includes('AI 生成'));
  assert(emptyGenBtn,'AI generate button missing in empty state');
  assert(!emptyGenBtn.disabled,'AI generate button should be enabled when sourceReady');
