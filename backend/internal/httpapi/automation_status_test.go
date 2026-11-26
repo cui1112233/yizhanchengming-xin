@@ -259,7 +259,7 @@ func TestRepairStaleRunningBooksSkipsActiveRun(t *testing.T) {
 	}
 }
 
-func TestFileAutomationStatusReaderRepairsN8AlreadyUploadedImages(t *testing.T) {
+func TestFileAutomationStatusReaderDoesNotCompleteOccupiedImages(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "automation.json")
 	raw := `{"jobs":{"job":{"owner":"alice","batchId":"batch-1","id":"job-1","state":"failed","books":{"book-1":{"bookId":"book-1","status":"failed","stage":"comic_publish","error":"N8接口返回错误：IMAGE_ALREADY_IN_CAROUSEL","retryRequested":true,"retryAt":"2026-10-30T13:30:00Z"}}}}}`
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
@@ -274,15 +274,33 @@ func TestFileAutomationStatusReaderRepairsN8AlreadyUploadedImages(t *testing.T) 
 		t.Fatalf("books=%#v", status["books"])
 	}
 	book, ok := books[0].(map[string]any)
-	if !ok || book["status"] != "completed" || book["stage"] != "uploaded" || book["error"] != "" || book["retryAt"] != nil {
-		t.Fatalf("old N8 upload failure was not repaired: %#v", book)
+	if !ok || book["status"] != "failed" || book["error"] == "" {
+		t.Fatalf("occupied images must not count as a published collection: %#v", book)
 	}
-	if status["state"] != "completed" {
-		t.Fatalf("state=%v, want completed", status["state"])
+	if status["state"] == "completed" {
+		t.Fatalf("state=%v, must not be completed", status["state"])
 	}
 	persisted, err := os.ReadFile(path)
-	if err != nil || strings.Contains(string(persisted), `"status":"failed"`) {
-		t.Fatalf("repaired state was not persisted: %s (err=%v)", persisted, err)
+	if err != nil || !strings.Contains(string(persisted), `"status":"failed"`) {
+		t.Fatalf("failure was not preserved: %s (err=%v)", persisted, err)
+	}
+}
+
+func TestRepairOccupiedImagesFalseCompletion(t *testing.T) {
+	for _, confirmed := range []bool{false, true} {
+		entry := map[string]any{"status": "completed", "stage": "uploaded", "publishError": "IMAGE_ALREADY_IN_CAROUSEL", "retryRequested": true}
+		if confirmed {
+			entry["comicCarouselId"] = 123
+		}
+		state := automationStateFile{Jobs: map[string]map[string]any{"job": {"state": "completed", "books": map[string]any{"book": entry}}}}
+		normalizeAlreadyUploadedAutomationState(&state)
+		if confirmed {
+			if entry["status"] != "completed" {
+				t.Fatal("confirmed receipt must remain completed")
+			}
+		} else if entry["status"] != "failed" || entry["error"] != "IMAGE_ALREADY_IN_CAROUSEL" || entry["retryRequested"] != false || entry["publishState"] != "upload_incomplete" {
+			t.Fatalf("false completion was not repaired: %#v", entry)
+		}
 	}
 }
 

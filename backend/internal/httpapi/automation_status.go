@@ -452,11 +452,9 @@ func writeSplitAutomationState(path string, state automationStateFile) error {
 	return nil
 }
 
-// normalizeAlreadyUploadedAutomationState repairs old task records written by
-// the pre-reconciliation publisher. N8 reports IMAGE_ALREADY_IN_CAROUSEL when
-// the images are already accepted by a carousel, but the old code stored that
-// response as a hard upload failure. Treating it as completed prevents a
-// second upload and makes the live log reflect the actual remote result.
+// Image occupancy proves only that an image belongs to some carousel, not that
+// this collection was published. Repair the old false completion without
+// scheduling an automatic resubmission of the occupied images.
 func normalizeAlreadyUploadedAutomationState(state *automationStateFile) bool {
 	return normalizeAlreadyUploadedAutomationStateInto(state, nil)
 }
@@ -478,6 +476,23 @@ func normalizeAlreadyUploadedAutomationStateInto(state *automationStateFile, cha
 			if entry == nil {
 				continue
 			}
+			if automationStringValue(entry["status"], "") == "completed" &&
+				automationStringValue(entry["stage"], "") == "uploaded" &&
+				n8ImagesAlreadyUploadedError(automationStringValue(entry["publishError"], "")) &&
+				automationNumberValue(entry["comicCarouselId"], 0) <= 0 {
+				entry["status"], entry["stage"] = "failed", "comic_publish"
+				if automationStringValue(entry["textCollectionId"], "") != "" {
+					entry["stage"] = "text_publish"
+				}
+				entry["error"] = entry["publishError"]
+				entry["message"] = "图片已上传，但合集尚未确认：图片被其他合集占用，需核对网络合集"
+				entry["publishState"] = "upload_incomplete"
+				entry["retryRequested"] = false
+				delete(entry, "retryAt")
+				delete(entry, "retryReason")
+				changed, jobChanged, jobTouched = true, true, true
+				continue
+			}
 			if automationStringValue(entry["status"], "") == "completed" {
 				if automationBoolValue(entry["retryRequested"]) || entry["retryAt"] != nil || entry["retryReason"] != nil {
 					delete(entry, "retryRequested")
@@ -488,23 +503,6 @@ func normalizeAlreadyUploadedAutomationStateInto(state *automationStateFile, cha
 				}
 				continue
 			}
-			if automationStringValue(entry["status"], "") != "failed" {
-				continue
-			}
-			errorText := automationStringValue(entry["error"], "")
-			if !n8ImagesAlreadyUploadedError(errorText) {
-				continue
-			}
-			entry["status"] = "completed"
-			entry["stage"] = "uploaded"
-			entry["message"] = "图片已上传完成，N8 已确认图片已占用；已停止重复上传"
-			entry["publishError"] = errorText
-			entry["error"] = ""
-			entry["retryRequested"] = false
-			delete(entry, "retryAt")
-			changed = true
-			jobChanged = true
-			jobTouched = true
 		}
 		if jobChanged {
 			normalizeAutomationJobCounts(job, books)

@@ -4648,15 +4648,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						publishCtx, cancel := context.WithTimeout(ctx, comicPublishStageTimeout)
 						record, publishErr := c.comicPublish(publishCtx, owner, batchID, book.ID, collection, frozenComicSettings(entry, effective))
 						cancel()
-						if publishErr != nil {
-							if n8ImagesAlreadyUploadedError(publishErr.Error()) {
-								entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "uploaded", "图片已上传完成，N8 已确认图片已占用；已停止重复上传", c.now()
-								entry["publishError"], entry["error"], entry["retryRequested"] = publishErr.Error(), "", false
-								delete(entry, "retryAt")
-								persist()
-								continue
-							}
-						}
 						if publishErr != nil || record.Status != "published" {
 							// 图片已上传但合集没建起来：这是可续建状态，不能映射成
 							// completed。放回回补队列，下一轮只复用 imageIDs 建合集。
