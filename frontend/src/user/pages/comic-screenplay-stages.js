@@ -52,6 +52,20 @@ export function comicAssetMediaImage(media, assetId) {
   return items.filter(item=>ready(item)&&(item.targetId===assetId||item.target_id===assetId)).map((item,index)=>({item,index,time:Date.parse(item.createdAt||item.created_at||'')||0})).sort((a,b)=>a.time-b.time||a.index-b.index).at(-1)?.item||null;
 }
 
+// 多视图：每个资产可独立保存正面/侧面/背面/3/4侧视图，主图仍走 selected。
+export function comicAssetViewImage(media, assetId, view = '') {
+  if (!assetId) return null;
+  const normalized = view === 'main' ? '' : String(view || '').trim();
+  const key = `${assetId}|${normalized}`;
+  const items = media?.items || [];
+  const ready = item => item.kind === 'image' && ['succeeded', 'ready', 'completed'].includes(item.status);
+  const selected = items.find(item => item.id === media?.settings?.viewSelected?.[key] && ready(item));
+  if (selected) return selected;
+  return items.filter(item => ready(item) && (item.targetId === assetId || item.target_id === assetId) && (item.view || '') === normalized)
+    .map((item, index) => ({ item, index, time: Date.parse(item.createdAt || item.created_at || '') || 0 }))
+    .sort((a, b) => a.time - b.time || a.index - b.index).at(-1)?.item || null;
+}
+
 export async function positioningServerRequestKey(purpose, itemId, clientKey, cryptoProvider = globalThis.crypto) {
   const digest=await cryptoProvider.subtle.digest('SHA-256',new TextEncoder().encode(`${purpose}:${itemId}:${clientKey}`));
   return 'positioning-'+Array.from(new Uint8Array(digest)).map(value=>value.toString(16).padStart(2,'0')).join('');

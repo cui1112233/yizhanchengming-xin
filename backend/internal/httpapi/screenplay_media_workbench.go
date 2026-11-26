@@ -52,6 +52,7 @@ type screenplayMediaAction struct {
 	Action            string                        `json:"action"`
 	ItemID            string                        `json:"itemId"`
 	TargetID          string                        `json:"targetId"`
+	View              string                        `json:"view"`
 	VoiceID           string                        `json:"voiceId"`
 	Text              string                        `json:"text"`
 	Speed             float64                       `json:"speed"`
@@ -76,6 +77,30 @@ type screenplayMediaSubtitle struct {
 	Text       string `json:"text"`
 	StartMS    int64  `json:"startMs"`
 	DurationMS int64  `json:"durationMs"`
+}
+
+// 多视图只使用稳定键持久化；main 与空值都表示当前主图，兼容旧数据。
+var screenplayAssetViewDirectives = map[string]string{
+	"front":         "视角要求：正面全身视图，角色正对镜头。",
+	"side":          "视角要求：侧面全身视图，角色侧身站立。",
+	"back":          "视角要求：背面全身视图，角色背对镜头。",
+	"three_quarter": "视角要求：三/四侧全身视图，兼顾面部与身体侧面。",
+}
+
+func normalizeScreenplayAssetView(value string) (string, string, error) {
+	view := strings.ToLower(strings.TrimSpace(value))
+	switch view {
+	case "", "main":
+		return "", "", nil
+	case "front", "side", "back", "three_quarter":
+		return view, screenplayAssetViewDirectives[view], nil
+	default:
+		return "", "", fmt.Errorf("%w: 未知的资产视图 %q", screenplay.ErrInvalidArgument, value)
+	}
+}
+
+func screenplayAssetViewKey(targetID, view string) string {
+	return targetID + "|" + view
 }
 
 func (s *ScreenplayMediaWorkbench) resolve(ctx context.Context, actor, id, permission string) (screenplay.Project, error) {
@@ -478,7 +503,24 @@ func (s *ScreenplayMediaWorkbench) action(ctx context.Context, p screenplay.Proj
 		if in.TargetID == "" {
 			return nil, fmt.Errorf("请选择目标资产或镜头")
 		}
-		return s.Media.MutateMedia(ctx, p.OwnerUsername, p.ID, func(v *screenplay.MediaState) error { v.Selected[in.TargetID] = item.ID; return nil })
+		view, _, viewErr := normalizeScreenplayAssetView(in.View)
+		if viewErr != nil {
+			return nil, viewErr
+		}
+		if view != "" && item.TargetID != in.TargetID {
+			return nil, fmt.Errorf("%w: 所选图片不属于目标资产", screenplay.ErrInvalidArgument)
+		}
+		return s.Media.MutateMedia(ctx, p.OwnerUsername, p.ID, func(v *screenplay.MediaState) error {
+			if view == "" {
+				v.Selected[in.TargetID] = item.ID
+				return nil
+			}
+			if v.ViewSelected == nil {
+				v.ViewSelected = map[string]string{}
+			}
+			v.ViewSelected[screenplayAssetViewKey(in.TargetID, view)] = item.ID
+			return nil
+		})
 	case "retry_import":
 		var target screenplay.MediaItem
 		for _, item := range st.Items {
@@ -608,6 +650,11 @@ func (s *ScreenplayMediaWorkbench) generate(ctx context.Context, p screenplay.Pr
 	imageWork := in.Action == "image" || in.Action == "asset_process"
 	imageSize, imageResolution := "", ""
 	imageAspect := screenplay.EffectiveCreativeConfig(p).AspectRatio
+	view, viewDirective, viewErr := normalizeScreenplayAssetView(in.View)
+	if viewErr != nil {
+		return nil, viewErr
+	}
+	in.View = view
 	if e := s.validTarget(ctx, p, in.TargetID); e != nil {
 		return nil, e
 	}
@@ -646,6 +693,15 @@ func (s *ScreenplayMediaWorkbench) generate(ctx context.Context, p screenplay.Pr
 		if err != nil {
 			return nil, err
 		}
+		if viewDirective != "" {
+			in.Prompt = strings.TrimSpace(in.Prompt + "\n\n" + viewDirective)
+		}
+		// 非主视图默认以当前主图为参考，保证角色跨视图一致；显式参考优先。
+		if in.Action == "image" && view != "" && len(in.ReferenceItemIDs) == 0 {
+			if selected := st.Selected[in.TargetID]; selected != "" {
+				in.ReferenceItemIDs = []string{selected}
+			}
+		}
 		imageSize, imageResolution, err = screenplayImageDimensions(p, imageAspect)
 		if err != nil {
 			return nil, err
@@ -662,7 +718,7 @@ func (s *ScreenplayMediaWorkbench) generate(ctx context.Context, p screenplay.Pr
 		}
 		refs = append(refs, item.AssetID)
 	}
-	attempt := screenplay.MediaItem{ID: newAgentID("sp-attempt"), Kind: in.Action, Status: "running", TargetID: in.TargetID, CreatedAt: time.Now().UTC()}
+	attempt := screenplay.MediaItem{ID: newAgentID("sp-attempt"), Kind: in.Action, Status: "running", TargetID: in.TargetID, View: view, CreatedAt: time.Now().UTC()}
 	if in.IdempotencyKey != "" {
 		if len(in.IdempotencyKey) > 256 {
 			return nil, fmt.Errorf("请求标识过长")
@@ -753,7 +809,7 @@ func (s *ScreenplayMediaWorkbench) generate(ctx context.Context, p screenplay.Pr
 					}
 					runErr = e
 					if e == nil {
-						item := screenplay.MediaItem{ID: a.ID, AssetID: a.ID, Kind: "image", Status: "succeeded", TargetID: in.TargetID, CreatedAt: a.CreatedAt}
+						item := screenplay.MediaItem{ID: a.ID, AssetID: a.ID, Kind: "image", Status: "succeeded", TargetID: in.TargetID, View: view, CreatedAt: a.CreatedAt}
 						runErr = s.append(ctx, p, item)
 						result = item
 					}

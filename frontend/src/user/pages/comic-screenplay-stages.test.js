@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { comicAssetMediaImage, positioningImageFingerprint, mergePositioningRecovery, positioningAttemptState, positioningServerRequestKey, positioningRefreshDecision, comicStages, comicStageLocation, comicScriptEpisodes, comicEpisodesDocument, reorderComicEpisodes, comicNextState } from './comic-screenplay-stages.js';
+import { comicAssetMediaImage, comicAssetViewImage, positioningImageFingerprint, mergePositioningRecovery, positioningAttemptState, positioningServerRequestKey, positioningRefreshDecision, comicStages, comicStageLocation, comicScriptEpisodes, comicEpisodesDocument, reorderComicEpisodes, comicNextState } from './comic-screenplay-stages.js';
 import { bindComicPositioningImage, editComicPositioningImage, getComicPositioning, saveComicPositioning, generateComicPositioningImage, analyzeComicPositioning } from '../../shared/api/comicScreenplayWorkflow.js';
 
 test('主入口严格三步，旧偏好定位到对应阶段真实工具而不是多出主入口',()=>{
@@ -29,6 +29,23 @@ test('下一步始终允许查看阶段，但只有真实已存剧本才显示�
  assert.equal(comicNextState('source',{document:{content:'# 第1集\n剧本对白。'}},true).ready,false);
  assert.equal(comicNextState('source',{document:{content:'# 第1集'}}).ready,false);
  assert.equal(comicNextState('storyboard',{}),null);
+});
+
+test('多视图按资产和视图独立选中，失败图忽略且旧主图选择不受影响',()=>{
+ const media={items:[
+  {id:'main',kind:'image',status:'succeeded',targetId:'a'},
+  {id:'front-old',kind:'image',status:'succeeded',targetId:'a',view:'front'},
+  {id:'front-new',kind:'image',status:'succeeded',targetId:'a',view:'front'},
+  {id:'side',kind:'image',status:'failed',targetId:'a',view:'side'},
+  {id:'other',kind:'image',status:'succeeded',targetId:'b',view:'front'}
+ ],settings:{selected:{a:'main'},viewSelected:{'a|front':'front-old'}}};
+ assert.equal(comicAssetMediaImage(media,'a').id,'main');
+ assert.equal(comicAssetViewImage(media,'a','front').id,'front-old');
+ assert.equal(comicAssetViewImage(media,'a','side'),null);
+ assert.equal(comicAssetViewImage(media,'a','main').id,'main');
+ assert.equal(comicAssetViewImage(media,'b','front').id,'other');
+ const unselected={...media,settings:{selected:{a:'main'}}};
+ assert.equal(comicAssetViewImage(unselected,'a','front').id,'front-new');
 });
 
 test('站位真实接口保存独立修订号与顺序，图片请求携幂等键，分析可取消',async()=>{

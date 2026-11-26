@@ -24,6 +24,7 @@ type MediaItem struct {
 	AssetID          string    `json:"assetId,omitempty"`
 	ShotID           string    `json:"shotId,omitempty"`
 	TargetID         string    `json:"targetId,omitempty"`
+	View             string    `json:"view,omitempty"`
 	Error            string    `json:"error,omitempty"`
 	ProviderID       string    `json:"providerId,omitempty"`
 	CreatedAt        time.Time `json:"createdAt"`
@@ -37,6 +38,7 @@ type MediaState struct {
 	Revision      int64                     `json:"revision"`
 	Items         []MediaItem               `json:"items"`
 	Selected      map[string]string         `json:"selected"`
+	ViewSelected  map[string]string         `json:"viewSelected,omitempty"`
 	Voices        map[string]string         `json:"voices"`
 }
 type MediaStore interface {
