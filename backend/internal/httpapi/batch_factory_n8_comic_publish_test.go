@@ -177,7 +177,7 @@ func TestN8ComicPublishRouteUsesCollectionMainImagesAndServerNamingRule(t *testi
 	if response.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
-	if client.request.Name != "崔家铭1026-第一本" || client.request.ProducerAdminName != "崔家铭" || client.request.AudioCategoryID != 3 {
+	if client.request.Name != "AIGC-崔家铭1026-第一本" || client.request.ProducerAdminName != "崔家铭" || client.request.AudioCategoryID != 3 {
 		t.Fatalf("request=%+v", client.request)
 	}
 	if !reflect.DeepEqual(client.request.WorkIDs, []int64{2001, 2002}) || len(client.request.Images) != 2 {
@@ -189,7 +189,7 @@ func TestN8ComicPublishRouteUsesCollectionMainImagesAndServerNamingRule(t *testi
 	result := decodeBody[struct {
 		Publish N8ComicPublishRecord `json:"publish"`
 	}](t, response).Publish
-	if result.CarouselID != 456 || result.Name != "崔家铭1026-第一本" || result.Status != "published" {
+	if result.CarouselID != 456 || result.Name != "AIGC-崔家铭1026-第一本" || result.Status != "published" {
 		t.Fatalf("publish=%+v", result)
 	}
 
@@ -199,7 +199,7 @@ func TestN8ComicPublishRouteUsesCollectionMainImagesAndServerNamingRule(t *testi
 	if repeat.Code != http.StatusOK {
 		t.Fatalf("repeat status=%d body=%s", repeat.Code, repeat.Body.String())
 	}
-	if client.request.Name != "崔家铭1026-第一本" {
+	if client.request.Name != "AIGC-崔家铭1026-第一本" {
 		t.Fatal("repeat publish changed client request")
 	}
 	if client.calls != 1 {

@@ -1066,7 +1066,7 @@ func n8ComicCollectionName(producer, title string, now time.Time) (string, error
 		return "", batchfactoryv11.ErrInvalid
 	}
 	chinaTime := now.In(time.FixedZone("CST", 8*60*60))
-	prefix := producer + chinaTime.Format("0102") + "-"
+	prefix := "AIGC-" + producer + chinaTime.Format("0102") + "-"
 	prefixRunes := []rune(prefix)
 	if len(prefixRunes) >= 64 {
 		return "", fmt.Errorf("制作者账号过长，无法生成漫画合集名称")
