@@ -292,6 +292,12 @@ func runComicPageWork(ctx context.Context, work []comicPageWorkItem, concurrency
 				return
 			}
 			if err := generate(ctx, item); err != nil {
+				// A live page worker owns this request. Leave it out of the
+				// failure ledger so the book's settle/refill path can collect its
+				// result instead of exhausting retries against the same lease.
+				if comicPageGenerationInFlightError(err) {
+					return
+				}
 				disposition := classifyAutomationFailure(err, "comic_images")
 				resultMu.Lock()
 				failures = append(failures, comicPageFailure{
