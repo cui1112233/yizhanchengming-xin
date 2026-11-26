@@ -362,7 +362,11 @@ func (c *Controller) Acquire(ctx context.Context, r Request) (*Lease, error) {
 			go l.renew()
 			return l, nil
 		}
-		if e = waitCapacityPoll(ctx); e != nil {
+		wait := waitPoll
+		if v.Waiting > 64 {
+			wait = waitCapacityPoll
+		}
+		if e = wait(ctx); e != nil {
 			cleanup()
 			return nil, e
 		}

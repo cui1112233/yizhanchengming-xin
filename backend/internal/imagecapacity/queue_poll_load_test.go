@@ -18,7 +18,7 @@ func TestQueuedImagesBoundRedisPollingAndCancelPromptly(t *testing.T) {
 		if args[7] == "acquire" {
 			attempts.Add(1)
 		}
-		return `{"granted":0}`, nil
+		return `{"granted":0,"waiting":256}`, nil
 	}, "load-test")
 	ctx, cancel := context.WithTimeout(context.Background(), 700*time.Millisecond)
 	defer cancel()
