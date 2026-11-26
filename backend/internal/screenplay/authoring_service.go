@@ -40,10 +40,17 @@ type MemberGrant struct {
 	Edit     bool   `json:"edit"`
 	Generate bool   `json:"generate"`
 }
+type AssistantToolRun struct {
+	Name    string `json:"name"`
+	OK      bool   `json:"ok"`
+	Summary string `json:"summary,omitempty"`
+}
 type AssistantMessage struct {
-	Role        string             `json:"role"`
-	Content     string             `json:"content"`
+	Role        string              `json:"role"`
+	Content     string              `json:"content"`
 	Suggestions []AssistantNavigate `json:"suggestions,omitempty"`
+	// Tools 记录本轮助手实际读取过的只读工具，供前端展示；不改变作品数据。
+	Tools []AssistantToolRun `json:"tools,omitempty"`
 	// Kind 仅用于对话智能展示（question=助手追问 / compacted=历史折叠占位），
 	// 空值表示普通消息；omitempty 保证旧数据与旧客户端完全兼容。
 	Kind string `json:"kind,omitempty"`

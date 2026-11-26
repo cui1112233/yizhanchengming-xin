@@ -50,6 +50,7 @@
 .comic-assistant-question-tip{display:block;margin-top:8px;color:var(--text-secondary)}
 .comic-assistant-messages .comic-assistant-compacted{opacity:.6;font-size:12px;background:transparent;border-style:dashed}
 .comic-assistant-suggestions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.comic-assistant-tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .comic-assistant-proposal pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;font:inherit;line-height:1.8;padding:10px;background:var(--surface-input);border-radius:8px}
 .comic-display-fields{display:grid;gap:18px;margin:16px 0}
 .comic-display-fields label{display:flex;justify-content:space-between;align-items:center;gap:18px}

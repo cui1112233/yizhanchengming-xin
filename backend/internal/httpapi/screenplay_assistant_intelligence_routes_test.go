@@ -53,6 +53,47 @@ func TestAuthoringAssistantQuestionAndSuggestions(t *testing.T) {
 	}
 }
 
+// 助手只读工具：先申请 storyboard_failures，再带着失败场景结果回答；
+// 不触发第二次计费以外的请求，也不修改作品。
+func TestAuthoringAssistantReadsStoryboardFailuresOnce(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	s := screenplay.NewMemoryStore()
+	_, _ = s.CreateProject(ctx, screenplay.Project{ID: "p", OwnerUsername: "alice", SourceText: "原文"})
+	_, _ = s.MutateStoryboardGenerations(ctx, "alice", "p", func(state *screenplay.StoryboardGenerationState) error {
+		state.Attempts = map[string]*screenplay.StoryboardGenerationAttempt{"k": {RequestKey: "k", Status: "partial", CreatedAt: now, Episodes: map[int]*screenplay.StoryboardGenerationEpisode{
+			1: {EpisodeNo: 1, Status: "failed", Calls: map[string]screenplay.StoryboardGenerationCall{"storyboard_scene_2": {Status: "invalid", Error: "坏 JSON"}}},
+		}}}
+		return nil
+	})
+	repo := screenplay.NewMemoryAuthoringRepository()
+	calls := 0
+	var secondUser string
+	mux := http.NewServeMux()
+	RegisterScreenplayAuthoringRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, s, repo,
+		func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error) {
+			return screenplayProviderFunc(func(_ context.Context, r batchfactoryv11.TextCompletionRequest) (string, error) {
+				calls++
+				if calls == 1 {
+					return `{"reply":"正在核对失败场景","tool":"storyboard_failures","actions":[],"suggestions":[]}`, nil
+				}
+				secondUser = r.UserPrompt
+				return `{"reply":"最近失败的是第1集第2场","actions":[],"suggestions":[]}`, nil
+			}), nil
+		})
+	res := signedJSONRequest(t, mux, now, "alice", "POST", "/api/comic-screenplays/projects/p/assistant/chat", map[string]any{"expected_revision": 0, "message": "分镜哪里失败了"})
+	if res.Code != 200 {
+		t.Fatal(res.Code, res.Body.String())
+	}
+	if calls != 2 || !strings.Contains(secondUser, "tool_result") || !strings.Contains(secondUser, "failed_scenes") {
+		t.Fatalf("工具结果未进入第二轮: calls=%d user=%s", calls, secondUser)
+	}
+	st, _ := repo.Load(ctx, "alice", "p")
+	if len(st.Messages) != 2 || len(st.Messages[1].Tools) != 1 || !st.Messages[1].Tools[0].OK || !strings.Contains(st.Messages[1].Tools[0].Summary, "第1集第2场") {
+		t.Fatalf("工具记录未落库: %#v", st.Messages)
+	}
+}
+
 // 会话超长时只压缩注入上下文与持久化消息，不改作品数据、不产生 proposal。
 func TestAuthoringAssistantCompactsLongConversation(t *testing.T) {
 	ctx := context.Background()

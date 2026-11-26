@@ -9,9 +9,80 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/screenplay"
+	"sort"
 	"strconv"
 	"strings"
 )
+
+const assistantToolPrompt = "\n\n【只读工具】上下文中没有的实时状态可以申请一次：storyboard_failures（最近一次分镜生成失败集与失败场次）。需要时只返回 {\"tool\":\"storyboard_failures\",\"reply\":\"正在核对\"}；工具结果会在下一轮提供，不会修改作品或启动生产。"
+
+type assistantWire struct {
+	Reply       string                       `json:"reply"`
+	Summary     string                       `json:"summary"`
+	Actions     []screenplay.AuthoringAction `json:"actions"`
+	Question    string                       `json:"question"`
+	Suggestions []assistantSuggestion        `json:"suggestions"`
+	Tool        string                       `json:"tool"`
+}
+
+// assistantReadStoryboardFailures 是助手唯一的原生只读工具：读取最近一次
+// 分镜生成尝试的失败场次，不触发新请求、不计费、不改作品。
+func assistantReadStoryboardFailures(ctx context.Context, store screenplay.Store, owner, projectID string) (screenplay.AssistantToolRun, map[string]any) {
+	run := screenplay.AssistantToolRun{Name: "storyboard_failures", OK: true}
+	generations, ok := store.(screenplay.StoryboardGenerationStore)
+	if !ok {
+		run.OK, run.Summary = false, "当前存储不支持读取分镜尝试"
+		return run, map[string]any{"error": run.Summary}
+	}
+	state, err := generations.LoadStoryboardGenerations(ctx, owner, projectID)
+	if err != nil {
+		run.OK, run.Summary = false, "分镜尝试读取失败"
+		return run, map[string]any{"error": err.Error()}
+	}
+	var latest *screenplay.StoryboardGenerationAttempt
+	for _, attempt := range state.Attempts {
+		if attempt != nil && (latest == nil || attempt.CreatedAt.After(latest.CreatedAt)) {
+			latest = attempt
+		}
+	}
+	if latest == nil {
+		run.Summary = "还没有分镜生成记录"
+		return run, map[string]any{"attempts": 0, "failed_scenes": []any{}}
+	}
+	failures := []map[string]any{}
+	for episodeNo, episode := range latest.Episodes {
+		if episode == nil {
+			continue
+		}
+		for phase, call := range episode.Calls {
+			if call.Status != "invalid" && call.Status != "failed" {
+				continue
+			}
+			if !strings.HasPrefix(phase, "storyboard_scene_") {
+				continue
+			}
+			scene, _ := strconv.Atoi(strings.TrimPrefix(phase, "storyboard_scene_"))
+			failures = append(failures, map[string]any{"episode": episodeNo, "scene": scene, "error": call.Error})
+		}
+	}
+	sort.Slice(failures, func(i, j int) bool {
+		left, right := failures[i], failures[j]
+		if left["episode"] != right["episode"] {
+			return left["episode"].(int) < right["episode"].(int)
+		}
+		return left["scene"].(int) < right["scene"].(int)
+	})
+	if len(failures) == 0 {
+		run.Summary = "最近一次分镜没有失败场景"
+	} else {
+		parts := make([]string, 0, len(failures))
+		for _, failure := range failures {
+			parts = append(parts, fmt.Sprintf("第%d集第%d场", failure["episode"], failure["scene"]))
+		}
+		run.Summary = "最近一次分镜失败场景：" + strings.Join(parts, "、")
+	}
+	return run, map[string]any{"request_key": latest.RequestKey, "status": latest.Status, "failed_scenes": failures}
+}
 
 // ResolveScreenplayAccess never returns an owner's identity before checking a specific right.
 func ResolveScreenplayAccess(ctx context.Context, store screenplay.Store, repo screenplay.AuthoringRepository, actor, id, right string) (string, error) {
@@ -21,6 +92,7 @@ func ScreenplayProjectArchived(ctx context.Context, repo screenplay.AuthoringRep
 	st, e := repo.Load(ctx, o, id)
 	return e == nil && st.Archived
 }
+
 // mediaStore 为可选：作品助手用它生成链路能力清单（只读媒体状态）。
 // 用可变参数是为了兼容既有调用点（测试与 workflow 注册），未提供时媒体环节按未就绪展示。
 func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, repo screenplay.AuthoringRepository, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), mediaStore ...screenplay.MediaStore) {
@@ -297,7 +369,7 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 					}
 					contextData["capabilities"] = caps
 					contextData["coverage"] = cov
-					system += "\n\n" + screenplay.FormatCapabilitiesForPrompt(caps, cov)
+					system += "\n\n" + screenplay.FormatCapabilitiesForPrompt(caps, cov) + assistantToolPrompt
 				}
 				switch path {
 				case "chapters/plan":
@@ -359,15 +431,30 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 						return e
 					}
 				default:
-					var parsed struct {
-						Reply       string                       `json:"reply"`
-						Summary     string                       `json:"summary"`
-						Actions     []screenplay.AuthoringAction `json:"actions"`
-						Question    string                       `json:"question"`
-						Suggestions []assistantSuggestion        `json:"suggestions"`
-					}
+					var parsed assistantWire
 					if json.Unmarshal([]byte(raw), &parsed) != nil || strings.TrimSpace(parsed.Reply) == "" {
 						return screenplay.ErrAIInvalidJSON
+					}
+					toolRuns := []screenplay.AssistantToolRun{}
+					if strings.TrimSpace(parsed.Tool) != "" {
+						if parsed.Tool != "storyboard_failures" {
+							return fmt.Errorf("%w: 不支持的只读工具 %s", screenplay.ErrInvalidArgument, parsed.Tool)
+						}
+						run, detail := assistantReadStoryboardFailures(r.Context(), store, o, st.ProjectID)
+						toolRuns = append(toolRuns, run)
+						contextData["tool_result"] = detail
+						payload, _ := json.Marshal(contextData)
+						retry, retryErr := (screenplayTextGenerator{owner: o, resolver: resolver}).Generate(r.Context(), screenplay.TextRequest{Model: project.ModelID, SystemPrompt: system, UserPrompt: string(payload) + "\n用户要求：" + user, JSONResponse: true, MaxOutputTokens: 16000, Temperature: 0.4})
+						if retryErr != nil {
+							return retryErr
+						}
+						raw = strings.TrimSpace(retry.Content)
+						raw = strings.TrimPrefix(raw, "```json")
+						raw = strings.TrimSuffix(raw, "```")
+						parsed = assistantWire{}
+						if json.Unmarshal([]byte(raw), &parsed) != nil || strings.TrimSpace(parsed.Reply) == "" {
+							return screenplay.ErrAIInvalidJSON
+						}
 					}
 					if len(parsed.Actions) > 0 {
 						if len(parsed.Actions) > 1 {
@@ -379,17 +466,17 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 						st.Proposals = append(st.Proposals, screenplay.AssistantProposal{ID: newAgentID("proposal"), Summary: parsed.Summary, Actions: parsed.Actions, Status: "pending", Revision: st.Revision + 1})
 					}
 					assistantContent := parsed.Reply
-					content := assistantContent
+					reply := screenplay.AssistantMessage{Role: "assistant", Content: assistantContent, Tools: toolRuns}
 					if strings.TrimSpace(parsed.Question) != "" {
 						// 主动追问落为独立消息，前端据此渲染追问卡片；不改任何作品数据。
 						st.Messages = append(st.Messages,
 							screenplay.AssistantMessage{Role: "user", Content: user},
-							screenplay.AssistantMessage{Role: "assistant", Content: assistantContent},
+							reply,
 							screenplay.AssistantMessage{Role: "assistant", Content: strings.TrimSpace(parsed.Question), Kind: screenplay.AssistantMessageKindQuestion})
 					} else {
 						st.Messages = append(st.Messages,
 							screenplay.AssistantMessage{Role: "user", Content: user},
-							screenplay.AssistantMessage{Role: "assistant", Content: content})
+							reply)
 					}
 					// 导航建议：校验入口标识后附加到最近一条普通助手消息，供前端点击跳转。
 					if safe := sanitizeAssistantSuggestions(parsed.Suggestions); len(safe) > 0 {
