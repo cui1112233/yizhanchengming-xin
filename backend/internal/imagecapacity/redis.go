@@ -362,7 +362,7 @@ func (c *Controller) Acquire(ctx context.Context, r Request) (*Lease, error) {
 			go l.renew()
 			return l, nil
 		}
-		if e = waitPoll(ctx); e != nil {
+		if e = waitCapacityPoll(ctx); e != nil {
 			cleanup()
 			return nil, e
 		}
@@ -412,4 +412,19 @@ func (l *Lease) Finish(o Outcome) {
 		defer cancel()
 		l.c.transition(ctx, "finish", l.p, l.r, l.token, o)
 	})
+}
+
+// Large batches can leave hundreds of images waiting for capacity. Polling the
+// full Redis queue every 250ms per waiter makes admission itself overload the
+// shared application/API server. Keep configuration-lock polling fast, but let
+// queued generation wait 1.5-2 seconds, with immediate context cancellation.
+func waitCapacityPoll(ctx context.Context) error {
+	t := time.NewTimer(time.Duration(1500+mathrand.IntN(500)) * time.Millisecond)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
