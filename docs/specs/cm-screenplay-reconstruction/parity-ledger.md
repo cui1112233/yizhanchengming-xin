@@ -1,6 +1,6 @@
 # 原版逐项复刻验收台账
 
-更新时间：2026-11-15T05:02:35.743621+00:00。当前任务：**G11 资产检查后台持续、离页、关闭重开续看同一任务**。
+更新时间：2026-11-26。当前任务：**G29–G30 Agent 链路（只读工具已落地，全 Skills 未复刻）**。
 
 保留36组、695处交互位置、330处接口调用位置。当前完整对照通过 **0/36组**；此数只表示已有台账裁定，不是功能完成率。4组本地数据闭环不能当作原版复刻完成。
 
@@ -38,11 +38,11 @@
 | G10 | 资产 | 批量遗漏资产检查 | partial | unverified |
 | G11 | 资产 | 检查任务后台持续、关闭重开续看 | partial | unverified |
 | G12 | 资产 | 跨项目普通资产库、导入到当前库 | partial | unverified |
-| G13 | 资产 | 多视图生成与各视图独立管理 | partial | unverified |
+| G13 | 资产 | 多视图生成与各视图独立管理 | implemented | unverified |
 | G14 | 图片 | 自己模型、生图/改图、参考图和选中图 | implemented | unverified |
 | G15 | 图片 | 批量图片、单项失败恢复 | partial | unverified |
 | G16 | 站位 | 新增编辑、分析、参考资产、图片保存 | partial | unverified |
-| G17 | 站位 | 画布标注、编辑图片、保存标注PNG | partial | unverified |
+| G17 | 站位 | 画布标注、编辑图片、保存标注PNG | implemented | unverified |
 | G18 | 音色 | 上传、真实库选择、试听与保存 | partial | unverified |
 | G19 | 分镜设置 | 收藏/最近/前缀、四密度和两个开关 | partial | unverified |
 | G20 | 分镜规划 | 新规划/已有规划/无规划、来源绑定 | partial | unverified |
@@ -54,9 +54,9 @@
 | G26 | 分镜 | 原文→场景自动识别→逐场景生成 | partial | unverified |
 | G27 | 分镜编辑 | 新增编辑、拆分合并、批量时长 | partial | unverified |
 | G28 | 分镜检查 | AI衔接Agent独立报告与后续修正 | partial | unverified |
-| G29 | Agent | 预填草稿、发送、方案应用 | partial | unverified |
+| G29 | Agent | 预填草稿、发送、方案应用 | implemented | unverified |
 | G30 | Agent | 原版全Skills、原生工具、复杂调度 | partial | unverified |
-| G31 | 媒体 | 图片/音频/视频/字幕面板及文件保存 | partial | unverified |
+| G31 | 媒体 | 图片/音频/视频/字幕面板及文件保存 | implemented | unverified |
 | G32 | 媒体 | TTS、ASR、视频生成轮询与失败处理 | implemented | unverified |
 | G33 | 交付 | 时间线建立并进入AI-CUT | partial | unverified |
 | G34 | 交付 | 媒体包、剪映兼容草稿与成片下载 | partial | unverified |
@@ -95,3 +95,6 @@
 
 
 2026-11-15 207e2078/775807c5：参考音频选择/单路试听/停止/结束/迟到隔离/随应用保存接通；原PauseOutline、20px音符、虚线选择区和空音频禁用补齐。实际27HTTP+MySQL、5种真实格式保存读取与Chrome静音播放通过；最终4001 PID11940重启保留档案和音频、4JS/CSS字节匹配。原native/完整视觉及其他库功能未通过，G12保持partial。 完整对照通过仍0/36。
+
+
+2026-11-26 ca2a5b79：G13 资产多视图生成与各视图独立选中、G17 站位画布文字标注并随 PNG 保存、G31 媒体逐项鉴权下载与字幕 SRT 导出已实现并本地 4001 烟测；G29 预填草稿/发送/方案应用完整；G30 已落地只读原生工具 storyboard_failures 与一轮工具调度，原版全 Skills 与复杂调度仍未复刻，保持 partial。以上均为本地实现与单元测试证据，未完成原版逐项对照，完整对照通过仍0/36。
