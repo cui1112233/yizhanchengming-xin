@@ -29,3 +29,17 @@ export function comicScheduleRequest(value,now=Date.now()){
  const at=new Date(value||'');if(!Number.isFinite(at.getTime())||at.getTime()<=now)throw new Error('请选择未来的定时制作时间');return {run_at:at.toISOString()};
 }
 export function comicLocalDateTime(value){const at=new Date(value||'');if(!Number.isFinite(at.getTime()))return '';return new Date(at.getTime()-at.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+
+function srtTime(value){
+  const total=Math.max(0,Math.round(Number(value)||0));
+  const ms=total%1000, seconds=Math.floor(total/1000)%60, minutes=Math.floor(total/60000)%60, hours=Math.floor(total/3600000);
+  return `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')},${String(ms).padStart(3,'0')}`;
+}
+
+// 字幕导出与时间线保持同一毫秒口径；空文本行跳过并重新编号。
+export function comicSubtitleSRT(subtitles=[]){
+  return subtitles.filter(line=>String(line?.text||'').trim()).map((line,index)=>{
+    const start=Math.max(0,Number(line.startMs)||0), duration=Math.max(0,Number(line.durationMs)||0);
+    return `${index+1}\n${srtTime(start)} --> ${srtTime(start+duration)}\n${String(line.text).trim()}\n`;
+  }).join('\n');
+}

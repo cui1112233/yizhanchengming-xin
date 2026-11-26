@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { comicProductionView,comicScheduleRequest,comicProductionShotKey, buildComicTimeline, safeComicMediaUrl } from './comic-screenplay-workflow.js';
+import { comicProductionView,comicScheduleRequest,comicProductionShotKey, buildComicTimeline, safeComicMediaUrl, comicSubtitleSRT } from './comic-screenplay-workflow.js';
 test('镜头生成结束与可交付成片明确区分',()=>{
   assert.equal(comicProductionView({status:'clips_ready'}).deliveryComplete,false);
   assert.equal(comicProductionView({status:'clips_ready'}).label,'镜头生成完成，待编辑与合成');
@@ -15,6 +15,10 @@ test('时间线按顺序编排视频，音频保留自己的起始时间',()=>{
   assert.deepEqual(buildComicTimeline([{itemId:'a',durationMs:3000,startMs:2000,order:1},{itemId:'v',durationMs:4000,order:0}],items).map(item=>[item.itemId,item.startMs]),[['v',0],['a',2000]]);
   assert.throws(()=>buildComicTimeline([{itemId:'x',durationMs:1000}],items),/素材/);
   assert.throws(()=>buildComicTimeline([{itemId:'v',durationMs:0}],items),/时长/);
+});
+test('字幕导出为 SRT，毫秒与时间线一致且跳过空行',()=>{
+  assert.equal(comicSubtitleSRT([{text:'开场',startMs:0,durationMs:1500},{text:'  ',startMs:2000,durationMs:1000},{text:'第二句',startMs:3723004,durationMs:2500}]),'1\n00:00:00,000 --> 00:00:01,500\n开场\n\n2\n01:02:03,004 --> 01:02:05,504\n第二句\n');
+  assert.equal(comicSubtitleSRT([]),'');
 });
 test('成片状态必须有第八步真实交付地址',()=>{
   assert.equal(comicProductionView({status:'completed'}).deliveryComplete,false);
